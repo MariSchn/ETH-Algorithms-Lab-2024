@@ -305,7 +305,7 @@ if __name__ == "__main__":
     **Key Responsibilities:**
 
     1.  **Adhere Strictly to Output Format:** The final output *must* follow the `OUTPUT_FORMAT` precisely.
-    2.  **Problem Description:** Extract the problem name from the problem description or draft. Populate the "Problem Description" section using *only* the information from the `<problem_description>`, as detailed in the `OUTPUT_FORMAT`.
+    2.  **Problem Description:** Extract the problem name from the problem description or draft. Populate the "Problem Description" section using *only* the information from the `<problem_description>`, as detailed in the `OUTPUT_FORMAT`. While the problem description mentions that the problem consists of multiple test cases, never mention this. The focus should always be on the problem as an algorithmic challenge, not on the test cases or input/output format.
     3.  **Hints:** Develop "Hints" as specified in the `OUTPUT_FORMAT`. These should be original and derived from your understanding of the problem and common solution paths.
     4.  **Solutions:**
         *   Carefully review and polish the solution explanations and code provided in the `<draft_markdown>`.
