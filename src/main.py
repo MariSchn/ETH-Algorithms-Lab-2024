@@ -342,6 +342,7 @@ if __name__ == "__main__":
         # Setup output paths
         output_dir = f"../Week_{page['week']:02d}/{page['title'].replace(' ', '_')}"
         output_path = os.path.join(output_dir, "README.md")
+        solution_path = os.path.join(output_dir, "solution.cpp")
 
         # Check if the output file already exists
         if os.path.exists(output_path):
@@ -364,12 +365,17 @@ if __name__ == "__main__":
             contents=prompt,
         )
 
+        # Post-process the response
         response_text = response.text
         if response_text.startswith("```markdown"):
             response_text = response_text[len("```markdown"):].lstrip()
-        if response_text.endswith("```"):
-            response_text = response_text[:-3].rstrip()
-
+    
+        # Save the generated content to the output file
         os.makedirs(output_dir, exist_ok=True)
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(response_text)
+
+        # Save the final solution code to a separate file
+        solution_code = response_text.split("```c++")[-1].split("```")[0].strip() if "```c++" in response_text else ""
+        with open(solution_path, "w", encoding="utf-8") as f:
+            f.write(solution_code)
