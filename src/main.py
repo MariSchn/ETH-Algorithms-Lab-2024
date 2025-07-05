@@ -1,6 +1,7 @@
 from dotenv import load_dotenv
 from tqdm import tqdm
 import os
+import argparse
 
 from notion_client import Client
 import requests
@@ -9,7 +10,18 @@ import io
 import json
 
 from google import genai
+from google.genai import types
 
+
+def parse_arguments():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="gemma-3-27b-it",
+        help="The model to use for generating content. See https://ai.google.dev/gemini-api/docs/models. Default is 'gemma-3-27b-it'.",
+    )
+    return parser.parse_args()
 
 def get_database(database_id: str, client: Client) -> dict:
     """
@@ -154,13 +166,16 @@ def get_pdf_text(url: str) -> str:
     return "\n\n".join(pdf)
 
 if __name__ == "__main__":
+    # ===== PARSE ARGUMENTS =====
+    args = parse_arguments()
+
     # ===== SETUP CLIENTS AND FETCH DATABASE =====
-    load_dotenv(".env.local")
+    load_dotenv()
     NOTION_CLIENT = Client(auth=os.getenv("NOTION_INTEGRATION_TOKEN"))
     DATABASE = get_database(os.getenv("NOTION_DATABASE_ID"), NOTION_CLIENT)
 
     GOOGLE_CLIENT = genai.Client(api_key=os.getenv("GOOGLE_GENAI_API_KEY"))
-    MODEL = "gemma-3-27b-it"
+    MODEL = args.model
 
     # ===== PARSE PAGES FROM DATABASE ======
     # * This is highly dependent on the structure of the Notion database.
@@ -227,105 +242,95 @@ if __name__ == "__main__":
 
     # ===== LLM REVISION =====
     # Prompt setup
-    INPUT_FORMAT = """
+    INPUT_TEMPLATE = """
     # Problem Description
-    <problem_description>
+    <PROBLEM_DESCRIPTION>
     # End of Problem Description
 
     # Markdown Document Draft
-    <draft_markdown>
+    <DRAFT_MARKDOWN>
     # End of Draft
     """
-    OUTPUT_FORMAT = """
-    # <Problem Name>
+    OUTPUT_TEMPLATE = """
+    # <PROBLEM_NAME_HERE>
 
     ## 📝 Problem Description
 
-    **CRITICAL RULE: You must describe the problem using only the terms and entities mentioned in the description. DO NOT classify the problem or use abstract algorithmic terminology.** The goal is to present the problem as it appears to a student *before* they have started analyzing it.
-
-    **FORBIDDEN WORDS for this section include, but are not limited to: `graph`, `node`, `edge`, `vertex`, `DP`, `dynamic programming`, `tree`, `delaunay triangulation`, `binary search tree`, `heap`, `priority queue`, `greedy`, `divide and conquer` `brute force`, `geometry`.**
-    S
-    Based *only* on the <problem_description>, summarize the problem. Abstract away any narrative or story elements. Focus on clearly and concisely defining:
-    1. The input (what is given in the problem).
-    2. The output (what needs to be computed or produced).
-    3. Use mathematical notation with "$" for variables and constraints where appropriate.
-
-    Ensure this description is faithful to the formal problem definition in the problem description and easy to understand.
+    <PROBLEM_SUMMARY_HERE>
 
     ## 💡 Hints
 
-    *Provide 2-3 progressively helpful hints that guide a student toward the solution(s). Hints should not give away the full solution but empower the student to discover it. Make sure to place the hints in the <details> tags so they can be expanded by the student.
-    * Hint #1: Subtle, prompting initial thought, a relevant concept, or a small observation.
-    * Hint #2: More direct, suggesting a possible technique, data structure, or a way to simplify the problem.
-    * Hint #3: Reveals a key insight, a critical step in the solution approach, or a common pitfall to avoid.*
-
-    <details><summary>Hint #1</summary>
-
-    </details>
-    <details><summary>Hint #2</summary>
-
-    </details>
-    <details><summary>Hint #3</summary>
-
-    </details>
+    <ALL_HINTS_HERE>
 
     ## ✨ Solutions
 
-    * Polish and clarify the draft solution(s) provided in `<draft_markdown>`. Improve the writing style, fix grammar or formatting issues, and ensure the logic is easy to follow. Preserve the author's original thought process and code structure as much as reasonably possible. Do not rewrite entire solutions from scratch unless the draft is exceptionally minimal or completely off-topic.
-    * All of the solutions given here are correct, you should mainly focus on polishing the writing style, fixing grammar or formatting issues, and ensuring the logic and explanation is easy to follow for students who have not solved the problem.
-    * When explaining the solutions, skip trivial steps like "Read input", "Output", or "Initialize variables". Focus on the core logic and reasoning behind the solution.
-    * The code should be placed at the end of the solution explanation.
-
-    <details><summary>First Solution (Test Set 1)</summary>
-
-    <!-- Solution draft will be here — polish it but keep the structure -->
-
-    </details>
-
-    <!-- Repeat the above block for each distinct solution approach present in the draft -->
-
-    <details><summary>Final Solution</summary>
-
-    <!-- Solution draft will be here — polish it but keep the structure -->
-
-    </details>
+    <ALL_POLISHED_SOLUTIONS_HERE>
 
     ## ⚡ Result
-
-    *Leave this section entirely empty. The student will fill in the result after submitting their solution.*
 
     ```plaintext
 
     ```
     """
-    SYSTEM_PROMPT = f"""You are an expert technical writer specializing in competitive programming, algorithms, and data structures. Your audience is university students in an Algorithms Lab course (e.g., at ETH Zurich), so your explanations must be educational, clear, precise, and accessible, even to those unfamiliar with the specific problem.
+    SYSTEM_PROMPT = f"""
+    <PROMPT_SETUP>
+    You are an expert technical writer for a university-level Algorithms Lab course. Your audience is students learning about competitive programming, algorithms, and data structures.
 
-    Your primary task is to revise and complete a markdown document that presents a problem and its solution(s). You will be given a problem description and a draft markdown document.
+    Your task is to create a definitive problem walkthrough document. This document serves as the primary educational resource for students after they've attempted the problem. It must not only provide answers but also guide them through the thinking process, from basic observations to the optimal solution.
+    </PROMPT_SETUP>
 
-    **Key Responsibilities:**
+    <INSTRUCTIONS>
+    You must follow these instructions meticulously.
 
-    1.  **Adhere Strictly to Output Format:** The final output *must* follow the `OUTPUT_FORMAT` precisely.
-    2.  **Problem Description:** Extract the problem name from the problem description or draft. Populate the "Problem Description" section using *only* the information from the `<problem_description>`, as detailed in the `OUTPUT_FORMAT`. While the problem description mentions that the problem consists of multiple test cases, never mention this. The focus should always be on the problem as an algorithmic challenge, not on the test cases or input/output format.
-    3.  **Hints:** Develop "Hints" as specified in the `OUTPUT_FORMAT`. These should be original and derived from your understanding of the problem and common solution paths.
-    4.  **Solutions:**
-        *   Carefully review and polish the solution explanations and code provided in the `<draft_markdown>`.
-        *   Focus on improving clarity, correctness, grammar, and formatting.
-        *   Preserve the original author's approach and thought process.
-        *   Correct minor logical in the draft.
-        *   If a draft solution has significant flaws, explain these flaws clearly while still presenting the polished (but flawed) original attempt, as per `OUTPUT_FORMAT` guidelines.
-        *   Ensure code is well-commented if the draft lacks comments or if comments would significantly aid understanding.
-    5.  **Tone and Style:** Maintain a formal, educational, and encouraging tone. Write in clear, concise English.
-    6.  **Completeness:** Ensure all sections of the `OUTPUT_FORMAT` are addressed. If the draft is missing content for a section you are asked to polish (e.g., a solution explanation is very brief), elaborate on it based on the provided code and problem, maintaining the spirit of the draft's approach.
+    ### 1. General Rules
+    - **Adhere to the Template:** Your final output must strictly follow the structure defined in the `<OUTPUT_TEMPLATE>`. You will populate the placeholders like `<ALL_HINTS_HERE>` by generating the necessary markdown blocks.
+    - **Tone and Style:** Maintain a formal, educational, and encouraging tone. Write in clear, concise English.
+    - **Completeness:** Ensure all required sections of the `<OUTPUT_TEMPLATE>` are populated, except for the "Result" section.
+    - **Formatting:** Use proper markdown syntax for headings, code blocks, and lists. Use LaTeX notation with '$' for mathematical variables and expressions. Break down long texts into reasonably small paragraphs with (sub)headings where appropriate. Also use italic for emphasis and bold for important points.
 
-    # BEGIN INPUT FORMAT
-    {INPUT_FORMAT}
-    # END INPUT FORMAT
+    ### 2. Instructions for "Problem Description" Section
+    - **Extract Problem Name:** Determine the problem's name from the input and place it in the `<PROBLEM_NAME_HERE>` placeholder.
+    - **CRITICAL RULE:** Summarize the problem based *only* on the `<PROBLEM_DESCRIPTION>`. Do not state what algorithmic technique or which algorithm is used in the solution. The goal is to present the problem as it appears to a student *before* they have started trying to solve it.
+    - **FORBIDDEN WORDS for this section include, but are not limited to:** `graph`, `node`, `edge`, `vertex`, `DP`, `dynamic programming`, `tree`, `delaunay triangulation`, `binary search tree`, `heap`, `priority queue`, `greedy`, `divide and conquer` `brute force`, `geometry`.
+    - **Content Requirements:**
+        1. Abstract away any narrative or story elements.
+        2. Seamlessly integrate the definitions of the input and expected output, without havig dedicated paragraphs or sections only for the input and output.
+        3. Use LaTeX notation with '$' for variables (e.g., an array $A$ of size $N$). However, **omit specific range constraints** (like $1 \\le N \\le 10^5$) from this summary. The goal is a clean, high-level problem statement.
+    
+    ### 3. Instructions for "Hints" Section
+    - **Generate Hints:** For the `<ALL_HINTS_HERE>` placeholder, generate multiple, progressively helpful hints. Each hint must be wrapped in its own `<details>` block. Inside of each `<details>` block, use a `<summary>` tag to provide a brief title for the hint. E.g. <summary>Hint #1</summary>
+    - **Hint Titles:** Use titles like "Hint #1", "Hint #2", etc., to indicate the order of hints. Do not include anything else in the title for the hints.
+    - **Hint #1 (Subtle):** Should prompt initial thought, suggest a relevant concept, or point out a small observation.
+    - **Hint #2 (More Direct):** Should suggest a possible technique, data structure, or a way to simplify the problem.
+    - **Hint #3 (Key Insight):** Should reveal a critical step in the solution approach or warn against a common pitfall.
+    - **Flexibility:** This is just a general guideline given for every problem in the course. Therefore, adjust the number of hints based on the problem's difficulty.
 
-    # BEGIN OUTPUT FORMAT
-    {OUTPUT_FORMAT}
-    # END OUTPUT FORMAT
+    ### 4. Instructions for "Solutions" Section
+    - **CRITICAL RULE:** Your main goal is to improve the writing style, fix grammar, and ensure the logic is easy to follow. Preserve the author's original thought process and code structure.
+    - **Generate Solution Blocks:** For the `<ALL_POLISHED_SOLUTIONS_HERE>` placeholder, polish each solution from the `<DRAFT_MARKDOWN>` and place it in a separate `<details>` block. Inside of each `<details>` block, use a `<summary>` tag to provide the brief title for the solution which is given in the <DRAFT_MARKDOWN>. E.g. <summary>First Solution (Test Set 1)</summary>
+    - **Keep all Solutions:** Polish each solution from the draft, even non-optimal ones, as they are valuable for education.
+    - **Focus on Core Logic:** Skip trivial steps like "read input" or "print output." Focus on the core algorithm and reasoning.
+    - **Elaborate if Necessary:** If a draft explanation is brief, elaborate on it based on the provided code, maintaining the spirit of the original approach, thought process and solution.
+    - **Code Formatting:**
+        - Place the polished code at the end of its corresponding explanation. 
+        - Use proper markdown code blocks with a language identifier (e.g., ```cpp).
+        - Add comments to the code only if they significantly aid understanding.
 
-    Process the provided input and generate the complete, revised markdown document.
+    ### 5. Instructions for "Result" Section
+    - **Leave Empty:** The "Result" section and its placeholder comment must be the absolute end of your output. Do not add any text there.
+    </INSTRUCTIONS>
+
+    <TEMPLATES>
+    <INPUT_TEMPLATE>
+    {INPUT_TEMPLATE}
+    </INPUT_TEMPLATE>
+
+    <OUTPUT_TEMPLATE>
+    {OUTPUT_TEMPLATE}
+    </OUTPUT_TEMPLATE>
+    </TEMPLATES>
+
+    Now, process the provided input and generate the complete, revised markdown document.
     """
     USER_PROMPT_TEMPLATE = """
     # Problem Description
@@ -351,19 +356,27 @@ if __name__ == "__main__":
 
         tqdm.write(f"Generating README for {page['title']} (Week {page['week']}, Type {page['problem_type']})...")
 
-        # Setup prompt for the model
-        prompt = SYSTEM_PROMPT
-        prompt += "\n" 
-        prompt += USER_PROMPT_TEMPLATE.format(
+        # Setup prompt
+        user_prompt = USER_PROMPT_TEMPLATE.format(
             problem_pdf=page["pdf"] if page["pdf"] else "No PDF available.",
             draft_markdown=page["content"]
         )
 
         # Generate content using the model
-        response = GOOGLE_CLIENT.models.generate_content(
-            model=MODEL,
-            contents=prompt,
-        )
+        if "gemma" in MODEL.lower():
+            # Gemma does not support system prompts, so we use the user prompt directly
+            response = GOOGLE_CLIENT.models.generate_content(
+                model=MODEL,
+                contents=SYSTEM_PROMPT + "\n" + user_prompt,
+            )
+        elif "gemini" in MODEL.lower():
+            response = GOOGLE_CLIENT.models.generate_content(
+                model="gemini-2.5-pro",
+                config=types.GenerateContentConfig(
+                    system_instruction=SYSTEM_PROMPT,
+                ),
+                contents=user_prompt
+            )
 
         # Post-process the response
         response_text = response.text
