@@ -68,6 +68,7 @@ The optimal location is either the midpoint of the window (if the size is even) 
 
 If we iterate over the entire (sorted) list of parasols, this will ensure that we find all optimal locations, as we have considered all valid windows, and determined the largest number of parasols within 100 meters, as well as the smallest maximum distance to a parasol, among all the valid windows.
 
+### Code
 
 ```c++
 #include<iostream>

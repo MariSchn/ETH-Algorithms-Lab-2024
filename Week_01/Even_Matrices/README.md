@@ -86,7 +86,7 @@ $$
 2. For each pair of rows $(i_1, i_2)$, apply the same approach as in the **Even Pairs** problem
 3. Accumulate the result across all row pairs.
 
-**Code**
+### Code
 
 ```c++
 #include<iostream>

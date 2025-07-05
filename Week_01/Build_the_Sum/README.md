@@ -14,7 +14,7 @@ No hints for this problem.
 
 This problem is straightforward. We simply iterate over the integers $a_1, \dots, a_n$ and store their sum in a variable `sum`, that is initialized with $0$.
 
-**Code**
+### Code
 ```c++
 #include<iostream>
 

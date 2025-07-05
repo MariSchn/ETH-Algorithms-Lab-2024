@@ -42,7 +42,7 @@ Therefore, we update `n_can_fall` to be the maximum of the current domino's heig
 
 Finally, we output the value of `n_fallen`, which represents the total number of dominoes that fell.
 
-**Code**
+### Code
 ```c++
 #include<iostream>
 #include<vector>

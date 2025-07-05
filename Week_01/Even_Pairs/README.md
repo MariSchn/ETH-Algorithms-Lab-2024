@@ -105,7 +105,7 @@ $$
 2. Calculate the number of odd prefix sums as the total number of prefix sums minus the number of even ones.  
 3. Use combinatorial counting to find the number of pairs with even sums based on the counts of even and odd prefix sums.
 
-**Code**
+### Code
 
 ```c++
 #include<iostream>
