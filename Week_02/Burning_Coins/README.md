@@ -20,7 +20,7 @@ The problem asks for the amount you are *guaranteed* to win. This means you must
 
 <summary>Hint #2</summary>
 
-This problem exhibits optimal substructure. The state of the game at any point can be uniquely described by the subarray of coins that are still available. Let's say coins from index $i$ to $j$ are left. Can you define a function, say `solve(i, j)`, that computes the best possible outcome for the player whose turn it is for this specific subproblem?
+This problem exhibits optimal substructure. The state of the game at any point can be uniquely described by the subarray of coins that are still available. Let's say coins from index $s$ to $e$ are left. Can you define a function, say `f(s, e)`, that computes the best possible outcome for the player whose turn it is for this specific subproblem?
 
 </details>
 
@@ -28,10 +28,10 @@ This problem exhibits optimal substructure. The state of the game at any point c
 
 <summary>Hint #3</summary>
 
-Let's define `DP(i, j)` as the maximum value the **current player** can obtain from the coins in the subarray from index $i$ to $j$. If it's your turn with coins `[i...j]`, you have two choices:
+Let's define `f(s, e)` as the maximum value the **current player** can obtain from the coins in the subarray from index $s$ to $e$. If it's your turn with coins `[s...e]`, you have two choices:
 
-1.  **Take coin `v_i`**: You get `v_i`. The remaining coins are `[i+1...j]`. Now it's your opponent's turn. They will play optimally on this subproblem. What does this mean for you? After your opponent makes their move (taking either `v_{i+1}` or `v_j}`), you will be left with either the subproblem `[i+2...j]` or `[i+1...j-1]`. Since the opponent is smart, they will leave you with the subproblem that gives you a smaller future gain.
-2.  **Take coin `v_j`**: Similarly, you get `v_j`. The remaining coins are `[i...j-1]`. Your opponent will make a move to leave you with the worse of the two possible resulting subproblems.
+1.  **Take coin `v_s`**: You get `v_s`. The remaining coins are `[s+1...e]`. Now it's your opponent's turn. They will play optimally on this subproblem. What does this mean for you? After your opponent makes their move (taking either `v_{s+1}` or `v_e}`), you will be left with either the subproblem `[s+2...e]` or `[s+1...e-1]`. Since the opponent is smart, they will leave you with the subproblem that gives you a smaller future gain.
+2.  **Take coin `v_e`**: Similarly, you get `v_e`. The remaining coins are `[s...e-1]`. Your opponent will make a move to leave you with the worse of the two possible resulting subproblems.
 
 Your recurrence relation must capture this minimax nature. You want to `max`imize your choice, while your opponent's move forces you to take the `min`imum of the subsequent outcomes.
 
