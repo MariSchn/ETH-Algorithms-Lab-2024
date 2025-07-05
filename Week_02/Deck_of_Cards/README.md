@@ -15,7 +15,8 @@ If multiple pairs yield the same minimum difference, we must choose the pair tha
 
 <summary>Hint #1</summary>
 
-A straightforward approach is to check every possible contiguous subarray, calculate its sum, and see how close it is to $k$. This involves iterating through all possible start indices $i$ and end indices $j$. How can you make the sum calculation for each subarray efficient? Think about pre-computation.
+A straightforward approach is to check every possible contiguous subarray, calculate its sum, and see how close it is to $k$. This involves iterating through all possible start indices $i$ and end indices $j$. <br />
+This solves the first few test sets. However, since the last test set has $n \leq 10^5$, a more efficient approach is needed. Try to think of a way to better go through the array without having to check every possible subarray explicitly. To be able to pass $n \leq 10^5$, you will need to find a solution with linear time complexity, $O(N)$.
 
 </details>
 
@@ -23,15 +24,12 @@ A straightforward approach is to check every possible contiguous subarray, calcu
 
 <summary>Hint #2</summary>
 
-Using prefix sums, the sum of any subarray can be found in $O(1)$ time. Let $P$ be the prefix sum array. The sum of elements from $i$ to $j$ is $P[j+1] - P[i]$. For each starting index $i$, we want to find an ending index $j$ such that $P[j+1]$ is as close as possible to $k + P[i]$. Since all card values are non-negative, the prefix sum array is monotonically non-decreasing. What algorithm can you use to efficiently search for a value in a sorted (or monotonic) array?
+ Consider maintaining a "window" (a subarray) defined by a `start` and `end` pointer. As you expand the window by incrementing `end`, the sum increases.
 
-</details>
-
-<details>
-
-<summary>Hint #3</summary>
-
-The prefix sum with binary search approach gives an $O(N \log N)$ solution, which passes most test cases. However, for the largest constraints, an even more efficient linear time $O(N)$ solution is required. Consider maintaining a "window" (a subarray) defined by a `start` and `end` pointer. As you expand the window by incrementing `end`, the sum increases. If the sum is less than $k$, you continue expanding. If the sum exceeds $k$, you should shrink the window from the left by incrementing `start`. This "sliding window" or "two-pointers" technique allows you to explore all relevant subarrays in a single pass.
+ - If the sum is less than $k$, you continue expanding as you need to get closer to $k$. <br />
+ - If the sum exceeds $k$, you should shrink the window from the left by incrementing `start`. 
+ 
+ This "sliding window" or "two-pointers" technique allows you to explore all relevant subarrays in a single pass.
 
 </details>
 
