@@ -27,7 +27,7 @@ The game ends as soon as a single meeple reaches the target. The position of the
 
 <summary>Hint #2</summary>
 
-Consider the subproblem for a single meeple, for instance, the red one. Sherlock wants this meeple to reach the target in the fewest possible moves. Moriarty, when it's his turn to move the red meeple, will try to do the opposite: he will choose a move that makes the path to the target as long as possible. This is a classic two-player adversarial game, often modeled with the minimax algorithm.
+Consider the subproblem for a single meeple, for instance, the red one. Sherlock wants this meeple to reach the target in the fewest possible moves. Moriarty, when it's his turn to move the red meeple, will try to do the opposite: he will choose a move that makes the path to the target as long as possible. Consider this when calculating how long it takes for a meeple to reach the target
 
 </details>
 
@@ -37,9 +37,8 @@ Consider the subproblem for a single meeple, for instance, the red one. Sherlock
 
 The structure of the board (all transitions go from a lower to a higher position label) means there are no cycles. This structure is ideal for dynamic programming or memoization. You can determine the outcome from any position by working backward from the target position $N$.
 
-Try to define a recursive function, say `get_moves(position, is_minimizer)`, that calculates the number of moves to reach the target. The `is_minimizer` flag would track which player's turn it is for that 
-
-meeple—the one who wants to win quickly (minimizer) or the one who wants to delay (maximizer).
+Try to define a recursive function, say `get_moves(position, ...)`, that calculates the number of moves to reach the target from any given `position`. 
+Note that some more args are necessary to actually calculate this.
 
 </details>
 
@@ -49,7 +48,7 @@ meeple—the one who wants to win quickly (minimizer) or the one who wants to de
 
 After you calculate the optimal number of moves for the red meeple to win ($R_{\text{moves}}$) and the black meeple to win ($B_{\text{moves}}$), you need to compare them. If $R_{\text{moves}} < B_{\text{moves}}$, Sherlock clearly wins. If $B_{\text{moves}} < R_{\text{moves}}$, Moriarty wins.
 
-What if $R_{\text{moves}} = B_{\text{moves}} = k$? In this case, the winner is determined by who can complete their $k$-move sequence first. Carefully analyze the turn order to see whose meeple—red or black—is moved on the final, decisive game turn.
+What if $R_{\text{moves}} = B_{\text{moves}} = k$? In this case, the winner is determined by who can complete their $k$-move sequence first. Carefully analyze the turn order to see whose meeple is moved on the final game turn deciding who wins.
 
 </details>
 
