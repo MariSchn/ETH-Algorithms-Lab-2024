@@ -165,6 +165,8 @@ int main() {
 ## ⚡ Result
 
 ```plaintext
+Compiling: successful
+
 Testing solution >>>>
    Test set 1 (25 pts / 3.500 s) : Correct answer      (0.0s)
    Test set 2 (25 pts / 3.500 s) : Correct answer      (0.002s)
