@@ -283,5 +283,17 @@ int main() {
 ## ⚡ Result
 
 ```plaintext
+Compiling: successful
 
+Judging solution >>>>
+   Test set 1  (15 pts / 1 s) : Correct answer      (0.463s)
+   Test set 1h (05 pts / 1 s) : Correct answer      (0.485s)
+   Test set 2  (25 pts / 1 s) : Correct answer      (0.059s)
+   Test set 2h (05 pts / 1 s) : Correct answer      (0.059s)
+   Test set 3  (15 pts / 1 s) : Correct answer      (0.496s)
+   Test set 3h (05 pts / 1 s) : Correct answer      (0.464s)
+   Test set 4  (25 pts / 1 s) : Correct answer      (0.683s)
+   Test set 4h (05 pts / 1 s) : Correct answer      (0.668s)
+
+Total score: 100
 ```
