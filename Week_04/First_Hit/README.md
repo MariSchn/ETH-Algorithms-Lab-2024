@@ -162,5 +162,17 @@ int main() {
 ## ⚡ Result
 
 ```plaintext
+Compiling: successful
 
+Judging solution >>>>
+   Test set 1 (15 pts / 1.000 s) : Correct answer      (0.006s)
+   Test set 2 (15 pts / 1.000 s) : Correct answer      (0.055s)
+   Test set 3 (15 pts / 1.000 s) : Correct answer      (0.068s)
+   Test set 4 (15 pts / 1.000 s) : Correct answer      (0.054s)
+   Test set 5 (10 pts / 1.000 s) : Correct answer      (0.177s)
+   Test set 6 (10 pts / 1.000 s) : Correct answer      (0.062s)
+   Test set 7 (10 pts / 1.000 s) : Correct answer      (0.054s)
+   Test set 8 (10 pts / 0.200 s) : Correct answer      (0.054s)
+
+Total score: 100
 ```
