@@ -167,7 +167,7 @@ int main() {
 ```plaintext
 Compiling: successful
 
-Testing solution >>>>
+Judging solution >>>>
    Test set 1 (25 pts / 3.500 s) : Correct answer      (0.0s)
    Test set 2 (25 pts / 3.500 s) : Correct answer      (0.002s)
    Test set 3 (25 pts / 3.500 s) : Correct answer      (0.049s)

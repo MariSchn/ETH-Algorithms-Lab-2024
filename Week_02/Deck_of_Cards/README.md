@@ -131,13 +131,13 @@ int main() {
 ```plaintext
 Compiling: successful
 
-Testing solution >>>>
+Judging solution >>>>
    Test set 1        (20 pts / 1 s) : Correct answer      (0.0s)
-   Test set 2        (40 pts / 1 s) : Correct answer      (0.006s)
-   Test set 3        (20 pts / 1 s) : Correct answer      (0.128s)
+   Test set 2        (40 pts / 1 s) : Correct answer      (0.007s)
+   Test set 3        (20 pts / 1 s) : Correct answer      (0.133s)
    Hidden test set 1 (05 pts / 1 s) : Correct answer      (0.0s)
-   Hidden test set 2 (10 pts / 1 s) : Correct answer      (0.006s)
-   Hidden test set 3 (05 pts / 1 s) : Correct answer      (0.128s)
+   Hidden test set 2 (10 pts / 1 s) : Correct answer      (0.007s)
+   Hidden test set 3 (05 pts / 1 s) : Correct answer      (0.133s)
 
 Total score: 100
 ```

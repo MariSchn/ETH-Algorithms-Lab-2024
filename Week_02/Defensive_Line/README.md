@@ -214,12 +214,12 @@ int main() {
 ```plaintext
 Compiling: successful
 
-Testing solution >>>>
+Judging solution >>>>
    Test set 1 (20 pts / 0.500 s) : Correct answer      (0.0s)
    Test set 2 (20 pts / 0.500 s) : Correct answer      (0.006s)
-   Test set 3 (20 pts / 0.500 s) : Correct answer      (0.074s)
+   Test set 3 (20 pts / 0.500 s) : Correct answer      (0.07s)
    Test set 4 (20 pts / 2.000 s) : Correct answer      (0.007s)
-   Test set 5 (20 pts / 0.500 s) : Correct answer      (0.085s)
+   Test set 5 (20 pts / 0.500 s) : Correct answer      (0.08s)
 
 Total score: 100
 ```
