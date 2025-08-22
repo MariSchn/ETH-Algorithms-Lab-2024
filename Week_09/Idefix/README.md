@@ -329,14 +329,12 @@ int main() {
 Compiling: successful
 
 Judging solution >>>>
-   Test set 1        (20 pts / 1 s) : Correct answer      (0.018s)
-   Hidden test set 1 (05 pts / 1 s) : Correct answer      (0.018s)
-   Test set 2        (20 pts / 1 s) : Correct answer      (0.085s)
-   Hidden test set 2 (05 pts / 1 s) : Correct answer      (0.085s)
-   Test set 3        (20 pts / 1 s) : Correct answer      (0.033s)
-   Hidden test set 3 (05 pts / 1 s) : Correct answer      (0.033s)
-   Test set 4        (20 pts / 1 s) : Correct answer      (0.37s)
-   Hidden test set 4 (05 pts / 1 s) : Correct answer      (0.143s)
+   Test set 1        (30 pts / 1 s) : Correct answer      (0.157s)
+   Test set 2        (30 pts / 1 s) : Correct answer      (0.388s)
+   Test set 3        (20 pts / 3 s) : Correct answer      (1.807s)
+   Hidden test set 1 (05 pts / 1 s) : Correct answer      (0.142s)
+   Hidden test set 2 (05 pts / 1 s) : Correct answer      (0.373s)
+   Hidden test set 3 (10 pts / 3 s) : Correct answer      (1.714s)
 
 Total score: 100
 ```
