@@ -31,6 +31,98 @@ The sum of a submatrix is even if and only if an even number of its elements are
 
 ## ✨ Solutions
 
+<details>
+
+<summary> First Solution (Test Set 1, 2) </summary>
+
+### Description
+This initial approach uses a brute-force method to count all submatrices with an even sum. The core of this solution is to iterate through every possible submatrix, calculate the sum of its elements, and check if the sum is even.
+
+To optimize the calculation of submatrix sums, we first compute an integral image (also known as a prefix sum matrix). The integral image allows us to find the sum of any rectangular submatrix in constant time, i.e., $O(1)$. The integral image $I$ is constructed such that each element $I[i][j]$ stores the sum of all elements in the rectangle from the origin $(0,0)$ to $(i,j)$.
+
+The sum of a submatrix with corners at $(i_1, j_1)$ and $(i_2, j_2)$ can then be calculated using the formula:
+`sum = I[i_2][j_2] - I[i_2][j_1-1] - I[i_1-1][j_2] + I[i_1-1][j_1-1]`
+
+The time complexity of this solution is dominated by the four nested loops, resulting in an overall complexity of $O(n^4)$. The space complexity is $O(n^2)$ to store the integral image. This approach is feasible for small $n$ and passes the first two test sets.
+
+### Code
+```cpp
+#include<iostream>
+#include<vector>
+
+int main() {
+  std::ios_base::sync_with_stdio(false);
+  
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) {
+    int n; std::cin >> n;
+    
+    // Read in the matrix
+    std::vector<std::vector<int>> M;
+    for(int i = 0; i < n; i++) {
+      std::vector<int> row;
+      for(int j = 0; j < n; j++) {
+        int x; std::cin >> x;
+        row.push_back(x);
+      }
+      M.push_back(row);
+    }
+
+    // Calculate integral image
+    std::vector<std::vector<int>> M_integral;
+    for(int i = 0; i < n; i++) {
+      std::vector<int> row;
+      for(int j = 0; j < n; j++) {
+        int x = M[i][j];
+        
+        if(i == 0 && j == 0) {
+          row.push_back(x);
+        } else if (i == 0) {
+          row.push_back(row[j - 1] + x);
+        } else if (j == 0) {
+          row.push_back(M_integral[i - 1][j] + x);
+        } else {
+          row.push_back(M_integral[i - 1][j] + row[j-1] - M_integral[i - 1][j - 1] + x);
+        }
+      }
+      M_integral.push_back(row);
+    }
+    
+    // Add padding
+    for(auto &row : M_integral) {
+      *row.insert(row.begin(), 0);
+    }
+    M_integral.insert(M_integral.begin(), std::vector<int>(n+1, 0));
+    
+    // Calculate number of even pairs
+    int n_even_pairs = 0;
+    int sum;
+    
+    for(int i_1 = 1; i_1 < n + 1; i_1++) {
+      for(int i_2 = i_1; i_2 < n + 1; i_2++) {
+        for(int j_1 = 1; j_1 < n + 1; j_1++) {
+          for(int j_2 = j_1; j_2 < n + 1; j_2++) {
+            sum = M_integral[i_2][j_2] -
+                  M_integral[i_2][j_1 - 1] -
+                  M_integral[i_1 - 1][j_2] +
+                  M_integral[i_1 - 1][j_1 - 1];
+                  
+            if(sum % 2 == 0) {
+              n_even_pairs++;
+            }
+          }
+        }
+      }
+    }
+    
+    std::cout << n_even_pairs << std::endl;
+    
+  }
+}
+```
+
+</details>
+
 <details><summary>Final Solution</summary>
 
 The **core idea** behind this solution is very similar to the **Even Pairs** problem. Instead of a 1D array, we now work with a 2D grid (a matrix), and instead of subarrays, we count submatrices whose total sum is even. To generalize the approach, we simply iterate over all row pairs $(i_1, i_2)$ and reduce the matrix in-between these rows to a 1D array by summing up the columns between these rows. This allows us to apply the same combinatorial counting technique used in the 1D case.
