@@ -194,5 +194,15 @@ int main() {
 ## ⚡ Result
 
 ```plaintext
+Compiling: successful
 
+Judging solution >>>>
+   Test set 1        (30 pts / 1 s) : Correct answer      (0.157s)
+   Test set 2        (30 pts / 1 s) : Correct answer      (0.388s)
+   Test set 3        (20 pts / 3 s) : Correct answer      (1.807s)
+   Hidden test set 1 (05 pts / 1 s) : Correct answer      (0.142s)
+   Hidden test set 2 (05 pts / 1 s) : Correct answer      (0.373s)
+   Hidden test set 3 (10 pts / 3 s) : Correct answer      (1.714s)
+
+Total score: 100
 ```
