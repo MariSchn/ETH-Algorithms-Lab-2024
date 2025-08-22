@@ -36,6 +36,72 @@ This solves the first few test sets. However, since the last test set has $n \le
 ## ✨ Solutions
 
 <details>
+
+<summary>First Solution (Test Set 1, 2) </summary>
+
+This solution uses a brute-force approach. We iterate through all possible start and end indices of a contiguous block of cards. For each block, we compute the sum of its card values and determine how close this sum is to the target value $k$. We keep track of the block that gives the minimum difference.
+
+This approach has a time complexity of $O(N^2)$ due to the nested loops, which is sufficient for the first two test sets.
+
+### Code
+```cpp
+#include <iostream>
+#include <vector>
+#include <cmath>
+#include <limits>
+
+int main() {
+  std::ios_base::sync_with_stdio(false);
+  int n_tests; std::cin >> n_tests;
+  
+  for(int n_test = 0; n_test < n_tests; n_test++) {
+    int n, k; std::cin >> n >> k;
+
+    // Read cards
+    std::vector<int> cards;
+    for(int i = 0; i < n; i++) {
+      int card; std::cin >> card;
+      cards.push_back(card);
+    }
+    
+    int i = 0;
+    int j = 0;
+    long long min_diff = std::numeric_limits<long long>::max();
+    
+    long long sum, diff, abs_diff;
+    
+    for(int start = 0; start < n; start++) {
+      sum = 0;
+      
+      for(int end = start; end < n; end++) {
+        sum += cards[end];
+        diff = k - sum;
+        abs_diff = std::abs(diff);
+        
+        if(abs_diff < min_diff) {
+          i = start;
+          j = end;
+          min_diff = abs_diff;
+        }
+        
+        if(diff < 0) {
+          // Continute with the next starting position 
+          break;
+        }
+      }
+      
+      if(min_diff == 0) {
+        break;
+      }
+    }
+    
+    std::cout << i << " " << j << std::endl;
+  }
+}
+```
+</details>
+
+<details>
 <summary>Final Solution</summary>
 
 Based on the input size, $n \leq 10^5$, we can already see that a brute-force solution with $O(N^2)$ complexity would be **too slow**. However, as we are looking for a contiguous subarray, we can utiliize the **sliding window**/**two pointers** technique to achieve go through the array in linear time, $O(N)$ while checking all possible subarrays. <br />
