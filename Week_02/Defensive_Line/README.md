@@ -58,6 +58,167 @@ Let $DP(i, j)$ represent this value. When considering the state $DP(i, j)$, you 
 
 <details>
 
+<summary>First Solution (Test Set 1, 2)</summary>
+
+This initial attempt uses a **brute-force recursive** approach to find the optimal assignment. The `calcMaxValue` function explores all possible ways to place `m` attackers on disjoint segments that sum to `k`.
+
+The function works by using a sliding window (`start`, `end`) to find the first available valid segment. Once a valid segment is found, it makes a recursive call to solve the subproblem for the remaining defenders (everything after the found segment) with one less attacker. It then continues to slide the window to find other possible first segments to see if they yield a better total result.
+
+The main issue with this solution is its inefficiency. It does not use memoization, meaning it repeatedly solves the same subproblems. For example, the optimal way to assign `m-1` attackers to a specific suffix of the defender line is calculated multiple times. This leads to a very high time complexity, which is why it only passes the smallest test cases.
+
+### Code
+
+```cpp
+#include<iostream>
+#include<vector>
+#include<cmath>
+
+int calcMaxValue(std::vector<int>& d_sums, int n, int k, int start, int end, int r) {
+  if(r == 0) return 0;
+  if(end >= n) return -1;  // "fail"
+  
+  int max_value = -1;
+  
+  while(end != n) {
+    int sum = d_sums[end] - d_sums[start - 1];
+
+    if(sum == k) {
+      int remainder_value = calcMaxValue(d_sums, n, k, end+1, end+1, r-1);
+      
+      if(remainder_value != -1) {
+        max_value = std::max(max_value, end - (start - 1) + remainder_value);
+        // break because if we are not able to fit r - 1 ranges in to the current interval,
+        // we will not be able to fit them into an even smaller interval
+        // break;
+      }
+    }
+    
+    // Advance sliding window
+    if (sum < k || start == end) end++;
+    else start++;
+  }
+  
+  return max_value;
+}
+
+int main() {
+  std::ios_base::sync_with_stdio(false);
+  
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) {
+    int n, m, k; std::cin >> n >> m >> k;
+    
+    int sum = 0;
+    std::vector<int> d_sums = {0};
+    for(int i = 0; i < n; i++) {
+      int v; std::cin >> v;
+      sum += v;
+      d_sums.push_back(sum);
+    }
+
+    int max_value = calcMaxValue(d_sums, n + 1, k, 1, 1, m);
+    
+    if(max_value == -1) std::cout << "fail" << std::endl;
+    else std::cout << max_value << std::endl;
+  }
+}
+```
+
+</details>
+
+<details>
+
+<summary>Second Solution (Test Set 1, 2, 4)</summary>
+
+This initial solution employs a **top-down dynamic programming** approach with **memoization**. The core of this method is a recursive function, `calcMaxValue(start, r)`, which determines the maximum number of defenders that can be engaged using `r` attackers, starting from the defender at index `start`.
+
+The state for the dynamic programming is defined by `(start, r)`, which corresponds to the subproblem for the suffix of defenders beginning at `start` with `r` attackers still available. To prevent redundant computations for identical subproblems, a memoization table, `memo[start][r]`, is utilized.
+
+Within the recursive function, a **sliding window** technique is used to identify all valid segments that begin at or after the `start` index. For each segment that meets the criteria (i.e., a contiguous group of defenders whose values sum to `k`), the function recursively calls itself to solve the subproblem for the remaining defenders and attackers: `calcMaxValue(end_of_segment + 1, r - 1)`.
+
+The function then selects the maximum value derived from all potential valid segments at the current stage. If no valid assignment is possible, it returns a "fail" indicator (-1). The recursion's base cases are when no attackers are left (`r = 0`) or when there are no more defenders to process.
+
+This strategy systematically examines all valid combinations of disjoint segments and, with the aid of memoization, operates with sufficient efficiency to pass the initial test sets.
+
+The primary drawback of this approach, and what distinguishes it from the more optimized final solution, is its computational efficiency. By integrating the sliding window search for valid segments inside the recursive calls, the same sub-arrays are scanned multiple times. This leads to a higher time complexity, making it too slow for larger test cases.
+
+### Code
+
+```cpp
+#include<iostream>
+#include<vector>
+#include<cmath>
+
+// memo[start][r] = max_value
+using Memo = std::vector<std::vector<int>>;
+
+int calcMaxValue(std::vector<int>& d_sums, Memo& memo, int n, int k, int start, int r) {
+  if(r == 0) return 0;
+  if(start >= n || (start == n - 1 && d_sums[start] - d_sums[start - 1] < k)) return -1; // fail
+  
+  if(memo[start][r] != -2) return memo[start][r];
+
+  // Setup sliding window
+  int i = start;
+  int j = start;
+  
+  int max_value = -1;
+  
+  while(i < n && j < n) {
+    int sum = d_sums[j] - d_sums[i-1];
+    int value = j - i + 1;
+    
+    if(sum > k) {
+      i++;
+    } else if(sum == k) {
+      int remainder_value = calcMaxValue(d_sums, memo, n, k, j + 1, r- 1);
+      
+      // If we aren't able to find r-1 intervals in [j+1, n], we won't be able to find them in an even smaller interval.
+      // So we can break out of the loop
+      if(remainder_value == -1) {
+        break;
+      } else {
+        max_value = std::max(max_value, value + remainder_value);
+      }
+      
+      j++;
+    } else { // sum < k
+      j++;
+    }
+  }
+  
+  memo[start][r] = max_value;
+  return max_value;
+}
+
+int main() {
+  std::ios_base::sync_with_stdio(false);
+  
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) {
+    int n, m, k; std::cin >> n >> m >> k;
+    
+    int sum = 0;
+    std::vector<int> d_sums = {0};
+    for(int i = 0; i < n; i++) {
+      int v; std::cin >> v;
+      sum += v;
+      d_sums.push_back(sum);
+    }
+    
+    Memo memo(n + 2, std::vector<int>(m+1, -2));
+
+    int res = calcMaxValue(d_sums, memo, n+1, k, 1, m);
+    if(res == -1) std::cout << "fail" << std::endl;
+    else std::cout << res << std::endl;
+  }
+}
+```
+
+</details>
+
+<details>
+
 <summary>Final Solution</summary>
 
 This problem can be effectively solved using **dynamic programming**. The goal is to find a selection of up to $m$ disjoint, continuous subsegments of the defenders' values, where each segment sums to $k$, such that the total length of these segments is maximized.
