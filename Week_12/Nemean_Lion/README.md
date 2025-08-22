@@ -347,4 +347,16 @@ int main() {
 ```
 </details>
 
-# End of Draft
+## ⚡ Result
+
+```plaintext
+Compiling: successful
+
+Judging solution >>>>
+   Test set 1 (30 pts / 2 s) : Correct answer      (0.901s)
+   Test set 2 (30 pts / 2 s) : Correct answer      (0.868s)
+   Test set 3 (20 pts / 2 s) : Correct answer      (0.776s)
+   Test set 4 (20 pts / 2 s) : Correct answer      (0.777s)
+
+Total score: 100
+```
