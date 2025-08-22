@@ -126,7 +126,7 @@ int main() {
 ```plaintext
 Compiling: successful
 
-Testing solution >>>>
+Judging solution >>>>
    graphs_easy   (30 pts / 1 s) : Correct answer      (0.0s)
    graphs_medium (70 pts / 1 s) : Correct answer      (0.045s)
 
