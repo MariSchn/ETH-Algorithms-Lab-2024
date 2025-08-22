@@ -55,6 +55,248 @@ What if $R_{\text{moves}} = B_{\text{moves}} = k$? In this case, the winner is d
 ## ✨ Solutions
 
 <details>
+
+<summary>First Solution (Test Set 1, 2)</summary>
+
+This first solution attempts to solve the problem by directly simulating the game using a **recursive approach with memoization**. The state of the game is captured by the tuple `(r, b, player, turn)`, representing the positions of the red and black meeples, the current player, and the turn number.
+
+The core of the solution is the `recursion` function, which determines the winner from a given game state. The logic follows a minimax structure: it checks if the current `player` can make a move that forces a win. A player is considered to have a winning move if they can transition to a new state from which the *other* player is guaranteed to lose. The function explores all legal moves for the current player. If any of these moves leads to a state where the opponent loses, the current player is marked as the winner for the original state. If all moves lead to states where the opponent wins, the current player loses.
+
+However, this approach has a critical flaw: the state space is too large. The `turn` number can grow, making the memoization table effectively unbounded and thus impractical. The state should ideally not include the turn number. Because of this, the solution is not efficient enough and fails on larger test cases where the number of turns can be high.
+
+### Code
+```cpp
+#include<iostream>
+#include<vector>
+#include<unordered_map>
+
+enum Player {
+  HOLMES,
+  MORIARTY
+};
+
+// [r][b][player][turn]
+using MemoVector = std::vector<std::vector<std::vector<std::vector<int>>>>;
+using Transitions = std::unordered_map<int, std::vector<int>>;
+
+int recursion(Transitions& transitions, MemoVector& memo, int n, int r, int b, Player player, int turn) {
+  // Base cases
+  if(r == n) return HOLMES;
+  else if(b == n) return MORIARTY;
+  
+  // Use already calculated value if available
+  if(memo[r][b][player][turn] != -1) {
+    return memo[r][b][player][turn];
+  }
+  
+  // Recursion
+  if(player == HOLMES && turn % 2 == 0) {
+    // Holmes moves Black
+    memo[r][b][player][turn] = MORIARTY;
+    
+    for(int x : transitions[b]) {
+      if(recursion(transitions, memo, n, r, x, MORIARTY, turn) == HOLMES) {
+        memo[r][b][player][turn] = HOLMES;
+        break;
+      }
+    }
+  }
+  else if(player == HOLMES && turn % 2 == 1) {
+    // Holmes moves Red
+    memo[r][b][player][turn] = MORIARTY;
+    
+    for(int x : transitions[r]) {
+      if(recursion(transitions, memo, n, x, b, MORIARTY, turn) == HOLMES) {
+        memo[r][b][player][turn] = HOLMES;
+        break;
+      }
+    }
+  }
+  else if(player == MORIARTY && turn % 2 == 0) {
+    // Moriarty moves Red
+    memo[r][b][player][turn] = HOLMES;
+    
+    for(int x : transitions[r]) {
+      if(recursion(transitions, memo, n, x, b, HOLMES, turn + 1) == MORIARTY) {
+        memo[r][b][player][turn] = MORIARTY;
+        break;
+      }
+    }
+  }
+  else if(player == MORIARTY && turn % 2 == 1) {
+    // Moriarty moves Black
+    memo[r][b][player][turn] = HOLMES;
+    
+    for(int x : transitions[b]) {
+      if(recursion(transitions, memo, n, r, x, HOLMES, turn + 1) == MORIARTY) {
+        memo[r][b][player][turn] = MORIARTY;
+        break;
+      }
+    }
+  }
+  
+  return memo[r][b][player][turn];
+}
+
+int main() {
+  std::ios_base::sync_with_stdio(false);
+  
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) {
+    int n, m, r, b; std::cin >> n >> m >> r >> b;
+    
+    MemoVector memo(n, std::vector<std::vector<std::vector<int>>>(
+                           n, std::vector<std::vector<int>>(
+                                  2, std::vector<int>(n, -1))));
+    std::unordered_map<int, std::vector<int>> transitions;
+    for(int i = 0; i < m; i++) {
+      int u, v; std::cin >> u >> v;
+      transitions[u].push_back(v);
+    }
+
+    int winner = recursion(transitions, memo, n, r, b, HOLMES, 1);
+    std::cout << winner << std::endl;
+  }
+}
+```
+
+</details>
+
+<details>
+
+<summary>Second Solution (Test Set 1, 2, 3) </summary>
+
+This second solution builds upon the first by refining the state representation. It correctly identifies that the specific turn number is not necessary; only its **parity** matters for determining which player moves which meeple.
+
+The state is now `(r, b, player, turn % 2)`, effectively reducing the fourth dimension of the state space from a potentially large number to just two values (0 or 1). This significantly shrinks the number of states that need to be memoized.
+
+To handle the potentially sparse state space more efficiently, this solution also switches from a 4D vector to an `unordered_map` for memoization, using a custom hash for the tuple key.
+
+This optimization makes the solution much more efficient, allowing it to pass more test cases. However, the state representation still considers the positions of both meeples simultaneously. This results in a state space that is quadratic in the number of board positions ($O(N^2)$), which is still too large for the given constraints and causes the solution to time out on the final test set.
+
+### Code
+```cpp
+#include<iostream>
+#include<vector>
+#include<unordered_map>
+
+enum Player {
+  HOLMES,
+  MORIARTY
+};
+
+struct tuple_hash {
+    std::size_t operator()(const std::tuple<int, int, int, int>& key) const {
+        int a = std::get<0>(key);
+        int b = std::get<1>(key);
+        int c = std::get<2>(key);
+        int d = std::get<3>(key);
+        
+        std::size_t hash = std::hash<int>()(a);
+        hash ^= std::hash<int>()(b) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+        hash ^= std::hash<int>()(c) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+        hash ^= std::hash<int>()(d) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+        return hash;
+    }
+};
+struct tuple_equal {
+    bool operator()(const std::tuple<int, int, int, int>& lhs, const std::tuple<int, int, int, int>& rhs) const {
+        return lhs == rhs;
+    }
+};
+
+// [r][b][player][turn]
+// using MemoVector = std::vector<std::vector<std::vector<std::vector<MemoPrimitive>>>>;
+using MemoPrimitive = int;
+using MemoKey = std::tuple<MemoPrimitive, MemoPrimitive, MemoPrimitive, MemoPrimitive>;
+using MemoMap = std::unordered_map<std::tuple<int, int, int, int>, int, tuple_hash>;
+using Transitions = std::unordered_map<int, std::vector<int>>;
+
+int recursion(const Transitions& transitions, MemoMap& memo, int n, int r, int b, Player player, int turn) {
+  // Base cases
+  if(r == n) return HOLMES;
+  else if(b == n) return MORIARTY;
+  
+  std::tuple<int, int, int, int> input_tuple = std::make_tuple(r, b, player, turn);
+  
+  // Use already calculated value if available
+  if(memo.find(input_tuple) != memo.end()) {
+    return memo[input_tuple];
+  }
+  
+  // Recursion
+  if(player == HOLMES && turn % 2 == 0) {
+    // Holmes moves Black
+    memo[input_tuple] = MORIARTY;
+    
+    for(int x : transitions.at(b)) {
+      if(recursion(transitions, memo, n, r, x, MORIARTY, turn) == HOLMES) {
+        memo[input_tuple] = HOLMES;
+        break;
+      }
+    }
+  }
+  else if(player == HOLMES && turn % 2 == 1) {
+    // Holmes moves Red
+    memo[input_tuple] = MORIARTY;
+    
+    for(int x : transitions.at(r)) {
+      if(recursion(transitions, memo, n, x, b, MORIARTY, turn) == HOLMES) {
+        memo[input_tuple] = HOLMES;
+        break;
+      }
+    }
+  }
+  else if(player == MORIARTY && turn % 2 == 0) {
+    // Moriarty moves Red
+    memo[input_tuple] = HOLMES;
+    
+    for(int x : transitions.at(r)) {
+      if(recursion(transitions, memo, n, x, b, HOLMES, (turn + 1) % 2) == MORIARTY) {
+        memo[input_tuple] = MORIARTY;
+        break;
+      }
+    }
+  }
+  else if(player == MORIARTY && turn % 2 == 1) {
+    // Moriarty moves Black
+    memo[input_tuple] = HOLMES;
+    
+    for(int x : transitions.at(b)) {
+      if(recursion(transitions, memo, n, r, x, HOLMES, (turn + 1) % 2) == MORIARTY) {
+        memo[input_tuple] = MORIARTY;
+        break;
+      }
+    }
+  }
+  
+  return memo[input_tuple];
+}
+
+int main() {
+  std::ios_base::sync_with_stdio(false);
+  
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) {
+    int n, m, r, b; std::cin >> n >> m >> r >> b;
+  
+    std::unordered_map<int, std::vector<int>> transitions;
+    for(int i = 0; i < m; i++) {
+      int u, v; std::cin >> u >> v;
+      transitions[u].push_back(v);
+    }
+
+    MemoMap memo;
+    
+    int winner = recursion(transitions, memo, n, r, b, HOLMES, 1);
+    std::cout << winner << std::endl;
+  }
+}
+```
+
+</details>
+
+<details>
 <summary>Final Solution</summary>
 
 This problem can be modeled as a game on a Directed Acyclic Graph (DAG), where positions are vertices and transitions are edges. For each meeple, we need to find the number of moves it will take to reach the target, assuming both players play optimally.
