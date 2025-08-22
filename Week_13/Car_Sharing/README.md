@@ -363,5 +363,14 @@ int main() {
 ## ⚡ Result
 
 ```plaintext
+Compiling: successful
 
+Judging solution >>>>
+   Test set 1 (20 pts / 5 s) : Correct answer      (0.067s)
+   Test set 2 (20 pts / 5 s) : Correct answer      (0.001s)
+   Test set 3 (20 pts / 5 s) : Correct answer      (0.16s)
+   Test set 4 (20 pts / 5 s) : Correct answer      (0.692s)
+   Test set 5 (20 pts / 5 s) : Correct answer      (1.372s)
+
+Total score: 100
 ```
