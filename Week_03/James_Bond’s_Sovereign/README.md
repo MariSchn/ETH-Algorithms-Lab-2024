@@ -66,96 +66,65 @@ This recursive approach involves many overlapping subproblems. We can use a 2D a
 The main function first determines all possible board states after the initial $k$ adversarial moves. For each state `[i, n-1 - (k-i)]`, it calls our DP function `solve(i, n-1 - (k-i))`. The final answer is the minimum of these results.
 
 ```cpp
-#include <iostream>
-#include <vector>
-#include <algorithm> // For std::min and std::max
-#include <limits>    // For std::numeric_limits
+#include<iostream>
+#include<vector>
+#include<cmath>
+#include<limits>
 
-// Memoization table: memo[start][end] stores the result for the subarray [start, end]
 using Memo = std::vector<std::vector<int>>;
 
-/**
- * @brief Calculates max winnings for the current player on the subarray [start, end].
- * Assumes it's the player's turn to pick from this subarray.
- * @param values The values of all coins.
- * @param memo The memoization table.
- * @param m The number of players.
- * @param start The starting index of the current subarray.
- * @param end The ending index of the current subarray.
- * @return The maximum guaranteed winnings from this subgame.
- */
-int solve(const std::vector<int>& values, Memo& memo, int m, int start, int end) {
-  // If the result is already computed, return it.
-  if (memo[start][end] != -1) {
+int recursion(const std::vector<int>& values, Memo& memo, int m, int start, int end) {
+  // Memo
+  if(memo[start][end] != -1) {
     return memo[start][end];
   }
 
-  // Base Case: If fewer than 'm' coins are left, we get only one more turn.
-  // We should pick the best available coin.
-  if (end - start + 1 < m) {
-    return memo[start][end] = std::max(values[start], values[end]);
+  if(end - start < m) {  
+    // Base Case
+    memo[start][end] = std::max(values[start], values[end]);
+  } else {
+    // Recursion
+    
+    // Calculate max winnings you can get when choosing the start-coin or end-coin
+    int start_min_winnings = std::numeric_limits<int>::max();
+    int end_min_winnings = std::numeric_limits<int>::max();
+    for(int i = 0; i < m; i++) {
+      start_min_winnings = std::min(start_min_winnings, recursion(values, memo, m, start + i + 1, end - (m - 1 - i)));
+      end_min_winnings   = std::min(end_min_winnings,   recursion(values, memo, m, start + i,     end - (m - 1 - i) - 1));
+    }
+    start_min_winnings += values[start];
+    end_min_winnings += values[end];
+    
+    memo[start][end] = std::max(start_min_winnings, end_min_winnings);
   }
-
-  // Recursive Step: It's our turn. We choose to take 'start' or 'end'.
-  // We assume the other m-1 players will then conspire to minimize our future winnings.
-
-  // Case 1: We take the 'start' coin.
-  // The opponents will leave us with the subproblem that yields the minimum score for us.
-  int winnings_if_take_start = std::numeric_limits<int>::max();
-  for (int i = 0; i < m; ++i) {
-    // Opponents take 'i' from the left and 'm-1-i' from the right.
-    winnings_if_take_start = std::min(winnings_if_take_start, solve(values, memo, m, start + 1 + i, end - (m - 1 - i)));
-  }
-  winnings_if_take_start += values[start];
-
-  // Case 2: We take the 'end' coin.
-  // The opponents will again leave us with the subproblem that minimizes our score.
-  int winnings_if_take_end = std::numeric_limits<int>::max();
-  for (int i = 0; i < m; ++i) {
-    // Opponents take 'i' from the left and 'm-1-i' from the right.
-    winnings_if_take_end = std::min(winnings_if_take_end, solve(values, memo, m, start + i, end - 1 - (m - 1 - i)));
-  }
-  winnings_if_take_end += values[end];
-
-  // We choose the option that maximizes our guaranteed winnings.
-  return memo[start][end] = std::max(winnings_if_take_start, winnings_if_take_end);
-}
-
-void testcase() {
-  int n, m, k;
-  std::cin >> n >> m >> k;
-
-  std::vector<int> values(n);
-  for (int i = 0; i < n; ++i) {
-    std::cin >> values[i];
-  }
-
-  // memo[i][j] stores the result of solve(i, j)
-  Memo memo(n, std::vector<int>(n, -1));
-
-  int guaranteed_winnings = std::numeric_limits<int>::max();
-
-  // Before our first turn (as player 'k'), players 0 to k-1 take 'k' coins.
-  // They can take 'i' from the left and 'k-i' from the right.
-  // They will choose 'i' to minimize our final score.
-  for (int i = 0; i <= k; ++i) {
-    int start_node = i;
-    int end_node = n - 1 - (k - i);
-    guaranteed_winnings = std::min(guaranteed_winnings, solve(values, memo, m, start_node, end_node));
-  }
-
-  std::cout << guaranteed_winnings << std::endl;
+  
+  return memo[start][end];
 }
 
 int main() {
   std::ios_base::sync_with_stdio(false);
-  std::cin.tie(NULL);
-  int t;
-  std::cin >> t;
-  while (t--) {
-    testcase();
+  
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) {
+    int n, m, k; std::cin >> n >> m >> k;
+
+    std::vector<int> values;
+    for(int i = 0; i < n; i++) {
+      int v; std::cin >> v;
+      values.push_back(v);
+    }
+    
+    int start = 0;
+    int end = n - 1;
+    Memo memo(n, std::vector<int>(n, -1));
+    
+    int res = std::numeric_limits<int>::max();
+    for(int i = 0; i <= k; i++) {
+      res = std::min(res, recursion(values, memo, m, start + i, end - (k - i)));
+    }
+    
+    std::cout << res << std::endl;
   }
-  return 0;
 }
 ```
 </details>
