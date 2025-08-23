@@ -52,109 +52,94 @@ The overall strategy is as follows:
 This approach is both robust due to the use of an exact geometry kernel and efficient enough to pass within the time limits.
 
 ```cpp
-#include <iostream>
-#include <vector>
-#include <algorithm>
-#include <iomanip>
-#include <stdexcept>
+///1
+#include<iostream>
+#include<type_traits>
+#include<limits>
+#include<algorithm>
 
-// CGAL headers for exact geometric computations
-#include <CGAL/Exact_predicates_exact_constructions_kernel.h>
+#include<CGAL/Exact_predicates_exact_constructions_kernel.h>
 
-// Define type aliases for convenience
 using K = CGAL::Exact_predicates_exact_constructions_kernel;
 using Point = K::Point_2;
 using Segment = K::Segment_2;
 using Ray = K::Ray_2;
 
-// Custom function to correctly floor a coordinate from CGAL's exact number type.
-// Standard std::floor on a converted double might be inaccurate.
 double floor_to_double(const K::FT& x) {
   double a = std::floor(CGAL::to_double(x));
   while (a > x) a -= 1;
-  while (a + 1 <= x) a += 1;
+  while (a+1 <= x) a += 1;
   return a;
-}
-
-void solve() {
-  int n;
-  std::cin >> n;
-  if (n == 0) {
-    exit(0);
-  }
-
-  // ===== READ INPUT =====
-  long x, y, a, b;
-  std::cin >> x >> y >> a >> b;
-  Ray ray(Point(x, y), Point(a, b));
-
-  std::vector<Segment> segments(n);
-  for (int i = 0; i < n; ++i) {
-    long r, s, t, u;
-    std::cin >> r >> s >> t >> u;
-    segments[i] = Segment(Point(r, s), Point(t, u));
-  }
-
-  // Randomly shuffle segments for better average-case performance
-  std::random_shuffle(segments.begin(), segments.end());
-
-  // ===== FIND FIRST HIT =====
-  bool hit_found = false;
-  Segment min_hit_segment; // Represents segment from ray origin to closest hit
-
-  for (const Segment& s : segments) {
-    if (!hit_found) {
-      // First phase: Intersect with the infinite ray
-      if (CGAL::do_intersect(ray, s)) {
-        hit_found = true;
-        auto intersection_obj = CGAL::intersection(ray, s);
-        if (const Point* p = boost::get<Point>(&*intersection_obj)) {
-          min_hit_segment = Segment(ray.source(), *p);
-        } else if (const Segment* seg = boost::get<Segment>(&*intersection_obj)) {
-          // If overlap, find the closer endpoint of the overlap
-          Point p1 = seg->source();
-          Point p2 = seg->target();
-          min_hit_segment = (CGAL::squared_distance(ray.source(), p1) < CGAL::squared_distance(ray.source(), p2))
-                           ? Segment(ray.source(), p1)
-                           : Segment(ray.source(), p2);
-        }
-      }
-    } else {
-      // Second phase: Intersect with the current shortest hit segment
-      if (CGAL::do_intersect(min_hit_segment, s)) {
-        auto intersection_obj = CGAL::intersection(min_hit_segment, s);
-        if (const Point* p = boost::get<Point>(&*intersection_obj)) {
-          // Update the shortest hit segment
-          min_hit_segment = Segment(ray.source(), *p);
-        } else if (const Segment* seg = boost::get<Segment>(&*intersection_obj)) {
-          // If overlap, find the closer endpoint and update
-          Point p1 = seg->source();
-          Point p2 = seg->target();
-          Point closer_point = (CGAL::squared_distance(ray.source(), p1) < CGAL::squared_distance(ray.source(), p2)) ? p1 : p2;
-          min_hit_segment = Segment(ray.source(), closer_point);
-        }
-      }
-    }
-  }
-
-  // ===== OUTPUT =====
-  if (hit_found) {
-    Point hit_point = min_hit_segment.target();
-    std::cout << std::setprecision(0) << std::fixed
-              << floor_to_double(hit_point.x()) << " "
-              << floor_to_double(hit_point.y()) << std::endl;
-  } else {
-    std::cout << "no" << std::endl;
-  }
 }
 
 int main() {
   std::ios_base::sync_with_stdio(false);
-  std::cin.tie(NULL);
-  while (true) {
-    solve();
+  
+  while(true) {
+    // ===== READ INPUT =====
+    int n; std::cin >> n;
+    if(!n) break;
+    
+    long x, y, a, b; std::cin >> x >> y >> a >> b;
+    Point o(x, y), d(a, b);
+    Ray ray(o, d);
+    
+    std::vector<Segment> segments(n);
+    for(int i = 0; i < n; ++i) {
+      long r, s, t, u; std::cin >> r >> s >> t >> u;
+      segments[i] = Segment(Point(r, s), Point(t, u));
+    }
+    std::random_shuffle(segments.begin(), segments.end());
+    
+    // ===== FIND FIRST HIT =====
+    bool found = false;
+    Segment curr_segment;
+    
+    for(const Segment& segment : segments) {
+      if(!found) {
+        if(CGAL::do_intersect(ray, segment)) {
+          std::result_of<K::Intersect_2(Ray, Segment)>::type its = CGAL::intersection(ray, segment);
+          found = true;
+          
+          if(const Point* its_p = boost::get<Point>(&*its)) {
+            curr_segment = Segment(ray.source(), *its_p);
+          } else if (const Segment* its_s = boost::get<Segment>(&*its)) {
+            Point source = its_s->source();
+            Point target = its_s->target();
+            
+            curr_segment = Segment(ray.source(),
+                                   CGAL::squared_distance(o, source) < CGAL::squared_distance(o, target) ? source : target);
+          } else {
+            throw std::runtime_error("Undefined intersection");
+          }
+        }
+      } else {
+        if(CGAL::do_intersect(curr_segment, segment)) {
+          std::result_of<K::Intersect_2(Segment, Segment)>::type its = CGAL::intersection(curr_segment, segment);
+          
+          if(const Point* its_p = boost::get<Point>(&*its)) {
+            curr_segment = Segment(curr_segment.source(), *its_p);
+          } else if (const Segment* its_s = boost::get<Segment>(&*its)) {
+            Point source = its_s->source();
+            Point target = its_s->target();
+            
+            curr_segment = Segment(o,
+                                   CGAL::squared_distance(o, source) < CGAL::squared_distance(o, target) ? source : target);
+          } else {
+            throw std::runtime_error("Undefined intersection");
+          }
+        }
+      }
+    }
+    
+    // ===== OUTPUT =====
+    if(found) {
+      std::cout << std::setprecision(0) << std::fixed;
+      std::cout << floor_to_double(curr_segment.target().x()) << " " << floor_to_double(curr_segment.target().y()) << std::endl;
+    } else {
+      std::cout << "no" << std::endl;
+    }
   }
-  return 0;
 }
 ```
 </details>

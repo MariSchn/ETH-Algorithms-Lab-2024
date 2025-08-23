@@ -32,7 +32,7 @@ The problem can be simplified by considering two disjoint cases for a valid plan
 ## ✨ Solutions
 
 <details>
-<summary>A Brute-Force Approach (Test Sets 1 & 2)</summary>
+<summary>First Solution(Test Sets 1, 2)</summary>
 
 ### Core Idea
 
@@ -63,8 +63,6 @@ This approach involves iterating through all pairs of waterways. There are $O(w^
 ```cpp
 #include <iostream>
 #include <vector>
-#include <numeric>
-#include <algorithm>
 
 void solve() {
   // ===== READ INPUT =====
@@ -74,9 +72,12 @@ void solve() {
   for(int i = 0; i < n; ++i) { std::cin >> required_men[i]; }
   
   std::vector<std::vector<int>> waterways(w);
+  std::vector<int> lengths(w);
   for(int i = 0; i < w; ++i) {
     int l; std::cin >> l;
-    waterways[i].resize(l);
+    lengths[i] = l;
+    waterways[i] = std::vector<int>(l);
+    
     for(int j = 0; j < l; ++j) {
       std::cin >> waterways[i][j];
     }
@@ -85,46 +86,56 @@ void solve() {
   // ===== SOLVE =====
   int max_size = 0;
   
-  // Create a combined path for every pair of waterways and apply sliding window
   for(int w_1 = 0; w_1 < w; ++w_1) {
-    for (int w_2 = 0; w_2 < w; ++w_2) {
-      std::vector<int> path;
-      // The path can be on a single waterway
-      if (w_1 == w_2) {
-        for(int island_idx : waterways[w_1]) {
-          path.push_back(required_men[island_idx]);
-        }
-      } else {
-        // Or on two waterways, connected at Pyke.
-        // Traverse waterway 1 in reverse, towards Pyke.
-        for(int i = waterways[w_1].size() - 1; i >= 0; --i) {
-          path.push_back(required_men[waterways[w_1][i]]);
-        }
-        // Traverse waterway 2 away from Pyke (skip Pyke itself as it's already added)
-        for(size_t i = 1; i < waterways[w_2].size(); ++i) {
-          path.push_back(required_men[waterways[w_2][i]]);
-        }
+    int l_1 = lengths[w_1]; // Length of 1st waterway
+    
+    // Perform Sliding Window on the first waterway
+    int left = 0;
+    int sum = 0;
+    for(int right = 0; right < l_1; ++right) {
+      sum += required_men[waterways[w_1][l_1 - 1 - right]];
+      
+      // Adjust left pointer
+      while(sum > k) {
+        sum -= required_men[waterways[w_1][l_1 - 1 - left]];
+        left++;
       }
-
-      // Standard Sliding Window
-      long long current_sum = 0;
-      int left = 0;
-      for (int right = 0; right < path.size(); ++right) {
-        current_sum += path[right];
-        while (current_sum > k) {
-          current_sum -= path[left];
-          left++;
+      
+      // If window is valid (sums up to k) update the maximum window size
+      if(sum == k) {
+        max_size = std::max(max_size, right - left + 1);
+      }
+    }
+    
+    // Continue Sliding Window on all other waterways
+    for(int w_2 = w_1 + 1; w_2 < w; ++w_2) {
+      int l_2 = lengths[w_2]; // Length of the 2nd waterway
+      
+      // Copy left and sum as they need to be reset after each waterway
+      int curr_left = left;
+      int curr_sum = sum;
+      
+      // Perform Sliding Window on the second waterway
+      for(int right = l_1; right < l_1 + l_2 - 1 ; ++right) {
+        curr_sum += required_men[waterways[w_2][right + 1 - l_1]];
+        
+        // Adjust left pointer
+        while(curr_sum > k) {
+          // left can still be on the first waterway
+          if(curr_left < l_1) {
+            curr_sum -= required_men[waterways[w_1][l_1 - 1 - curr_left]];
+          } else {
+            curr_sum -= required_men[waterways[w_2][curr_left + 1 - l_1]];
+          }
+          curr_left++;
         }
-        if (current_sum == k) {
-          max_size = std::max(max_size, right - left + 1);
+        
+        // If window is valid (sums up to k) update the maximum window size
+        if(curr_sum == k) {
+          max_size = std::max(max_size, right - curr_left + 1);
         }
       }
     }
-  }
-
-  // Handle case where k=0, which means no islands can be conquered
-  if (k == 0) {
-      max_size = 0;
   }
   
   // ===== OUTPUT =====
@@ -133,19 +144,16 @@ void solve() {
 
 int main() {
   std::ios_base::sync_with_stdio(false);
-  std::cin.tie(NULL);
   
   int n_tests; std::cin >> n_tests;
   while(n_tests--) { solve(); }
-  return 0;
 }
 ```
-*Note: The provided student code was slightly different. The version above has been adjusted for clarity and correctness, representing the described brute-force logic more directly.*
 
 </details>
 
 <details>
-<summary>An Optimal O(N) Solution with Hashing</summary>
+<summary>Final Solution</summary>
 
 ### Decomposing the Problem
 
@@ -201,14 +209,13 @@ The overall time complexity is $O(n) + O(n) = O(n)$, which is efficient enough f
 #include <vector>
 #include <unordered_map>
 #include <algorithm>
-#include <numeric>
+
+// [Prefix Sum, Distance to 0, Waterway Index]
+typedef std::tuple<int, int, int> Path;
 
 void solve() {
   // ===== READ INPUT =====
-  int n;
-  long long k;
-  int w;
-  std::cin >> n >> k >> w;
+  int n, k, w; std::cin >> n >> k >> w;
   
   std::vector<int> required_men(n);
   for(int i = 0; i < n; ++i) { std::cin >> required_men[i]; }
@@ -216,10 +223,10 @@ void solve() {
   std::vector<std::vector<int>> waterways(w);
   for(int i = 0; i < w; ++i) {
     int l; std::cin >> l;
-    waterways[i].resize(l);
+    waterways[i] = std::vector<int>(l);
+
     for(int j = 0; j < l; ++j) {
       int r; std::cin >> r;
-      // Store costs directly instead of island indices for convenience
       waterways[i][j] = required_men[r];
     }
   }
@@ -229,13 +236,12 @@ void solve() {
   // ===== SOLVE =====
   int max_size = 0;
   
-  // Case 1: Search for maximum size on each waterway individually
+  // Search for maximum size on each waterway individually
   for(int i = 0; i < w; ++i) {
     int l = waterways[i].size();
     
     // Perform Sliding Window over waterway i
-    long long sum = 0;
-    int left = 0;
+    int sum, left; sum = left = 0;
     for(int right = 0; right < l; ++right) {
       sum += waterways[i][right];
       
@@ -250,43 +256,43 @@ void solve() {
     }
   }
   
-  // Case 2: Search for maximum size across 2 waterways
-  std::unordered_map<long long, int> men_to_max_num_islands; // num_men -> most islands
-  
+  // Search for maximum size for 2 waterways
+  std::unordered_map<int, int> men_to_max_num_islands; // num_men -> most islands
+  std::vector<int> prefix_sums; // stores the 
   for(int w_idx = 0; w_idx < w; ++w_idx) {
-    // Calculate Prefix Sums for segments on the current waterway starting after Pyke
-    std::vector<long long> prefix_sums;
+    // Calculate Prefix Sums for the current waterway i
+    prefix_sums = std::vector<int>(1, 0);
     
-    long long current_sum = 0;
-    // Iterate from island 1 (after Pyke)
-    for(size_t i = 1; i < waterways[w_idx].size(); ++i) {
-      current_sum += waterways[w_idx][i];
-      // Optimization: No need to extend path if cost already exceeds k
-      if(current_sum + CENTER_COST > k) { break; } 
-      prefix_sums.push_back(current_sum);
+    const int l = waterways[w_idx].size();
+    int sum = 0;
+    for(int i = 1; i < l; ++i) {
+      sum += waterways[w_idx][i];
+      if(sum >= k) { break; } // Capturing all visited islands on the current waterway would require at least all k men, so it is not possible to be used in a combination of 2 waterways
+      prefix_sums.push_back(sum);
     }
     
-    // For each segment on the current waterway, check for a complement in previously seen waterways
-    for(size_t i = 0; i < prefix_sums.size(); ++i) {
-      long long path_len = i + 1;
-      long long current_cost = prefix_sums[i];
-      long long complement = k - current_cost - CENTER_COST;
+    const int l_sums = prefix_sums.size();
+    
+    // Check for each island j along the current waterway if the complement (k - [sums[j]) has already been seen before, if so this would form a valid window
+    for(int i = 1; i < l_sums; ++i) {
+      int complement = k - prefix_sums[i] - CENTER_COST;
 
-      if(men_to_max_num_islands.count(complement)) {
-        // Found a valid two-waterway path
-        max_size = std::max(max_size, (int)path_len + men_to_max_num_islands[complement] + 1); // +1 for Pyke
+      if(men_to_max_num_islands.find(complement) != men_to_max_num_islands.end()) {
+        // We have previously seen a waterway along which the remaining men could be used
+        max_size = std::max(max_size, i + men_to_max_num_islands[complement] + 1); // + 1 to account for the center
       }
     }
     
-    // Add the paths from this waterway to the map for future waterways to use
-    for(size_t i = 0; i < prefix_sums.size(); ++i) {
-        long long path_len = i + 1;
-        long long current_cost = prefix_sums[i];
-        if(!men_to_max_num_islands.count(current_cost)) {
-            men_to_max_num_islands[current_cost] = path_len;
-        } else {
-            men_to_max_num_islands[current_cost] = std::max(men_to_max_num_islands[current_cost], (int)path_len);
-        }
+    // Add the results from this waterway to the Hash Map
+    for(int i = 1; i < l_sums; ++i) {
+      // Check if there already exists an entry for the number men
+      if(men_to_max_num_islands.find(prefix_sums[i]) == men_to_max_num_islands.end()) {
+        // We have not encountered this amount of (remaining) men so create a new entry
+        men_to_max_num_islands[prefix_sums[i]] = i;
+      } else {
+        // We have previously encountered this amount of (remaining) men so only update if we can now capture more islands
+        men_to_max_num_islands[prefix_sums[i]] = std::max(men_to_max_num_islands[prefix_sums[i]], i);
+      }
     }
   }
   
@@ -296,11 +302,9 @@ void solve() {
 
 int main() {
   std::ios_base::sync_with_stdio(false);
-  std::cin.tie(NULL);
   
   int n_tests; std::cin >> n_tests;
   while(n_tests--) { solve(); }
-  return 0;
 }
 ```
 

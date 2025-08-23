@@ -52,60 +52,40 @@ To overcome these issues, we can leverage the **Computational Geometry Algorithm
 This approach effectively delegates the difficult and error-prone geometric calculations to a specialized, well-tested library, leading to a simple and correct solution.
 
 ```cpp
-#include <iostream>
-#include <vector>
+#include<iostream>
+#include<vector>
 
-// Include the CGAL kernel for exact predicates and inexact constructions.
-#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
+#include<CGAL/Exact_predicates_inexact_constructions_kernel.h>
 
-// Define a type alias for the kernel for convenience.
 using K = CGAL::Exact_predicates_inexact_constructions_kernel;
 
 int main() {
-  // Fast I/O
   std::ios_base::sync_with_stdio(false);
-  std::cin.tie(NULL);
-
-  while (true) {
-    int n;
-    std::cin >> n;
-    if (!n) {
-      break; // Terminate on n=0
-    }
-
-    // Read the points defining the ray. Use long for large coordinates.
-    long x, y, a, b;
-    std::cin >> x >> y >> a >> b;
-    // Create a CGAL Ray object.
+  
+  while(true) {
+    int n; std::cin >> n;
+    if(!n) break;
+    
+    long x, y, a, b; std::cin >> x >> y >> a >> b;
     K::Ray_2 ray(K::Point_2(x, y), K::Point_2(a, b));
 
     bool hit = false;
 
-    // Iterate through each of the n obstacle segments.
-    for (int j = 0; j < n; ++j) {
-      long r, s, t, u;
-      std::cin >> r >> s >> t >> u;
-
-      // If we've already found a hit, we just need to consume the remaining
-      // input for this test case without processing it.
-      if (hit) continue;
-      
-      // Create a CGAL Segment object.
+    for(int j = 0; j < n; ++j) {
+      long r, s, t, u; std::cin >> r >> s >> t >> u;
+  
       K::Segment_2 segment(K::Point_2(r, s), K::Point_2(t, u));
-
-      // Use CGAL's robust intersection test.
-      if (CGAL::do_intersect(ray, segment)) {
+      
+      if(CGAL::do_intersect(ray, segment)) {
+        for(; j < n - 1; ++j) std::cin >> r >> s >> t >> u;
         hit = true;
+        break;
       }
     }
-
-    if (hit) {
-      std::cout << "yes\n";
-    } else {
-      std::cout << "no\n";
-    }
+    
+    if (hit) std::cout << "yes" << std::endl;
+    else std::cout << "no" << std::endl;
   }
-  return 0;
 }
 ```
 
