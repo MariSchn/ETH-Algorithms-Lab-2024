@@ -34,6 +34,77 @@ There are efficient, well-known algorithms to find all bridges in a graph in lin
 
 <details>
 
+<summary>First Solution (Test Set 1, 3)</summary>
+
+This solution uses a **brute force approach** to identify critical bridges. The core idea is straightforward: for each edge in the graph, temporarily remove it and check if the graph becomes disconnected.
+
+The algorithm works as follows:
+1. **Build the graph** using the Boost Graph Library's `adjacency_list` and store all edges in a separate vector for iteration.
+2. **Test each edge individually**: For every edge, remove it from the graph and use `boost::connected_components` to count the number of connected components.
+3. **Identify critical edges**: If removing an edge results in more than one connected component, the edge is critical (a bridge).
+4. **Restore the edge** and continue testing the next one.
+
+While this approach is conceptually simple and easy to implement, it has a significant drawback in terms of efficiency. The time complexity is $O(M \cdot (N + M))$, where we perform $M$ connectivity checks, each taking $O(N + M)$ time. For large graphs, this becomes too slow, which is why it only passes the smaller test sets.
+
+### Code
+
+```cpp
+#include<iostream>
+#include<cmath>
+
+#include<boost/graph/adjacency_list.hpp>
+#include <boost/graph/connected_components.hpp>
+
+using Graph = boost::adjacency_list<boost::vecS, boost::vecS, boost::undirectedS>;
+using EdgeIterator = boost::graph_traits<Graph>::edge_iterator; 
+
+
+int main() {
+  std::ios_base::sync_with_stdio(false);
+  
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) {
+    // ===== READ INPUT ===== 
+    int n, m; std::cin >> n >> m;
+    
+    Graph g(n);
+    std::vector<std::pair<int, int>> edges;
+    
+    for(int i = 0; i < m; i++) {
+      int v, w; std::cin >> v >> w;
+      
+      boost::add_edge(v, w, g);
+      edges.push_back(std::pair<int, int>(v, w));
+    }
+    
+    // ===== FIND CRITICAL EDGES =====
+    std::vector<std::pair<int, int>> critical_edges;
+    for(const std::pair<int, int>& edge : edges) {
+      boost::remove_edge(edge.first, edge.second, g);
+      
+      std::vector<int> component(n);
+      if(boost::connected_components(g, &component[0]) > 1) {
+        critical_edges.push_back(std::pair<int, int>(std::min(edge.first, edge.second),
+                                                     std::max(edge.first, edge.second)));
+      }
+      
+      boost::add_edge(edge.first, edge.second, g);
+    }
+    
+    // ===== OUTPUT =====
+    std::sort(critical_edges.begin(), critical_edges.end());
+    std::cout << critical_edges.size() << std::endl;
+    for(const std::pair<int, int>& edge : critical_edges) {
+      std::cout << edge.first << " " << edge.second << "\n";
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+
 <summary>Final Solution</summary>
 
 The problem can be modeled using a graph, where each island is one node and the bridges are edges between the nodes. It remains to get a more formal definition of a critical bridge in graph theory.
