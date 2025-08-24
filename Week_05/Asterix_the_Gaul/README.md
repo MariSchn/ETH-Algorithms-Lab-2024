@@ -24,7 +24,7 @@ A solution that checks all $2^N$ subsets is too slow when $N=30$, as $2^{30}$ is
 ## ✨ Solutions
 
 <details>
-<summary>First Solution (Test Sets 1-3)</summary>
+<summary>First Solution (Test Sets 1, 2, 3)</summary>
 This problem asks us to select a subset of movements to satisfy certain conditions, which is a variation of the classic **Subset Sum Problem**. Since these problems are generally NP-complete, we expect a solution with exponential time complexity. For the smaller constraints where $N \le 20$, a brute-force approach that checks every possible subset of movements is feasible.
 
 The overall strategy can be broken down into two main phases:
@@ -81,56 +81,46 @@ void solve() {
   }
   
   // ===== SOLVE =====
-  // For every number of moves k in [0, n], find the max distance achievable in less than T seconds without potions.
+  // For every number of moves [0, 1, ..., n] calculate the furthest we can reach WITHOUT drinking any potion in the given time T
   std::vector<long> n_moves_to_best_raw_distance(n + 1, MIN_LONG);
-  for (int s = 0; s < (1 << n); ++s) { // Iterate through all 2^n subsets of moves
+  for (int s = 0; s < 1<<n; ++s) { // Iterate through all subsets of moves
     long sum_distance = 0;
     long sum_time = 0;
     int n_moves = 0;
     
-    // Calculate total distance, time, and move count for the current subset
+    // Calculate total distance, time, and move count of the subset
     for (int i = 0; i < n; ++i) {
-      if (s & (1 << i)) { // Check if the i-th move is in the subset
+      if (s & 1<<i) { // Move i is in the subset
         sum_distance += moves[i].first;
         sum_time += moves[i].second;
         n_moves++;
       }
     }
     
-    // If the time is valid, update the max distance for this number of moves
-    if (sum_time < T) {
-      n_moves_to_best_raw_distance[n_moves] = std::max(n_moves_to_best_raw_distance[n_moves], sum_distance);
-    }
+    if(sum_time >= T) { continue; } // Subset takes too long
+    
+    n_moves_to_best_raw_distance[n_moves] = std::max(n_moves_to_best_raw_distance[n_moves], sum_distance);
   }
   
+  // Check for every possible number of moves, the minimum number of potion needed to reach Panoramix with this amount of moves
+  // output the minimum number of potions among all possible number of moves
   long min_gulps = MAX_LONG;
-  // If we can reach Panoramix with 0 moves (D<=0), 0 gulps are needed.
-  if (D <= 0) {
-    min_gulps = 0;
-  }
-
-  // For each possible number of moves, find the minimum gulps needed.
-  for (int n_moves = 1; n_moves <= n; ++n_moves) {
-    // Skip if there's no way to make n_moves in time.
-    if (n_moves_to_best_raw_distance[n_moves] == MIN_LONG) {
-      continue;
+  for(int n_moves = 1; n_moves <= n; ++n_moves) {
+    if (n_moves_to_best_raw_distance[n_moves] == MIN_LONG) { continue; }
+    
+    long remaining_distance = D - n_moves_to_best_raw_distance[n_moves];  // Calculate remaining distance to reach Panoramix
+    if(remaining_distance <= 0) {
+      min_gulps = 0;
+      break;
     }
     
-    long remaining_distance = D - n_moves_to_best_raw_distance[n_moves];
-    if (remaining_distance <= 0) {
-      min_gulps = 0; // Reachable without any potion
-      break; // 0 is the best possible, so we can stop.
-    }
+    // Calculate how much boost would be required to reach Panoramix with 
+    long necessary_boost = std::ceil(((double) remaining_distance) / ((double) n_moves));
     
-    // Calculate the required boost per move. Use ceiling division.
-    long necessary_boost = (remaining_distance + n_moves - 1) / n_moves;
-    
-    // Find the first potion that provides at least the necessary boost.
-    auto potion_iter = std::lower_bound(boosts.begin(), boosts.end(), necessary_boost);
-    if (potion_iter != boosts.end()) {
-      // The number of gulps is the 1-based index of the potion.
-      long gulps_needed = std::distance(boosts.begin(), potion_iter) + 1;
-      min_gulps = std::min(min_gulps, gulps_needed);
+    // Check if it is possible to gain that boost using the potions
+    const auto potion_iter = std::lower_bound(std::begin(boosts), std::end(boosts), necessary_boost);
+    if (potion_iter != std::end(boosts)) {
+      min_gulps = std::min(min_gulps, potion_iter - std::begin(boosts) + 1);
     }
   }
   
@@ -144,7 +134,6 @@ void solve() {
 
 int main() {
   std::ios_base::sync_with_stdio(false);
-  std::cin.tie(NULL);
   
   int n_tests; std::cin >> n_tests;
   while(n_tests--) { solve(); }
@@ -181,128 +170,100 @@ The previous solution's $O(2^N \cdot N)$ complexity is too slow for the full con
 #include <array>
 #include <limits>
 
+using vi = std::vector<int>;
 using vpii = std::vector<std::pair<int, int>>;
 
-// These are global to be accessible by the recursive helper and solve function.
 vpii moves;
-std::vector<int> potions;
-// Arrays to store results for the two halves, indexed by number of moves.
-// Each element is a pair of (remaining_time, remaining_distance).
-std::array<std::vector<std::pair<int64_t, int64_t>>, 16> first_half;
-std::array<std::vector<std::pair<int64_t, int64_t>>, 16> second_half;
-// Final best results after combining halves.
-std::array<int64_t, 31> best_rem_dist;
+vi potions;
+std::array<std::vector<std::pair<int64_t, int64_t>>, 16> first_half, second_half;
+std::array<int64_t, 31> best_without_potion;
 
-// Recursive function to generate all subsets for a half.
-// It calculates remaining time and distance from the initial T and D.
-void dfs_fill(int move_idx, int moves_used, int64_t rem_dist, int64_t rem_time, int max_move_idx, auto &arr) {
-  if (rem_time <= 0) return; // Path is already too long
-  if (move_idx >= max_move_idx) {
-    arr[moves_used].emplace_back(rem_time, rem_dist);
+void dfs_fill(int move, int moves_used, int64_t distance, int64_t time, int max_move, std::array<std::vector<std::pair<int64_t, int64_t>>, 16> &arr) {
+  if (time <= 0) return;
+  if (move >= max_move) {
+    arr[moves_used].emplace_back(time, distance);
     return;
   }
-  // Recurse without taking the current move
-  dfs_fill(move_idx + 1, moves_used, rem_dist, rem_time, max_move_idx, arr);
-  // Recurse taking the current move
-  dfs_fill(move_idx + 1, moves_used + 1, rem_dist - moves[move_idx].first, rem_time - moves[move_idx].second, max_move_idx, arr);
+  dfs_fill(move + 1, moves_used, distance, time, max_move, arr);
+  dfs_fill(move + 1, moves_used + 1, distance - moves[move].first, time - moves[move].second, max_move, arr);
 }
 
-// Filters out suboptimal pairs.
-// For a given time, we only need the one that minimizes remaining distance.
-// For two pairs (t1, d1) and (t2, d2), if t1 > t2, we need d1 < d2 for it to be optimal.
-void sort_and_remove_suboptimal(auto &arr) {
+void sort_and_remove_suboptimal(std::array<std::vector<std::pair<int64_t, int64_t>>, 16> &arr) {
   for (auto &row : arr) {
     if (row.size() <= 1) continue;
-    // Sort by rem_time ascending, then rem_dist ascending.
-    std::sort(row.begin(), row.end());
-    // Remove duplicates and entries that are worse than previous ones.
-    std::vector<std::pair<int64_t, int64_t>> optimal_row;
-    optimal_row.push_back(row[0]);
-    for (size_t i = 1; i < row.size(); ++i) {
-        // Keep a point if it has a better (smaller) remaining distance
-        // than the last kept optimal point.
-        if (row[i].second < optimal_row.back().second) {
-            optimal_row.push_back(row[i]);
-        }
+    std::sort(row.begin(), row.end(), [](const auto &a, const auto &b) {
+      return a.first < b.first || (a.first == b.first && a.second > b.second);
+    });
+    int64_t min_distance = row.back().second;
+    for (int i = row.size() - 2; i >= 0; --i) {
+      if (row[i].second >= min_distance) row.erase(row.begin() + i);
+      else min_distance = row[i].second;
     }
-    row = optimal_row;
   }
 }
 
-void clear_globals() {
+void clear() {
   for (auto &v : first_half) v.clear();
   for (auto &v : second_half) v.clear();
 }
 
 void solve() {
-  clear_globals();
-  int n, m;
-  int64_t D, T;
-  std::cin >> n >> m >> D >> T;
+  clear();
+  int nr_moves, nr_potions;
+  int64_t distance, time;
+  std::cin >> nr_moves >> nr_potions >> distance >> time;
 
-  moves.resize(n);
-  for (auto &move : moves) std::cin >> move.first >> move.second;
+  moves.resize(nr_moves);
+  for (auto &m : moves) std::cin >> m.first >> m.second;
 
-  potions.resize(m);
+  potions.resize(nr_potions);
   for (auto &p : potions) std::cin >> p;
-  // Potions are not guaranteed to be sorted in the input.
   std::sort(potions.begin(), potions.end());
 
-  best_rem_dist.fill(std::numeric_limits<int64_t>::max());
-  
-  int n_half = n / 2;
-  dfs_fill(0, 0, D, T, n_half, first_half);
-  dfs_fill(n_half, 0, 0, T, n, second_half); // Note: rem_dist starts at 0 for the second half
-  
+  best_without_potion.fill(std::numeric_limits<int64_t>::max());
+  dfs_fill(0, 0, distance, time, (nr_moves + 1) / 2, first_half);
+  dfs_fill((nr_moves + 1) / 2, 0, distance, time, nr_moves, second_half);
+
   sort_and_remove_suboptimal(first_half);
   sort_and_remove_suboptimal(second_half);
 
-  // Combine results from both halves
-  for (int i = 0; i <= n_half; ++i) {
-    for (const auto &p1 : first_half[i]) {
-      for (int j = 0; j <= n - n_half; ++j) {
-        if(second_half[j].empty()) continue;
-
-        // Find partner in second half s.t. p1.rem_time + p2.rem_time > T
-        // This is equivalent to p2.rem_time > T - p1.rem_time
-        // We want the partner with the minimum remaining distance.
-        auto it = std::lower_bound(second_half[j].begin(), second_half[j].end(), std::make_pair(T - p1.first, (int64_t) -1));
-        if (it != second_half[j].begin()) {
-            --it; // The last element that satisfies the time condition
-            int64_t combined_rem_dist = p1.second + it->second;
-            best_rem_dist[i + j] = std::min(best_rem_dist[i + j], combined_rem_dist);
-        }
+  for (int i = 0; i <= (nr_moves + 1) / 2; i++) {
+    for (const auto &elem : first_half[i]) {
+      for (int j = 0; j <= nr_moves / 2; j++) {
+        const auto &row = second_half[j];
+        auto it = std::upper_bound(row.begin(), row.end(), time - elem.first, [](const auto &value, const auto &elem) {
+          return value < elem.first;
+        });
+        if (it == row.end()) break;
+        best_without_potion[i + j] = std::min(best_without_potion[i + j], elem.second + it->second - distance);
       }
     }
   }
 
-  int64_t min_gulps = std::numeric_limits<int64_t>::max();
-  if (D <= 0) min_gulps = 0;
-
-  for (int k = 1; k <= n; ++k) {
-    if (best_rem_dist[k] <= 0) {
-      min_gulps = 0;
-      break;
+  int64_t best = std::numeric_limits<int64_t>::max();
+  for (int i = 1; i <= nr_moves; i++) {
+    if (best_without_potion[i] <= 0) {
+      std::cout << "0\n";
+      return;
     }
-    if (best_rem_dist[k] != std::numeric_limits<int64_t>::max()) {
-      int64_t needed_boost = (best_rem_dist[k] + k - 1) / k;
-      auto it = std::lower_bound(potions.begin(), potions.end(), needed_boost);
-      if (it != potions.end()) {
-        min_gulps = std::min(min_gulps, (int64_t)(it - potions.begin() + 1));
-      }
+    if (best_without_potion[i] != std::numeric_limits<int64_t>::max()) {
+      int64_t needed_gain = (best_without_potion[i] - 1) / i + 1;
+      auto it = std::lower_bound(potions.begin(), potions.end(), needed_gain);
+      if (it != potions.end()) best = std::min(best, (int64_t)(it - potions.begin() + 1));
     }
   }
-  
-  if (min_gulps == std::numeric_limits<int64_t>::max()) {
-    std::cout << "Panoramix captured" << std::endl;
+
+  if (best == std::numeric_limits<int64_t>::max()) {
+    std::cout << "Panoramix captured" << std::endl;;
   } else {
-    std::cout << min_gulps << std::endl;
+    std::cout << best << std::endl;;
   }
 }
 
 int main() {
     std::ios_base::sync_with_stdio(false);
     std::cin.tie(nullptr);
+
     int n_tests; std::cin >> n_tests;
     while (n_tests--) { solve(); }
 }
