@@ -56,62 +56,51 @@ The Computational Geometry Algorithms Library (CGAL) provides a robust and easy-
 This method reduces the complexity from the inefficient $O(N \cdot M)$ to roughly $O(N \log N + M \log N)$, which is well within the time limits.
 
 ```cpp
-#include <iostream>
-#include <vector>
-#include <iomanip>
+#include<iostream>
+#include<vector>
 
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Delaunay_triangulation_2.h>
 
-// Define CGAL kernel and data types
 using K = CGAL::Exact_predicates_inexact_constructions_kernel;
 using Triangulation = CGAL::Delaunay_triangulation_2<K>;
 using Point = K::Point_2;
 
-void solve() {
-  int n;
-  std::cin >> n;
-  if (n == 0) exit(0); // Terminate program if n is 0
-
-  // Read existing restaurant locations
-  std::vector<Point> restaurants(n);
-  for (int i = 0; i < n; ++i) {
-    long x, y; // Use long to handle large coordinates
-    std::cin >> x >> y;
-    restaurants[i] = Point(x, y);
-  }
-
-  // Construct the Delaunay triangulation from existing restaurant locations
-  Triangulation t;
-  t.insert(restaurants.begin(), restaurants.end());
-
-  int m;
-  std::cin >> m;
-  
-  // Set output to fixed-point notation for large numbers
-  std::cout << std::setprecision(0) << std::fixed;
-
-  // Process each query for a new restaurant location
-  for (int i = 0; i < m; ++i) {
-    long x, y;
-    std::cin >> x >> y;
-    Point query_point(x, y);
-
-    // Find the nearest existing restaurant (vertex in the triangulation)
-    Point closest_point = t.nearest_vertex(query_point)->point();
-    
-    // Compute and print the squared distance
-    K::FT distance = CGAL::squared_distance(query_point, closest_point);
-    std::cout << distance << std::endl;
-  }
-}
 
 int main() {
   std::ios_base::sync_with_stdio(false);
-  while (true) {
-    solve();
+  
+  while(true) {
+    // ===== READ INPUT =====
+    int n; std::cin >> n;
+    if (n == 0) break;  // Test if input was terminated
+    
+    std::vector<Point> restaurants(n);
+    for(int i = 0; i < n; ++i) {
+      int x, y; std::cin >> x >> y;
+      restaurants[i] = Point(x, y);
+    }
+    
+    int m; std::cin >> m;
+    std::vector<Point> new_restaurants(m);
+    for(int i = 0; i < m; ++i) {
+      int x, y; std::cin >> x >> y;
+      new_restaurants[i] = Point(x, y);
+    }
+    
+    // ===== CONSTRUCT TRIANGULATION & CALCULATE DISTANCEES =====
+    Triangulation t;
+    t.insert(restaurants.begin(), restaurants.end());
+    
+    // Disable scientific notation (e+10) in output
+    std::cout << std::setprecision(0) << std::fixed;
+    for(const Point& query_point : new_restaurants) {
+      Point closest_point = t.nearest_vertex(query_point)->point();
+      K::FT distance = CGAL::squared_distance(query_point, closest_point);
+      
+      std::cout << distance << std::endl;
+    }
   }
-  return 0;
 }
 ```
 </details>
