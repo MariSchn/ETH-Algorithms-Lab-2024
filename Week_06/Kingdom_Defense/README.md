@@ -100,35 +100,33 @@ void solve() {
   const vertex_desc v_source = boost::add_vertex(G);
   const vertex_desc v_sink = boost::add_vertex(G);
   
-  long total_garrison = 0;
-  long total_demand = 0;
+  int in_capacity = 0;
+  int out_capacity = 0;
   for(int i = 0; i < l; ++i) {
     int g, d; std::cin >> g >> d;
     adder.add_edge(v_source, i, g);
     adder.add_edge(i, v_sink, d);
 
-    total_garrison += g;
-    total_demand += d;
+    in_capacity += g;
+    out_capacity += d;
   }
   
-  // Quick check for impossibility
-  if(total_garrison < total_demand) {
-    for(int i = 0; i < p; ++i) { int f, t, c, C; std::cin >> f >> t >> c >> C; }
+  if(in_capacity < out_capacity) {
+    // Not enough soldiers 
     std::cout << "no" << std::endl;
     return;
   }
   
   for(int i = 0; i < p; ++i) {
     int f, t, c, C; std::cin >> f >> t >> c >> C;
-    // For test set 1, c is always 0, so we just use C as capacity.
-    adder.add_edge(f, t, C);
+    adder.add_edge(f, t, C); // TODO: Change this. This should only work for first test set
   }
   
   // ===== CALCULATE MAX FLOW =====
   long flow = boost::push_relabel_max_flow(G, v_source, v_sink);
   
   // ===== OUTPUT =====
-  if(flow >= total_demand) {
+  if(flow >= out_capacity) {
     std::cout << "yes" << std::endl;
   } else {
     std::cout << "no" << std::endl;
@@ -172,7 +170,6 @@ The logic remains the same: a solution is possible if the max flow equals the to
 
 ```cpp
 #include<iostream>
-#include<vector>
 
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/push_relabel_max_flow.hpp>
@@ -208,57 +205,53 @@ class edge_adder {
 };
 
 void solve() {
-  // ===== READ INPUT =====
+  // ===== READ INPUT & BUILD GRAPH =====
   int l, p; std::cin >> l >> p;
   
-  const vertex_desc v_source = l;
-  const vertex_desc v_sink = l + 1;
-  graph G(l + 2);
+  graph G(l);
   edge_adder adder(G);
   
-  std::vector<long> effective_garrison(l);
+  const vertex_desc v_source = boost::add_vertex(G);
+  const vertex_desc v_sink = boost::add_vertex(G);
   
-  long total_garrison = 0;
-  long total_demand = 0;
+  std::vector<int> in_capacities(l);
+  
+  int in_capacity = 0;
+  int out_capacity = 0;
   for(int i = 0; i < l; ++i) {
-    long d; 
-    std::cin >> effective_garrison[i] >> d;
-    adder.add_edge(i, v_sink, d);
+    int g, d; std::cin >> in_capacities[i] >> d;
+    adder.add_edge(i, v_sink, d); // Only add "out_capacity"
 
-    total_garrison += effective_garrison[i];
-    total_demand += d;
+    in_capacity += in_capacities[i];
+    out_capacity += d;
   }
   
-  if(total_garrison < total_demand) {
-    for(int i = 0; i < p; ++i) { int f, t, c, C; std::cin >> f >> t >> c >> C; }
+  if(in_capacity < out_capacity) {
+    // Not enough soldiers 
     std::cout << "no" << std::endl;
     return;
   }
   
   for(int i = 0; i < p; ++i) {
-    int f, t;
-    long c, C; 
-    std::cin >> f >> t >> c >> C;
+    int f, t, c, C; std::cin >> f >> t >> c >> C;
     
-    // Adjust garrisons based on mandatory flow c
-    effective_garrison[f] -= c;
-    effective_garrison[t] += c;
+    // Adjust "in_capacities" based on minimum amount of soldiers along a path (c)
+    in_capacities[f] -= c;
+    in_capacities[t] += c;
     
-    // Add path with remaining capacity
     adder.add_edge(f, t, C - c);
   }
   
-  // Add supply edges with (potentially negative) effective garrisons
+  // Add "in_capacities" as edges
   for(int i = 0; i < l; ++i) {
-    // BUG: effective_garrison[i] can be negative, which is invalid for capacity.
-    adder.add_edge(v_source, i, effective_garrison[i]);
+    adder.add_edge(v_source, i, in_capacities[i]);
   }
   
   // ===== CALCULATE MAX FLOW =====
   long flow = boost::push_relabel_max_flow(G, v_source, v_sink);
   
   // ===== OUTPUT =====
-  if(flow >= total_demand) {
+  if(flow >= out_capacity) {
     std::cout << "yes" << std::endl;
   } else {
     std::cout << "no" << std::endl;
@@ -339,61 +332,53 @@ class edge_adder {
 };
 
 void solve() {
-  // ===== READ INPUT =====
+  // ===== READ INPUT & BUILD GRAPH =====
   int l, p; std::cin >> l >> p;
   
-  const vertex_desc v_source = l;
-  const vertex_desc v_sink = l + 1;
-  graph G(l + 2);
+  graph G(l);
   edge_adder adder(G);
   
-  std::vector<long> effective_garrison(l);
+  const vertex_desc v_source = boost::add_vertex(G);
+  const vertex_desc v_sink = boost::add_vertex(G);
   
-  long total_garrison = 0;
-  long total_demand = 0;
+  std::vector<int> in_capacities(l);
+  
+  int in_capacity = 0;
+  int out_capacity = 0;
   for(int i = 0; i < l; ++i) {
-    long d; 
-    std::cin >> effective_garrison[i] >> d;
-    adder.add_edge(i, v_sink, d); // Add demand edge for location i
+    int d; std::cin >> in_capacities[i] >> d;
+    adder.add_edge(i, v_sink, d); // Only add "out_capacity"
 
-    total_garrison += effective_garrison[i];
-    total_demand += d;
+    in_capacity += in_capacities[i];
+    out_capacity += d;
   }
   
-  // Pre-computation: if total soldiers are not enough, impossible.
-  if(total_garrison < total_demand) {
-    // Still need to read the rest of the input for this test case
-    for(int i = 0; i < p; ++i) { int f, t, c, C; std::cin >> f >> t >> c >> C; }
+  if(in_capacity < out_capacity) {
+    // Not enough soldiers 
     std::cout << "no" << std::endl;
     return;
   }
   
   for(int i = 0; i < p; ++i) {
-    int f, t;
-    long c, C; 
-    std::cin >> f >> t >> c >> C;
+    int f, t, c, C; std::cin >> f >> t >> c >> C;
     
-    // Adjust garrisons based on mandatory flow 'c'
-    effective_garrison[f] -= c;
-    effective_garrison[t] += c;
+    // Adjust "in_capacities" based on minimum amount of soldiers along a path (c)
+    in_capacities[f] -= c;
+    in_capacities[t] += c;
     
-    // Add path edge with remaining capacity for optional flow
     adder.add_edge(f, t, C - c);
   }
   
-  // Add supply edges from source to each location
+  // Add "in_capacities" as edges
   for(int i = 0; i < l; ++i) {
-    // Correctly handle negative effective garrisons by clamping capacity at 0.
-    // A negative value means a deficit, not a supply.
-    adder.add_edge(v_source, i, std::max(0L, effective_garrison[i]));
+    adder.add_edge(v_source, i, std::max(in_capacities[i], 0));
   }
   
   // ===== CALCULATE MAX FLOW =====
   long flow = boost::push_relabel_max_flow(G, v_source, v_sink);
-  
+
   // ===== OUTPUT =====
-  // If max flow can satisfy total demand, a solution exists.
-  if(flow >= total_demand) {
+  if(flow >= out_capacity) {
     std::cout << "yes" << std::endl;
   } else {
     std::cout << "no" << std::endl;
