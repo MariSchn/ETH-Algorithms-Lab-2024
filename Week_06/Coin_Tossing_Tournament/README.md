@@ -63,14 +63,11 @@ In summary, the problem is solvable if and only if `score_sum == M` and `max_flo
 The following C++ code uses the Boost Graph Library to implement this max-flow solution.
 
 ```cpp
-#include <iostream>
-#include <vector>
-#include <numeric>
+#include<iostream>
 
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/push_relabel_max_flow.hpp>
 
-// Define graph types for Boost Graph Library
 using traits = boost::adjacency_list_traits<boost::vecS, boost::vecS, boost::directedS>;
 using graph = boost::adjacency_list<boost::vecS, 
                                     boost::vecS, 
@@ -82,88 +79,81 @@ using graph = boost::adjacency_list<boost::vecS,
 using vertex_desc = traits::vertex_descriptor;
 using edge_desc = traits::edge_descriptor;
 
-// Helper class to add edges and their reverse edges for the BGL max_flow algorithm
+
 class edge_adder {
   graph &G;
-
-public:
-  explicit edge_adder(graph &G) : G(G) {}
   
-  void add_edge(int from, int to, long capacity) {
-    auto c_map = boost::get(boost::edge_capacity, G);
-    auto r_map = boost::get(boost::edge_reverse, G);
-    const auto e = boost::add_edge(from, to, G).first;
-    const auto rev_e = boost::add_edge(to, from, G).first;
-    c_map[e] = capacity;
-    c_map[rev_e] = 0; // Reverse edge has zero capacity
-    r_map[e] = rev_e;
-    r_map[rev_e] = e;
-  }
+  public:
+    explicit edge_adder(graph &G) : G(G) {}
+    
+    void add_edge(int from, int to, long capacity) {
+      auto c_map = boost::get(boost::edge_capacity, G);
+      auto r_map = boost::get(boost::edge_reverse, G);
+      const auto e = boost::add_edge(from, to, G).first;
+      const auto rev_e = boost::add_edge(to, from, G).first;
+      c_map[e] = capacity;
+      c_map[rev_e] = 0; // reverse edge has no capacity!
+      r_map[e] = rev_e;
+      r_map[rev_e] = e;
+    }
 };
 
 void solve() {
-  int n, m;
-  std::cin >> n >> m;
+  // ===== READ INPUT & BUILD GRAPH =====
+  int n, m; std:: cin >> n >> m;
+  int score_sum = 0;
   
-  // Create graph with nodes for players, games, source, and sink.
-  // Player nodes: 0 to n-1
-  // Game nodes:   n to n+m-1
+  // 0  to      n - 1 -> Players
+  // n  to  n + m - 1 -> Games
   graph G(n + m); 
   edge_adder adder(G);
   
   const vertex_desc v_source = boost::add_vertex(G);
   const vertex_desc v_sink = boost::add_vertex(G);
   
-  // Add edges from source to games and from games to players
-  for (int i = 0; i < m; ++i) {
-    int a, b, c;
-    std::cin >> a >> b >> c;
+  // Connect Source -> Games and Games -> Players
+  for(int i = 0; i < m; ++i) {
+    // Each game gives 1 point -> Connect source to game with capacity 1
+    adder.add_edge(v_source, n + i, 1);
     
-    // Each game provides 1 point: source -> game with capacity 1
-    int game_node = n + i;
-    adder.add_edge(v_source, game_node, 1);
+    // Connect Game to Players depending on outcome
+    int a, b, c; std::cin >> a >> b >> c;
     
-    // Connect game to players based on outcome
-    if (c == 1) {       // Player 'a' won
-      adder.add_edge(game_node, a, 1);
-    } else if (c == 2) { // Player 'b' won
-      adder.add_edge(game_node, b, 1);
-    } else {             // Outcome unknown, connect to both
-      adder.add_edge(game_node, a, 1);
-      adder.add_edge(game_node, b, 1);
+    if(c == 1) {         // Player a wins -> Connect to a
+      adder.add_edge(n + i, a, 1);
+    } else if (c == 2) { // Player b wins -> Connect to b
+      adder.add_edge(n + i, b, 1);
+    } else {             // Don't know -> Connect to both
+      adder.add_edge(n + i, a, 1);
+      adder.add_edge(n + i, b, 1);
     }
   }
   
-  // Add edges from players to sink with capacity equal to their target score
-  long score_sum = 0;
-  for (int i = 0; i < n; ++i) {
-    int s;
-    std::cin >> s;
+  // Connect Players -> Sink
+  for(int i = 0; i < n; ++i) {
+    int s; std::cin >> s;
     score_sum += s;
     
     adder.add_edge(i, v_sink, s);
   }
   
-  // Calculate max flow from source to sink
-  long flow = boost::push_relabel_max_flow(G, v_source, v_sink);
+  // ===== CALCULATE MAX FLOW =====
+  int flow = boost::push_relabel_max_flow(G, v_source, v_sink);
   
-  // Check if the scoreboard is possible
-  if (score_sum == m && flow == m) {
-    std::cout << "yes\n";
+  // ===== OUTPUT =====
+  if(score_sum == m && flow == score_sum) {
+    std::cout << "yes" << std::endl;
   } else {
-    std::cout << "no\n";
+    std::cout << "no" << std::endl;
   }
 }
 
 int main() {
-  std::ios_base::sync_with_stdio(false);
-  std::cin.tie(NULL);
-  int t;
-  std::cin >> t;
-  while (t--) {
+  int n_tests; std::cin >> n_tests;
+  
+  while(n_tests--) {
     solve();
   }
-  return 0;
 }
 ```
 </details>
