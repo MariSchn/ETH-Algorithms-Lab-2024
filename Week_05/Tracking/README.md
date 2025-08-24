@@ -56,60 +56,46 @@ using Graph = boost::adjacency_list<boost::vecS,
                                     boost::no_property,
                                     EdgeWeight>;
 using VertexDescriptor = boost::graph_traits<Graph>::vertex_descriptor;
+using EdgeDescriptor = boost::graph_traits<Graph>::edge_descriptor;
 
-void solve() {
-    int n, m, k, x, y;
-    std::cin >> n >> m >> k >> x >> y;
+
+int main() {
+  std::ios_base::sync_with_stdio(false);
+  
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) {
+    // ===== READ INPUT =====
+    int n, m, k, x, y; std::cin >> n >> m >> k >> x >> y;
     
     Graph g(n);
-    std::vector<std::tuple<int, int, int>> river_edges;
-    for (int i = 0; i < m; ++i) {
-        int u, v, w, type;
-        std::cin >> u >> v >> w >> type;
-        boost::add_edge(u, v, EdgeWeight(w), g);
-        if (type == 1) {
-            river_edges.emplace_back(u, v, w);
-        }
+    std::vector<std::pair<int, int>> river_edges;
+    for(int i = 0; i < m; i++) {
+      int a, b, c, d; std::cin >> a >> b >> c >> d;
+      boost::add_edge(a, b, EdgeWeight(c), g);
+      
+      if(d) river_edges.push_back(std::make_pair(a, b));
     }
 
-    // Run Dijkstra from start city x
+    // ===== FIND SHORTEST PATH =====
     std::vector<int> start_dist(n);
-    boost::dijkstra_shortest_paths(g, x,
-        boost::distance_map(boost::make_iterator_property_map(
-            start_dist.begin(), boost::get(boost::vertex_index, g))));
-
-    // Run Dijkstra from end city y
     std::vector<int> end_dist(n);
-    boost::dijkstra_shortest_paths(g, y,
-        boost::distance_map(boost::make_iterator_property_map(
-            end_dist.begin(), boost::get(boost::vertex_index, g))));
+    boost::dijkstra_shortest_paths(g, x, boost::distance_map(boost::make_iterator_property_map(start_dist.begin(), boost::get(boost::vertex_index, g))));
+    boost::dijkstra_shortest_paths(g, y, boost::distance_map(boost::make_iterator_property_map(end_dist.begin(), boost::get(boost::vertex_index, g))));
     
     int min_dist = std::numeric_limits<int>::max();
     
-    // Iterate over all river edges to find the shortest path that includes one
-    for (const auto& edge : river_edges) {
-        int u = std::get<0>(edge);
-        int v = std::get<1>(edge);
-        int w = std::get<2>(edge);
+    for(std::pair<int, int> river_edge : river_edges) {
+      int a = river_edge.first;
+      int b = river_edge.second;
+      int edge_weight = boost::get(boost::edge_weight_t(), g, boost::edge(a, b, g).first);
       
-        // Consider path x -> u -> v -> y
-        if (start_dist[u] != std::numeric_limits<int>::max() && end_dist[v] != std::numeric_limits<int>::max()) {
-            min_dist = std::min(min_dist, start_dist[u] + w + end_dist[v]);
-        }
-        // Consider path x -> v -> u -> y
-        if (start_dist[v] != std::numeric_limits<int>::max() && end_dist[u] != std::numeric_limits<int>::max()) {
-            min_dist = std::min(min_dist, start_dist[v] + w + end_dist[u]);
-        }
+      min_dist = std::min(min_dist, std::min(start_dist[a] + edge_weight + end_dist[b], 
+                                             start_dist[b] + edge_weight + end_dist[a]));
     }
 
+    // ===== OUTPUT =====
     std::cout << min_dist << std::endl;
-}
-
-int main() {
-    std::ios_base::sync_with_stdio(false);
-    int t; std::cin >> t;
-    while (t--) solve();
-    return 0;
+  }
 }
 ```
 </details>
@@ -138,7 +124,7 @@ The code below implements this layered graph strategy. It builds the graph with 
 #include<iostream>
 #include<vector>
 #include<limits>
-#include<tuple>
+#include<cmath>
 
 #include<boost/graph/adjacency_list.hpp>
 #include<boost/graph/dijkstra_shortest_paths.hpp>
@@ -146,74 +132,67 @@ The code below implements this layered graph strategy. It builds the graph with 
 using EdgeWeight = boost::property<boost::edge_weight_t, int>;
 using Graph = boost::adjacency_list<boost::vecS, 
                                     boost::vecS,
-                                    boost::directedS, // Using directed to be explicit about layer transitions
+                                    boost::undirectedS,
                                     boost::no_property,
                                     EdgeWeight>;
 using VertexDescriptor = boost::graph_traits<Graph>::vertex_descriptor;
+using EdgeDescriptor = boost::graph_traits<Graph>::edge_descriptor;
 
-void solve() {
-    int n, m, k, x, y;
-    std::cin >> n >> m >> k >> x >> y;
+
+int main() {
+  std::ios_base::sync_with_stdio(false);
+  
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) {
+    // ===== READ INPUT =====
+    int n, m, k, x, y; std::cin >> n >> m >> k >> x >> y;
     
-    // Store edges to build the layered graph
-    std::vector<std::tuple<int, int, int>> regular_edges;
+    std::vector<std::tuple<int, int, int>> edges;
     std::vector<std::tuple<int, int, int>> river_edges;
     
-    for (int i = 0; i < m; ++i) {
-        int u, v, w, type;
-        std::cin >> u >> v >> w >> type;
-        if (type == 1) {
-            river_edges.emplace_back(u, v, w);
-        } else {
-            regular_edges.emplace_back(u, v, w);
-        }
+    for(int i = 0; i < m; i++) {
+      int a, b, c, d; std::cin >> a >> b >> c >> d;
+      if(d) { river_edges.emplace_back(a, b, c); }
+      else { edges.emplace_back(a, b, c); }
     }
 
-    // Construct the multi-layered graph with n * (k+1) nodes
+    // ===== FIND SHORTEST PATH =====
+    // Construct multi-layered Graph
     Graph g(n * (k + 1));
     
-    // Add regular edges within each layer
-    for (const auto& edge : regular_edges) {
-        int u = std::get<0>(edge);
-        int v = std::get<1>(edge);
-        int w = std::get<2>(edge);
-        for (int i = 0; i <= k; ++i) {
-            boost::add_edge(i * n + u, i * n + v, EdgeWeight(w), g);
-            boost::add_edge(i * n + v, i * n + u, EdgeWeight(w), g);
-        }
+    // Add regular edges
+    for(const std::tuple<int, int, int> edge : edges) {
+      int s = std::get<0>(edge);
+      int t = std::get<1>(edge);
+      int w = std::get<2>(edge);
+      
+      // Add edge in all layers of the graph
+      for(int i = 0; i < k + 1; ++i) {
+        boost::add_edge(i * n + s, i * n + t, EdgeWeight(w), g);
+      }
     }
     
-    // Add river edges to transition between layers
-    for (const auto& edge : river_edges) {
-        int u = std::get<0>(edge);
-        int v = std::get<1>(edge);
-        int w = std::get<2>(edge);
-        
-        // Add edges to go from layer i to i+1
-        for (int i = 0; i < k; ++i) {
-            boost::add_edge(i * n + u, (i + 1) * n + v, EdgeWeight(w), g);
-            boost::add_edge(i * n + v, (i + 1) * n + u, EdgeWeight(w), g);
-        }
-        // Add edges within the final layer (k) for "at least k"
-        boost::add_edge(k * n + u, k * n + v, EdgeWeight(w), g);
-        boost::add_edge(k * n + v, k * n + u, EdgeWeight(w), g);
+    // Add river edges
+    for(const std::tuple<int, int, int> edge : river_edges) {
+      int s = std::get<0>(edge);
+      int t = std::get<1>(edge);
+      int w = std::get<2>(edge);
+      
+      // Add edge in all layers of the graph
+      for(int i = 0; i < k; ++i) {
+        boost::add_edge(s +  i      * n, t +  i      * n, EdgeWeight(w), g);
+        boost::add_edge(s + (i + 1) * n, t +  i      * n, EdgeWeight(w), g);
+        boost::add_edge(s +  i      * n, t + (i + 1) * n, EdgeWeight(w), g);
+        boost::add_edge(s + (i + 1) * n, t + (i + 1) * n, EdgeWeight(w), g);
+      }
     }
     
     std::vector<int> dist_map(n * (k + 1));
-    // Run Dijkstra from start node (x, 0)
-    boost::dijkstra_shortest_paths(g, x,
-        boost::distance_map(boost::make_iterator_property_map(
-            dist_map.begin(), boost::get(boost::vertex_index, g))));
+    boost::dijkstra_shortest_paths(g, x, boost::distance_map(boost::make_iterator_property_map(dist_map.begin(), boost::get(boost::vertex_index, g))));
     
-    // The answer is the shortest distance to the destination node (y, k)
+    // ===== OUTPUT =====
     std::cout << dist_map[k * n + y] << std::endl;
-}
-
-int main() {
-    std::ios_base::sync_with_stdio(false);
-    int t; std::cin >> t;
-    while (t--) solve();
-    return 0;
+  }
 }
 ```
 </details>
