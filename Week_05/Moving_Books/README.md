@@ -66,82 +66,61 @@ The crucial part is to implement the `is_possible(k)` check efficiently. To give
 By combining the binary search with this greedy check, we can efficiently find the minimum required number of trips, $k^*$, and the final answer will be $3k^* - 1$.
 
 ```cpp
-#include <iostream>
-#include <vector>
-#include <algorithm>
-#include <cmath>
+#include<iostream>
+#include<vector>
+#include<algorithm>
+#include<cmath>
 
 void solve() {
-    int n_friends, n_books;
-    std::cin >> n_friends >> n_books;
+    // ===== READ INPUT =====
+    int n_friends, n_books; std::cin >> n_friends >> n_books;
     
-    std::vector<int> strengths(n_friends);
-    std::vector<int> weights(n_books);
+    std::vector<int> strengths(n_friends), weights(n_books);
     
     for(int i = 0; i < n_friends; ++i) std::cin >> strengths[i];
     for(int i = 0; i < n_books; ++i) std::cin >> weights[i];
 
-    // Sort both friends and boxes in descending order of strength/weight.
-    // This allows us to use a greedy strategy.
+    
+    // ===== CALCULATE SOLUTION =====
     std::sort(strengths.begin(), strengths.end(), std::greater<int>());
     std::sort(weights.begin(), weights.end(), std::greater<int>());
 
-    // If the strongest friend cannot lift the heaviest box, it's impossible.
     if (strengths[0] < weights[0]) {
       std::cout << "impossible" << std::endl;
       return;
     }
     
-    // Binary search for the minimum number of trips 'k'.
-    // low: min possible trips (work distributed as evenly as possible).
-    // high: max possible trips (one friend moves all books).
-    long long low = std::ceil(static_cast<double>(n_books) / static_cast<double>(n_friends));
-    long long high = n_books;
-    long long ans = high;
+    int low = std::ceil(static_cast<double>(n_books) / static_cast<double>(n_friends));
+    int high = n_books;
     
-    while(low <= high) {
-      long long k = low + (high - low) / 2;
-      if (k == 0) { // Should not happen with problem constraints, but safe to have
-          low = 1;
-          continue;
-      }
-      
-      // Calculate how many friends are needed if each makes at most 'k' trips.
-      long long used_friends = std::ceil(static_cast<double>(n_books) / static_cast<double>(k));
+    while(low < high) {
+      int middle = std::floor((low + high) / 2);
+      int used_friends = std::ceil(static_cast<double>(n_books) / static_cast<double>(middle));
       
       bool can_carry = true;
-      if (used_friends > n_friends) {
+      
+      for(int i = 0; i < used_friends; i++) {
+        if(weights[i * middle] > strengths[i]) {
           can_carry = false;
-      } else {
-        // Check if the 'f' strongest friends can carry the books.
-        // The i-th strongest friend must be able to lift the i*k-th heaviest book.
-        for(int i = 0; i < used_friends; i++) {
-          if(weights[i * k] > strengths[i]) {
-            can_carry = false;
-            break;
-          }
+          break;
         }
       }
       
       if(can_carry) {
-        // This 'k' is possible, try for a smaller 'k'.
-        ans = k;
-        high = k - 1;
+        high = middle;
       } else {
-        // This 'k' is not enough, need more trips.
-        low = k + 1;
+        low = middle+1;
       }
     }
 
-    std::cout << ans * 3 - 1 << std::endl;
+    // ===== OUTPUT =====
+    std::cout << low * 3 - 1 << std::endl;
 }
 
 int main() {
   std::ios_base::sync_with_stdio(false);
-  std::cin.tie(NULL);
   
-  int n_tests;
-  std::cin >> n_tests;
+  int n_tests; std::cin >> n_tests;
   while(n_tests--) {
     solve();
   }
