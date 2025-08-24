@@ -54,69 +54,56 @@ The implementation uses a `std::vector` of pairs to store the boats, which is th
 #include <limits>
 
 void solve() {
-    // Read input for one test case
-    int n;
-    std::cin >> n;
-
-    std::vector<std::pair<int, int>> boats;
-    boats.reserve(n);
-    for (int i = 0; i < n; ++i) {
-        int l, p;
-        std::cin >> l >> p;
-        boats.emplace_back(l, p);
+  // ===== READ INPUT =====
+  int n; std::cin >> n;
+  
+  std::vector<std::pair<int, int>> boats; boats.reserve(n);
+  for(int i = 0; i < n; ++i) {
+    int l, p; std::cin >> l >> p;
+    boats.emplace_back(l, p);
+  }
+  
+  // ===== SOLVE =====
+  std::sort(boats.begin(), boats.end(), [](const std::pair<int, int> &a, const std::pair<int, int> &b){
+    return a.second < b.second;
+  });
+  
+  int n_boats = 0;
+  int right_end = std::numeric_limits<int>::min();
+  int prev_right_end = std::numeric_limits<int>::min();
+  
+  for(const std::pair<int, int> boat : boats) {
+    int length = boat.first;
+    int ring_pos = boat.second;
+    
+    if(ring_pos >= right_end) {
+      // Boat can be placed
+      prev_right_end = right_end;
+      
+      // Determine where the next right end is going to be
+      if(right_end + length >= ring_pos) { right_end = right_end + length; }
+      else { right_end = ring_pos; }
+      
+      n_boats++;
+    } else {
+      // Boat can not be placed, Check if we should replace the current right most boat
+      if(prev_right_end + length < right_end) {
+        // Current Boat is a better fit -> Replace
+        if(prev_right_end + length >= ring_pos) { right_end = prev_right_end + length; }
+        else { right_end = ring_pos; }
+      }
     }
-
-    // Sort boats by ring position (the second element of the pair)
-    std::sort(boats.begin(), boats.end(), [](const std::pair<int, int> &a, const std::pair<int, int> &b) {
-        return a.second < b.second;
-    });
-
-    int n_boats = 0;
-    // Use long long for endpoints to avoid overflow with large coordinates and lengths
-    long long right_end = std::numeric_limits<long long>::min();
-    long long prev_right_end = std::numeric_limits<long long>::min();
-
-    for (const auto& boat : boats) {
-        long long length = boat.first;
-        long long ring_pos = boat.second;
-
-        // Case 1: Ring is not covered, so we can potentially add this boat.
-        if (ring_pos >= right_end) {
-            n_boats++;
-            prev_right_end = right_end;
-            
-            // Place the new boat as far left as possible.
-            // Its start must be >= right_end and >= ring_pos - length.
-            // New endpoint is max(right_end, ring_pos - length) + length.
-            right_end = std::max(right_end, ring_pos - length) + length;
-
-        } else {
-            // Case 2: Ring is covered. Check if replacing the last boat is better.
-            // A replacement is better if the new right_end is smaller.
-            long long potential_new_right_end = std::max(prev_right_end, ring_pos - length) + length;
-            
-            if (potential_new_right_end < right_end) {
-                // The replacement is beneficial. Update right_end.
-                // n_boats does not change.
-                right_end = potential_new_right_end;
-            }
-        }
-    }
-
-    std::cout << n_boats << std::endl;
+  }
+  
+  // ===== OUTPUT =====
+  std::cout << n_boats << std::endl;
 }
 
 int main() {
-    std::ios_base::sync_with_stdio(false);
-    std::cin.tie(NULL);
-
-    int t;
-    std::cin >> t;
-    while (t--) {
-        solve();
-    }
-
-    return 0;
+  std::ios_base::sync_with_stdio(false);
+  
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) { solve(); }
 }
 ```
 </details>
