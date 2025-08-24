@@ -85,103 +85,86 @@ After both passes, any biker `i` for whom `rides_forever[i]` is still `true` is 
 
 ### C++ Implementation
 ```cpp
-#include <iostream>
-#include <vector>
+#include<iostream>
+#include<vector>
 #include <tuple>
 #include <algorithm>
 #include <CGAL/Gmpq.h>
 
-// A Biker is represented by their y-intercept, slope, and original index.
-// Using CGAL::Gmpq for the slope is crucial to avoid floating-point precision issues.
+// Intercept, Slope, Index
 typedef std::tuple<int64_t, CGAL::Gmpq, int> Biker;
 
 void solve() {
-    int n;
-    std::cin >> n;
-
-    std::vector<Biker> bikers;
-    bikers.reserve(n);
-    for (int i = 0; i < n; ++i) {
-        int64_t y0, x1, y1;
-        std::cin >> y0 >> x1 >> y1;
-        CGAL::Gmpq slope(y1 - y0, x1);
-        bikers.emplace_back(y0, slope, i);
-    }
-
-    // Sort bikers by their starting y-coordinate (y-intercept) in ascending order.
-    std::sort(bikers.begin(), bikers.end());
-
-    std::vector<bool> rides_forever(n, true);
-
-    // Pass 1: Elimination from below (bottom to top)
-    if (n > 0) {
-        CGAL::Gmpq champ_slope = std::get<1>(bikers[0]);
-        for (int i = 1; i < n; ++i) {
-            CGAL::Gmpq current_slope = std::get<1>(bikers[i]);
-            int original_index = std::get<2>(bikers[i]);
-
-            // Paths intersect for x > 0 only if current biker's slope is less than champion's.
-            if (champ_slope > current_slope) {
-                // If they intersect, check who wins based on absolute slope.
-                // Champion from below wins ties (<=).
-                if (CGAL::abs(champ_slope) <= CGAL::abs(current_slope)) {
-                    rides_forever[original_index] = false;
-                } else {
-                    champ_slope = current_slope; // Current biker becomes the new champion.
-                }
-            } else {
-                // No intersection, but current biker might become a better champion
-                // for bikers further up due to a smaller absolute slope.
-                if (CGAL::abs(champ_slope) >= CGAL::abs(current_slope)) {
-                    champ_slope = current_slope;
-                }
-            }
-        }
-    }
+  // ===== READ INPUT =====
+  int n; std::cin >> n;
+  
+  std::vector<Biker> bikers; bikers.reserve(n);
+  for(int i = 0; i < n; ++i) {
+    int64_t y_0, x_1, y_1; std::cin >> y_0 >> x_1 >> y_1;
+    bikers.emplace_back(y_0, CGAL::Gmpq(y_1 - y_0, x_1), i);
+  }
+  
+  // ===== SOLVE ======
+  // Sort bikers descendingly by their intercept
+  std::sort(bikers.begin(), bikers.end(), [](const Biker &a, const Biker &b){
+    return std::get<0>(a) < std::get<0>(b);
+  });
+  
+  std::vector<bool> rides_forever(n, true);
+  // Iterate from the top and eliminate all riders that can not ride forever
+  CGAL::Gmpq lowest_abs_slope = std::get<1>(bikers[0]);
+  for(int i = 1; i < n; ++i) {
+    CGAL::Gmpq curr_slope = std::get<1>(bikers[i]);
     
-    // Pass 2: Elimination from above (top to bottom)
-    if (n > 0) {
-        CGAL::Gmpq champ_slope = std::get<1>(bikers[n - 1]);
-        for (int i = n - 2; i >= 0; --i) {
-            CGAL::Gmpq current_slope = std::get<1>(bikers[i]);
-            int original_index = std::get<2>(bikers[i]);
-
-            // Paths intersect for x > 0 only if current biker's slope is greater than champion's.
-            if (champ_slope < current_slope) {
-                // If they intersect, check who wins.
-                // Champion from above loses ties (<).
-                if (CGAL::abs(champ_slope) < CGAL::abs(current_slope)) {
-                    rides_forever[original_index] = false;
-                } else {
-                    champ_slope = current_slope; // Current biker becomes new champion.
-                }
-            } else {
-                // No intersection, but update champion if current biker is better.
-                if (CGAL::abs(champ_slope) >= CGAL::abs(current_slope)) {
-                    champ_slope = current_slope;
-                }
-            }
-        }
+    // Check if the riders will intersect (either both drive up or both drive down)
+    if(lowest_abs_slope > curr_slope) {
+      // The bikers will cross -> Check who will continue by determining which has the lower abs slope
+      if(CGAL::abs(lowest_abs_slope) <= CGAL::abs(curr_slope)) {
+        rides_forever[std::get<2>(bikers[i])] = false;
+      } else {
+        lowest_abs_slope = curr_slope;
+      }
+    } else {
+      // The biker[i] has a lower slope, so it either drives furhter down or is a new `lowest_abs_slope`
+      if(CGAL::abs(lowest_abs_slope) >= CGAL::abs(curr_slope)) {
+        lowest_abs_slope = curr_slope;
+      }
     }
+  }
+  
+  // Iterate from the bottom and eliminate all riders that can not ride forever
+  // Basically the exact same as the previous loop just from the bottom
+  lowest_abs_slope = std::get<1>(bikers[n-1]);
+  for(int i = n - 2; i >= 0; --i) {
+    CGAL::Gmpq curr_slope = std::get<1>(bikers[i]);
 
-    // Output the original indices of surviving bikers.
-    for (int i = 0; i < n; ++i) {
-        if (rides_forever[i]) {
-            std::cout << i << " ";
-        }
+    if(lowest_abs_slope < curr_slope) {
+      if(CGAL::abs(lowest_abs_slope) < CGAL::abs(curr_slope)) {
+        rides_forever[std::get<2>(bikers[i])] = false;
+      } else {
+        lowest_abs_slope = curr_slope;
+      }
+    } else {
+      if(CGAL::abs(lowest_abs_slope) >= CGAL::abs(curr_slope)) {
+        lowest_abs_slope = curr_slope;
+      }
     }
-    std::cout << std::endl;
+  }
+  
+  // ===== OUTPUT =====
+  for(int i = 0; i < n; ++i) {
+    if(rides_forever[i]) {
+      std::cout << i << " ";
+    }
+  }
+  std::cout << std::endl;
 }
 
 int main() {
-    std::ios_base::sync_with_stdio(false);
-    std::cin.tie(NULL);
-    int t;
-    std::cin >> t;
-    while (t--) {
-        solve();
-    }
-    return 0;
+  std::ios_base::sync_with_stdio(false);
+  
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) { solve(); }
 }
 ```
 </details>
