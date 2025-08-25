@@ -54,63 +54,51 @@ The overall approach is:
 4.  The result is the size of this matching.
 
 ```cpp
-#include <iostream>
-#include <vector>
+#include<iostream>
+#include<vector>
 
-// Boost libraries for graph representation and matching
-#include <boost/graph/adjacency_list.hpp>
-#include <boost/graph/max_cardinality_matching.hpp>
+#include<boost/graph/adjacency_list.hpp>
+#include<boost/graph/push_relabel_max_flow.hpp>
+#include<boost/graph/max_cardinality_matching.hpp>
 
-// Define a type for our graph
-using graph = boost::adjacency_list<boost/vecS,
+using traits = boost::adjacency_list_traits<boost::vecS, boost::vecS, boost::directedS>;
+using graph = boost::adjacency_list<boost::vecS,
                                     boost::vecS,
                                     boost::undirectedS>;
+using vertex_desc = traits::vertex_descriptor;
+using edge_desc = traits::edge_descriptor;
 
 void solve() {
-  // ===== READ INPUT =====
-  int n, m, b, p;
-  long long d; // Use long long for distance to be safe
-  std::cin >> n >> m >> b >> p >> d;
+  // ===== READ INPUT & BUILD GRAPH =====
+  int n, m, b, p, d; std::cin >> n >> m >> b >> p >> d;
   
-  // For test set 1, b, p, and d are not immediately needed
-  // but we must read them to advance the input stream.
-  for (int i = 0; i < b; ++i) {
-    int barrack_loc;
-    std::cin >> barrack_loc;
-  }
-  // p is 0, so no plazas to read.
-
-  // ===== BUILD GRAPH =====
   graph G(n);
-  for (int i = 0; i < m; ++i) {
-    int u, v, l;
-    std::cin >> u >> v >> l;
-    boost::add_edge(u, v, G);
+  std::vector<int> barracks(b);
+  std::vector<int> plazas(p);
+  
+  for(int i = 0; i < b; ++i) std::cin >> barracks[i];
+  for(int i = 0; i < p; ++i) std::cin >> plazas[i];
+  for(int i = 0; i < m; ++i) {
+    int x, y, l; std::cin >> x >> y >> l;
+    boost::add_edge(x, y, G);
   }
   
   // ===== FIND MAXIMUM MATCHING =====
-  // mate_map stores the matching: mate_map[u] = v if (u,v) is in the matching
-  std::vector<int> mate_map(n);
+  std::vector<int> mate_map(n); // exterior property map
 
-  boost::edmonds_maximum_cardinality_matching(G, 
-    boost::make_iterator_property_map(mate_map.begin(), boost::get(boost::vertex_index, G)));
-  
-  // The matching_size function counts the number of matched vertices and divides by 2
-  int matching_size = boost::matching_size(G, 
-    boost::make_iterator_property_map(mate_map.begin(), boost::get(boost::vertex_index, G)));
+  boost::edmonds_maximum_cardinality_matching(G, boost::make_iterator_property_map(mate_map.begin(), boost::get(boost::vertex_index, G)));
+  int matching_size = boost::matching_size(G, boost::make_iterator_property_map(mate_map.begin(), boost::get(boost::vertex_index, G)));
   
   // ===== OUTPUT =====
   std::cout << matching_size << std::endl;
+  
 }
 
 int main() {
-  std::ios_base::sync_with_stdio(false);
-  int t;
-  std::cin >> t;
-  while (t--) {
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) {
     solve();
   }
-  return 0;
 }
 ```
 </details>
@@ -160,122 +148,86 @@ Our final algorithm combines these two ideas:
     *   The resulting matching size is the maximum number of roads that can be made safe.
 
 ```cpp
-#include <iostream>
-#include <vector>
-#include <map>
+///4
+#include<iostream>
+#include<vector>
 
-// Boost libraries
-#include <boost/graph/adjacency_list.hpp>
+#include<boost/graph/adjacency_list.hpp>
+#include<boost/graph/push_relabel_max_flow.hpp>
 #include <boost/graph/dijkstra_shortest_paths.hpp>
-#include <boost/graph/max_cardinality_matching.hpp>
+#include<boost/graph/max_cardinality_matching.hpp>
 
-// Define types for our graph and its properties
-using graph = boost::adjacency_list<boost/vecS,
+using traits = boost::adjacency_list_traits<boost::vecS, boost::vecS, boost::directedS>;
+using graph = boost::adjacency_list<boost::vecS,
                                     boost::vecS,
                                     boost::undirectedS,
                                     boost::no_property,
                                     boost::property<boost::edge_weight_t, int>>;
-using vertex_desc = boost::graph_traits<graph>::vertex_descriptor;
+using vertex_desc = traits::vertex_descriptor;
+using edge_desc = traits::edge_descriptor;
+
 
 void solve() {
-  // ===== READ INPUT =====
-  int n, m, b, p;
-  long long d;
-  std::cin >> n >> m >> b >> p >> d;
-
-  int num_nodes = n + p; // n original intersections + p duplicates for plazas
+  // ===== READ INPUT & BUILD GRAPH =====
+  int n, m, b, p, d; std::cin >> n >> m >> b >> p >> d;
+  int num_nodes = n + p;
+  
   graph G(num_nodes);
-  
   std::vector<int> barracks(b);
+  std::vector<int> plazas(p);
+  std::vector<bool> covered(num_nodes, false);
+  
   for(int i = 0; i < b; ++i) std::cin >> barracks[i];
-  
-  std::vector<int> plaza_locations(p);
-  // Map original plaza index to its new duplicate vertex index
-  std::map<int, int> plaza_to_dup; 
-  for(int i = 0; i < p; ++i) {
-    std::cin >> plaza_locations[i];
-    plaza_to_dup[plaza_locations[i]] = n + i;
-  }
-
-  // ===== BUILD GRAPH WITH PLAZA DUPLICATION =====
+  for(int i = 0; i < p; ++i) std::cin >> plazas[i];
   for(int i = 0; i < m; ++i) {
-    int u, v, l;
-    std::cin >> u >> v >> l;
-    boost::add_edge(u, v, l, G);
+    int x, y, l; std::cin >> x >> y >> l;
+    boost::add_edge(x, y, l, G);
     
-    // If an endpoint is a plaza, connect the other endpoint to the plaza's duplicate as well.
-    if(plaza_to_dup.count(u)) {
-      boost::add_edge(v, plaza_to_dup[u], l, G);
-    }
-    if(plaza_to_dup.count(v)) {
-      boost::add_edge(u, plaza_to_dup[v], l, G);
+    // Duplicate plaza nodes
+    // Could be more efficient as we check this for every single edge
+    // But is fast enough
+    for(int j = 0; j < p; ++j) {
+      if(x == plazas[j]) {
+        boost::add_edge(y, n + j, l, G);
+      } else if (y == plazas[j]) {
+        boost::add_edge(x, n + j, l, G);
+      }
     }
   }
 
-  // ===== FIND REACHABLE VERTICES =====
-  std::vector<long long> final_dist(num_nodes, -1);
-
-  for(int start_node : barracks) {
-    std::vector<long long> dist_map(num_nodes);
-    boost::dijkstra_shortest_paths(G, start_node,
-        boost::distance_map(boost::make_iterator_property_map(dist_map.begin(), boost::get(boost::vertex_index, G))));
-    
-    for(int i = 0; i < num_nodes; ++i) {
-        if(final_dist[i] == -1 || dist_map[i] < final_dist[i]) {
-            final_dist[i] = dist_map[i];
-        }
-    }
-  }
+  // ===== FIND SUBGRAPH THAT IS COVERED BY BARRACKS =====
+  for(int i = 0; i < b; ++i) {
+    std::vector<int> dist_map(num_nodes); //exterior property
+    boost::dijkstra_shortest_paths(G, barracks[i], boost::distance_map(boost::make_iterator_property_map(dist_map.begin(), boost::get(boost::vertex_index, G))));
   
-  // A road (u,v) can be secured if BOTH u and v are reachable.
-  // The matching will be on a subgraph of reachable nodes.
-  // We can "remove" unreachable nodes by clearing their edges.
-  graph active_G(num_nodes);
-  std::vector<bool> reachable(num_nodes, false);
-
-  for(int i = 0; i < n; ++i) {
-      if (final_dist[i] != -1 && final_dist[i] <= d) {
-          reachable[i] = true;
+    for(int j = 0; j < num_nodes; ++j) {
+      if(dist_map[j] <= d) {
+        covered[j] = true;
       }
-  }
-  // Also check reachability for duplicate plaza nodes
-  for(int i = 0; i < p; ++i) {
-      if (final_dist[n + i] != -1 && final_dist[n + i] <= d) {
-          reachable[n + i] = true;
-      }
+    }
   }
 
-  // Rebuild graph with only edges where both endpoints are reachable
-  auto es = boost::edges(G);
-  for (auto eit = es.first; eit != es.second; ++eit) {
-      vertex_desc u = boost::source(*eit, G);
-      vertex_desc v = boost::target(*eit, G);
-      if (reachable[u] && reachable[v]) {
-          boost::add_edge(u, v, active_G);
-      }
+  for(int i = 0; i < num_nodes; ++i) {
+    if(!covered[i]) {
+      boost::clear_vertex(i, G);
+    }
   }
 
-  // ===== FIND MAXIMUM MATCHING ON THE SUBGRAPH =====
-  std::vector<vertex_desc> mate_map(num_nodes);
-  boost::edmonds_maximum_cardinality_matching(active_G, 
-    boost::make_iterator_property_map(mate_map.begin(), boost::get(boost::vertex_index, G)));
-  
-  int matching_size = boost::matching_size(active_G, 
-    boost::make_iterator_property_map(mate_map.begin(), boost::get(boost::vertex_index, G)));
+  // ===== FIND MAXIMUM MATCHING =====
+  std::vector<int> mate_map(num_nodes);
+
+  boost::edmonds_maximum_cardinality_matching(G, boost::make_iterator_property_map(mate_map.begin(), boost::get(boost::vertex_index, G)));
+  int matching_size = boost::matching_size(G, boost::make_iterator_property_map(mate_map.begin(), boost::get(boost::vertex_index, G)));
   
   // ===== OUTPUT =====
   std::cout << matching_size << std::endl;
 }
 
 int main() {
-  std::ios_base::sync_with_stdio(false);
-  std::cin.tie(NULL);
-  int t;
-  std::cin >> t;
-  while (t--) {
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) {
     solve();
   }
-  return 0;
 }
 ```
 </details>

@@ -60,93 +60,87 @@ We can now define an LP with variables $a, b, c$ and the constraints above. We a
 **A Note on Implementation:** When using libraries like CGAL to solve LPs, we might encounter cycling issues in the simplex algorithm on certain inputs. To prevent this, it's good practice to enable a cycling-prevention rule, such as **Bland's rule**.
 
 ```cpp
-/// Solution for Test Set 1
-#include <iostream>
-#include <vector>
+#include<iostream>
+#include<vector>
 
 #include <CGAL/QP_models.h>
 #include <CGAL/QP_functions.h>
 #include <CGAL/Gmpz.h>
 #include <CGAL/Gmpq.h>
 
-// Type definitions for CGAL
 typedef int IT;
 typedef CGAL::Gmpz ET;
+
 typedef CGAL::Quadratic_program<IT> Program;
 typedef CGAL::Quadratic_program_solution<ET> Solution;
 
-// Variable indices for the sewer canal equation: ax + by + c = 0
-const int a = 0;
-const int b = 1;
-const int c = 2;
-
 void solve() {
-  // Read input
-  int n, m;
-  long s;
-  std::cin >> n >> m >> s;
-
-  std::vector<std::pair<int, int>> noble_houses(n);
-  for (int i = 0; i < n; ++i) {
-    std::cin >> noble_houses[i].first >> noble_houses[i].second;
+  // ===== READ INPUT =====
+  int n, m; long s; std::cin >> n >> m >> s;
+  
+  std::vector<std::vector<int>> noble_houses(n, std::vector<int>(2));
+  for(int i = 0; i < n; ++i) {
+    std::cin >> noble_houses[i][0] >> noble_houses[i][1];
   }
-
-  std::vector<std::pair<int, int>> common_houses(m);
-  for (int i = 0; i < m; ++i) {
-    std::cin >> common_houses[i].first >> common_houses[i].second;
+  
+  std::vector<std::vector<int>> common_houses(m, std::vector<int>(2));
+  for(int i = 0; i < m; ++i) {
+    std::cin >> common_houses[i][0] >> common_houses[i][1];
   }
-
-  // --- LP for Cersei's Constraint ---
-  // We want to find if a line ax + by + c = 0 exists that separates the houses.
+  
+  // ===== CONSTRUCT FIRST LINEAR PROGRAM (CERSEI) =====
+  // Check if noble and common houses are linearly sepearble such that the noble houses are on the left of the line
+  // Variables: Parameters of the normal form of the sewer canal
+  const int a = 0;
+  const int b = 1;
+  const int c = 2;
+  
   Program lp(CGAL::SMALLER, false, 0, false, 0);
-
-  // Noble houses: require ax_n + by_n + c >= 1
-  // This is equivalent to -ax_n - by_n - c <= -1
-  for (int i = 0; i < n; ++i) {
-    lp.set_a(a, i, -noble_houses[i].first);
-    lp.set_a(b, i, -noble_houses[i].second);
+  
+  // Add noble houses constraints
+  for(int i = 0; i < n; ++i) {
+    lp.set_a(a, i, -noble_houses[i][0]); 
+    lp.set_a(b, i,- noble_houses[i][1]);
     lp.set_a(c, i, -1);
     lp.set_b(i, -1);
   }
-
-  // Common houses: require ax_c + by_c + c <= -1
-  for (int i = 0; i < m; ++i) {
-    lp.set_a(a, n + i, common_houses[i].first);
-    lp.set_a(b, n + i, common_houses[i].second);
-    lp.set_a(c, n + i, 1);
-    lp.set_b(n + i, -1);
+  
+  // Add common houses constraints
+  for(int i = 0; i < m; ++i) {
+    lp.set_a(a, n+i, common_houses[i][0]); 
+    lp.set_a(b, n+i, common_houses[i][1]);
+    lp.set_a(c, n+i, 1);
+    lp.set_b(n+i, -1);
   }
-
-  // Orientation: noble houses on the left (west).
-  // The normal vector (a, b) points towards the noble houses' side.
-  // We constrain its x-component 'a' to be non-positive.
-  lp.set_u(a, true, 0); // a <= 0
-
-  // We don't need an objective function; we only care about feasibility.
+  
+  // Add constraint, that the normal has to point to the left, to ensure that the noble houses are on the left
+  lp.set_u(a, true, 0);
+  // No objective function needed, as we only want to check for feasibility/separability
+  
+  // ===== SOLVE FIRST LINEAR PROGRAM =====
   CGAL::Quadratic_program_options options;
-  options.set_pricing_strategy(CGAL::QP_BLAND); // Use Bland's rule to prevent cycling
-  Solution sol = CGAL::solve_linear_program(lp, ET(), options);
-
-  if (sol.is_infeasible()) {
-    std::cout << "Y\n";
+  options.set_pricing_strategy(CGAL::QP_BLAND);
+  Solution solution = CGAL::solve_linear_program(lp, ET(), options);
+  if(solution.is_infeasible()) {
+    std::cout << "Y" << std::endl;
   } else {
-    std::cout << "B\n";
+    std::cout << "B" << std::endl;
   }
 }
 
 int main() {
   std::ios_base::sync_with_stdio(false);
-  std::cin.tie(NULL);
-  int t;
-  std::cin >> t;
-  while (t--) {
+  
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) {
     solve();
   }
-  return 0;
 }
 ```
 </details>
+
 <details>
+
 <summary>Second Solution (Test Set 2)</summary>
 
 For the second test set, there are only noble houses ($m=0$) and no budget constraint ($s=-1$). This means Cersei's and Tywin's constraints are trivially satisfied. The problem reduces to fulfilling Jaime's wish: **minimize the length of the longest fresh water pipe**.
@@ -168,255 +162,101 @@ This single inequality with an absolute value can be rewritten as two linear ine
 The final LP has variables $m_w, c_w, d$. The objective is to **minimize $d$**, subject to the two inequalities above for each house and the non-negativity constraint $d \ge 0$. The optimal objective value will be the minimum possible longest pipe length. We round this value up to the next integer as required.
 
 ```cpp
-/// Solution for Test Set 2
-#include <iostream>
-#include <vector>
-#include <cmath>
-#include <iomanip>
+#include<iostream>
+#include<vector>
 
 #include <CGAL/QP_models.h>
 #include <CGAL/QP_functions.h>
 #include <CGAL/Gmpz.h>
 #include <CGAL/Gmpq.h>
 
-// Type definitions
 typedef int IT;
 typedef CGAL::Gmpz ET;
+
 typedef CGAL::Quadratic_program<IT> Program;
 typedef CGAL::Quadratic_program_solution<ET> Solution;
+typedef Solution::Variable_value_iterator SVI;
 
-// Variable indices for the water canal line y = mx + c and max distance d
-const int m_w = 0;
-const int c_w = 1;
+// Variables to easier reference the parameters of the line equation (and more)
+const int a = 0;
+const int b = 1;
+const int c = 2;
+
+const int m = 0;
+// const int b = 1; // Already defined above
 const int d = 2;
 
 void solve() {
-  // Read input
-  int n, m;
-  long s;
-  std::cin >> n >> m >> s;
+  // ===== READ INPUT =====
+  int n, m; long s; std::cin >> n >> m >> s;
   
-  std::vector<std::pair<int, int>> houses(n + m);
-  for (int i = 0; i < n + m; ++i) {
-    std::cin >> houses[i].first >> houses[i].second;
+  std::vector<std::vector<int>> noble_houses(n, std::vector<int>(2));
+  for(int i = 0; i < n; ++i) {
+    std::cin >> noble_houses[i][0] >> noble_houses[i][1];
   }
   
-  // --- LP for Jaime's Constraint ---
-  // Minimize the maximum vertical distance 'd'
+  std::vector<std::vector<int>> common_houses(m, std::vector<int>(2));
+  for(int i = 0; i < m; ++i) {
+    std::cin >> common_houses[i][0] >> common_houses[i][1];
+  }
+  
+  // ===== THIRD LINEAR PROGRAM (JAIME) =====
+  // Minimize the (vertical) distance between the all the houses and the water canal
   Program lp(CGAL::SMALLER, false, 0, false, 0);
   
-  // For each house (x_i, y_i), add two constraints:
-  // m*x_i + c - d <= y_i
-  // -m*x_i - c - d <= -y_i
-  for (int i = 0; i < n + m; ++i) {
-    const int x_i = houses[i].first;
-    const int y_i = houses[i].second;
-
-    // Constraint 1: m_w*x_i + c_w - d <= y_i
-    lp.set_a(m_w, 2 * i, x_i);
-    lp.set_a(c_w, 2 * i, 1);
-    lp.set_a(d,   2 * i, -1);
-    lp.set_b(2 * i, y_i);
+  // Add noble houses constraints
+  for(int i = 0; i < n; ++i) {
+    lp.set_a(m, i, -noble_houses[i][0]);
+    lp.set_a(b, i, -1);
+    lp.set_a(d, i, -1);
+    lp.set_b(i, -noble_houses[i][1]);
     
-    // Constraint 2: -m_w*x_i - c_w - d <= -y_i
-    lp.set_a(m_w, 2 * i + 1, -x_i);
-    lp.set_a(c_w, 2 * i + 1, -1);
-    lp.set_a(d,   2 * i + 1, -1);
-    lp.set_b(2 * i + 1, -y_i);
+    lp.set_a(m, i + n, noble_houses[i][0]);
+    lp.set_a(b, i + n, 1);
+    lp.set_a(d, i + n, -1);
+    lp.set_b(i + n, noble_houses[i][1]);
   }
   
-  // We must have a non-negative distance
+  // Add common houses constraints
+  for(int i = 0; i < m; ++i) {
+    lp.set_a(m, 2*n + i, -common_houses[i][0]);
+    lp.set_a(b, 2*n + i, -1);
+    lp.set_a(d, 2*n + i, -1);
+    lp.set_b(2*n + i, -common_houses[i][1]);
+    
+    lp.set_a(m, 2*n + i + m, common_houses[i][0]);
+    lp.set_a(b, 2*n + i + m, 1);
+    lp.set_a(d, 2*n + i + m, -1);
+    lp.set_b(2*n + i + m, common_houses[i][1]);
+  }
+  
   lp.set_l(d, true, 0);
   
-  // Objective function: minimize d
+  // Minimize the maximum distance d
   lp.set_c(d, 1);
   
-  Solution sol = CGAL::solve_linear_program(lp, ET());
-  
-  double result = CGAL::to_double(sol.objective_value());
-  std::cout << (long)std::ceil(result) << "\n";
-}
-
-int main() {
-  std::ios_base::sync_with_stdio(false);
-  std::cin.tie(NULL);
-  int t;
-  std::cin >> t;
-  while (t--) {
-    solve();
-  }
-  return 0;
-}
-```
-</details>
-<details>
-<summary>Third Solution (Test Set 1, 2, 3)</summary>
-
-This solution addresses the first three test sets. The key assumption for test set 3 is that the right-angle constraint can be ignored, meaning we can find the optimal sewer and water canals independently. This allows us to combine the logic from the previous two solutions in a sequential manner.
-
-The overall strategy is:
-1.  **Check Cersei:** Solve an LP to see if a separating sewer canal exists. If not, output "Y".
-2.  **Check Tywin:** Add the budget constraint to the LP from step 1. If it becomes infeasible, output "B".
-3.  **Optimize Jaime:** If the first two checks pass, solve a separate LP (as in Solution 2) to find the minimum longest water pipe.
-
-### LP Formulation
-
-**Step 1 & 2: Sewer Canal (Cersei & Tywin)**
-
-Let the sewer canal be $ax + by + c = 0$. Since sewage pipes are horizontal, the canal must be non-horizontal, so $a \neq 0$. We can **normalize** the equation by setting $a=1$. The line is now $x + by + c = 0$.
-
-*   **Cersei's Constraint:** The normal vector is $(1, b)$, which always points into the right half-plane. To place noble houses on the left and common houses on the right, we need:
-    *   $x_n + by_n + c \le 0$ for all noble houses $(x_n, y_n)$.
-    *   $x_c + by_c + c \ge 0$ for all common houses $(x_c, y_c)$.
-*   **Tywin's Constraint:** The sum of horizontal pipe lengths must be at most $s$. The horizontal distance from a house $(x_i, y_i)$ to the line $x=-by-c$ is $|x_i - (-by_i-c)| = |x_i + by_i + c|$. Since we know the sign of this expression for each house type from Cersei's constraints:
-    *   For nobles: $|x_n + by_n + c| = -(x_n + by_n + c)$
-    *   For commons: $|x_c + by_c + c| = x_c + by_c + c$
-    
-    The total length is $\sum_{\text{commons}}(x_c+by_c+c) - \sum_{\text{nobles}}(x_n+by_n+c)$. The constraint is:
-    $$ \left(\sum x_c - \sum x_n\right) + b\left(\sum y_c - \sum y_n\right) + c(m-n) \le s $$
-    This is a single linear inequality involving variables $b$ and $c$.
-
-We first solve an LP with just Cersei's constraints. If it's infeasible, we print "Y". Otherwise, we add Tywin's constraint (if $s \neq -1$) and solve again. If this is now infeasible, we print "B".
-
-**Step 3: Water Canal (Jaime)**
-
-If both checks pass, we know a valid configuration is possible. We then solve a completely separate LP for the water canal, exactly as described in the "Second Solution", to minimize the maximum vertical pipe length.
-
-```cpp
-/// Solution for Test Sets 1, 2, 3
-#include <iostream>
-#include <vector>
-#include <cmath>
-#include <iomanip>
-#include <numeric>
-
-#include <CGAL/QP_models.h>
-#include <CGAL/QP_functions.h>
-#include <CGAL/Gmpz.h>
-#include <CGAL/Gmpq.h>
-
-// Type definitions
-typedef long IT;
-typedef CGAL::Gmpz ET;
-typedef CGAL::Quadratic_program<IT> Program;
-typedef CGAL::Quadratic_program_solution<ET> Solution;
-
-// Var indices for sewer canal: x + by + c = 0
-const int b_s = 0;
-const int c_s = 1;
-
-// Var indices for water canal: y = m_w*x + c_w
-const int m_w = 0;
-const int c_w = 1;
-const int d = 2;
-
-struct Point { long x, y; };
-
-void solve() {
-  int n, m;
-  long s;
-  std::cin >> n >> m >> s;
-
-  std::vector<Point> nobles(n), commons(m);
-  long noble_x_sum = 0, noble_y_sum = 0;
-  for (int i = 0; i < n; ++i) {
-    std::cin >> nobles[i].x >> nobles[i].y;
-    noble_x_sum += nobles[i].x;
-    noble_y_sum += nobles[i].y;
-  }
-  long common_x_sum = 0, common_y_sum = 0;
-  for (int i = 0; i < m; ++i) {
-    std::cin >> commons[i].x >> commons[i].y;
-    common_x_sum += commons[i].x;
-    common_y_sum += commons[i].y;
-  }
-
-  // --- LP for Sewer Canal (Cersei & Tywin) ---
-  Program lp_sewer(CGAL::SMALLER, false, 0, false, 0);
-
-  // Cersei's constraints
-  // Nobles: x_n + b_s*y_n + c_s <= 0
-  for (int i = 0; i < n; ++i) {
-    lp_sewer.set_a(b_s, i, nobles[i].y);
-    lp_sewer.set_a(c_s, i, 1);
-    lp_sewer.set_b(i, -nobles[i].x);
-  }
-  // Commons: x_c + b_s*y_c + c_s >= 0  => -x_c - b_s*y_c - c_s <= 0
-  for (int i = 0; i < m; ++i) {
-    lp_sewer.set_a(b_s, n + i, -commons[i].y);
-    lp_sewer.set_a(c_s, n + i, -1);
-    lp_sewer.set_b(n + i, commons[i].x);
-  }
-
-  Solution sol_sewer = CGAL::solve_linear_program(lp_sewer, ET());
-  if (sol_sewer.is_infeasible()) {
-    std::cout << "Y\n";
-    return;
-  }
-
-  // Tywin's constraint
-  if (s != -1) {
-    long y_diff = common_y_sum - noble_y_sum;
-    long x_diff = common_x_sum - noble_x_sum;
-    lp_sewer.set_a(b_s, n + m, y_diff);
-    lp_sewer.set_a(c_s, n + m, m - n);
-    lp_sewer.set_b(n + m, s - x_diff);
-
-    sol_sewer = CGAL::solve_linear_program(lp_sewer, ET());
-    if (sol_sewer.is_infeasible()) {
-      std::cout << "B\n";
-      return;
+    // ===== SOLVE FIRST LINEAR PROGRAM =====
+    Solution solution = CGAL::solve_linear_program(lp, ET());
+    if(solution.is_infeasible() || solution.is_unbounded()) {
+      std::cout << "error" << std::endl;
+    } else {
+      std::cout << (long) std::ceil(CGAL::to_double(solution.objective_value())) << std::endl;
     }
-  }
-
-  // --- LP for Water Canal (Jaime) ---
-  Program lp_water(CGAL::SMALLER, true, 0, false, 0);
-
-  // Constraints for nobles
-  for (int i = 0; i < n; ++i) {
-    lp_water.set_a(m_w, 2 * i, nobles[i].x);
-    lp_water.set_a(c_w, 2 * i, 1);
-    lp_water.set_a(d, 2 * i, -1);
-    lp_water.set_b(2 * i, nobles[i].y);
-
-    lp_water.set_a(m_w, 2 * i + 1, -nobles[i].x);
-    lp_water.set_a(c_w, 2 * i + 1, -1);
-    lp_water.set_a(d, 2 * i + 1, -1);
-    lp_water.set_b(2 * i + 1, -nobles[i].y);
-  }
-  // Constraints for commons
-  for (int i = 0; i < m; ++i) {
-    lp_water.set_a(m_w, 2 * n + 2 * i, commons[i].x);
-    lp_water.set_a(c_w, 2 * n + 2 * i, 1);
-    lp_water.set_a(d, 2 * n + 2 * i, -1);
-    lp_water.set_b(2 * n + 2 * i, commons[i].y);
-
-    lp_water.set_a(m_w, 2 * n + 2 * i + 1, -commons[i].x);
-    lp_water.set_a(c_w, 2 * n + 2 * i + 1, -1);
-    lp_water.set_a(d, 2 * n + 2 * i + 1, -1);
-    lp_water.set_b(2 * n + 2 * i + 1, -commons[i].y);
-  }
-
-  lp_water.set_c(d, 1); // Minimize d
-
-  Solution sol_water = CGAL::solve_linear_program(lp_water, ET());
-  double result = CGAL::to_double(sol_water.objective_value());
-  std::cout << (long)std::ceil(result) << "\n";
 }
 
 int main() {
   std::ios_base::sync_with_stdio(false);
-  std::cin.tie(NULL);
-  int t;
-  std::cin >> t;
-  while (t--) {
+  
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) {
     solve();
   }
-  return 0;
 }
 ```
 </details>
+
 <details>
+
 <summary>Final Solution</summary>
 
 The final solution must handle all constraints simultaneously, including the crucial **right-angle constraint**. Instead of solving separate LPs, we can build a single, comprehensive LP model that incorporates all requirements. The logic follows the same incremental checking process as the previous solution.
@@ -460,149 +300,169 @@ We construct a single LP object and add constraints in stages:
 This approach correctly solves the full problem by finding parameters for both canals that satisfy all conditions simultaneously.
 
 ```cpp
-/// Final Solution
-#include <iostream>
-#include <vector>
-#include <cmath>
-#include <iomanip>
-#include <numeric>
+#include<iostream>
+#include<vector>
 
 #include <CGAL/QP_models.h>
 #include <CGAL/QP_functions.h>
 #include <CGAL/Gmpz.h>
 #include <CGAL/Gmpq.h>
 
-// Type definitions
 typedef long IT;
 typedef CGAL::Gmpz ET;
+
 typedef CGAL::Quadratic_program<IT> Program;
 typedef CGAL::Quadratic_program_solution<ET> Solution;
+typedef Solution::Variable_value_iterator SVI;
 
-// LP Variables:
-// Sewer: ax + by + c = 0. We fix a=1.
-const int b = 0; // LP var for b
-const int c = 1; // LP var for c
+// https://github.com/haeggee/algolab/blob/main/problems/week06-lannister/src/algorithm.cpp
 
-// Water: a2x + b2y + c2 = 0. We fix b2=1. Right-angle => a2 = -b.
-const int c2 = 2; // LP var for c2
-const int d = 3;  // LP var for max distance
+// Variables to easier reference the parameters of the line equation (and more)
+const int a = 0;
+const int b = 1;
+const int c = 2;
 
-struct Point { long x, y; };
+const int a2 = 3;
+const int b2 = 4;
+const int c2 = 5;
+const int d  = 6;
 
 void solve() {
-  int n, m;
-  long s;
-  std::cin >> n >> m >> s;
-
-  std::vector<Point> nobles(n), commons(m);
-  long noble_x_sum = 0, noble_y_sum = 0;
-  for (int i = 0; i < n; ++i) {
-    std::cin >> nobles[i].x >> nobles[i].y;
-    noble_x_sum += nobles[i].x;
-    noble_y_sum += nobles[i].y;
+  // ===== READ INPUT =====
+  int n, m; long s; std::cin >> n >> m >> s;
+  
+  long sum_x_nobles, sum_y_nobles, sum_x_commons, sum_y_commons;
+  sum_x_nobles = sum_y_nobles = sum_x_commons = sum_y_commons = 0;
+  
+  std::vector<std::vector<int>> noble_houses(n, std::vector<int>(2));
+  for(int i = 0; i < n; ++i) {
+    std::cin >> noble_houses[i][0] >> noble_houses[i][1];
+    sum_x_nobles += noble_houses[i][0];
+    sum_y_nobles += noble_houses[i][1];
   }
-  long common_x_sum = 0, common_y_sum = 0;
-  for (int i = 0; i < m; ++i) {
-    std::cin >> commons[i].x >> commons[i].y;
-    common_x_sum += commons[i].x;
-    common_y_sum += commons[i].y;
+  
+  std::vector<std::vector<int>> common_houses(m, std::vector<int>(2));
+  for(int i = 0; i < m; ++i) {
+    std::cin >> common_houses[i][0] >> common_houses[i][1];
+    sum_x_commons += common_houses[i][0];
+    sum_y_commons += common_houses[i][1];
   }
-
-  // --- Unified LP Model ---
+  
   Program lp(CGAL::SMALLER, false, 0, false, 0);
-  int constraint_idx = 0;
-
-  // == Stage 1: Check Cersei ==
-  // Nobles: x_n + b*y_n + c <= 0
-  for (int i = 0; i < n; ++i) {
-    lp.set_a(b, constraint_idx, nobles[i].y);
-    lp.set_a(c, constraint_idx, 1);
-    lp.set_b(constraint_idx, -nobles[i].x);
-    constraint_idx++;
-  }
-  // Commons: x_c + b*y_c + c >= 0  => -x_c - b*y_c - c <= 0
-  for (int i = 0; i < m; ++i) {
-    lp.set_a(b, constraint_idx, -commons[i].y);
-    lp.set_a(c, constraint_idx, -1);
-    lp.set_b(constraint_idx, commons[i].x);
-    constraint_idx++;
-  }
-
-  Solution sol = CGAL::solve_linear_program(lp, ET());
-  if (sol.is_infeasible()) {
-    std::cout << "Y\n";
-    return;
-  }
-
-  // == Stage 2: Check Tywin ==
-  if (s != -1) {
-    long y_diff = common_y_sum - noble_y_sum;
-    long x_diff = common_x_sum - noble_x_sum;
-    lp.set_a(b, constraint_idx, y_diff);
-    lp.set_a(c, constraint_idx, m - n);
-    lp.set_b(constraint_idx, s - x_diff);
-    constraint_idx++;
-
-    sol = CGAL::solve_linear_program(lp, ET());
-    if (sol.is_infeasible()) {
-      std::cout << "B\n";
+  
+  // ===== FIRST LINEAR PROGRAM (CERSEI) =====
+  if(true) {  // Always check Cerseis constraint
+    // Check if noble and common houses are linearly sepearble such that the noble houses are on the left of the line
+    
+    // Add noble houses constraints
+    for(int i = 0; i < n; ++i) {
+      lp.set_a(a, i, noble_houses[i][0]); 
+      lp.set_a(b, i, noble_houses[i][1]);
+      lp.set_a(c, i, 1);
+    }
+    
+    // Add common houses constraints
+    for(int i = 0; i < m; ++i) {
+      lp.set_a(a, n+i, -common_houses[i][0]); 
+      lp.set_a(b, n+i, -common_houses[i][1]);
+      lp.set_a(c, n+i, -1);
+    }
+    
+    // Add constraint, that the normal has to point to the left, to ensure that the noble houses are on the left
+    lp.set_l(a, true, 1);
+    lp.set_u(a, true, 1);
+    // No objective function needed, as we only want to check for feasibility/separability
+    
+    // ===== SOLVE =====
+    CGAL::Quadratic_program_options options;
+    options.set_pricing_strategy(CGAL::QP_BLAND);
+    Solution solution = CGAL::solve_linear_program(lp, ET(), options);
+    if(solution.is_infeasible()) {
+      std::cout << "Y" << std::endl;
       return;
     }
   }
-
-  // == Stage 3: Optimize Jaime ==
-  // Water canal: -bx + y + c2 = 0. Distance is |y_i - bx_i + c2|.
-  // We minimize d subject to |y_i - bx_i + c2| <= d for all i.
   
-  // Constraints for nobles
-  for (int i = 0; i < n; ++i) {
-    // y_i - b*x_i + c2 <= d  =>  -b*x_i + c2 - d <= -y_i
-    lp.set_a(b, constraint_idx, -nobles[i].x);
-    lp.set_a(c2, constraint_idx, 1);
-    lp.set_a(d, constraint_idx, -1);
-    lp.set_b(constraint_idx, -nobles[i].y);
-    constraint_idx++;
+  // ===== SECOND LINEAR PROGRAM (TYWIN) =====  
+  if(s != -1) {  // Only check for Tywins constraint if it is actually present (s != -1)
+    lp.set_a(b, m + n, sum_y_commons - sum_y_nobles);
+    lp.set_a(c, m + n, m - n);
+    lp.set_b(m + n, s - sum_x_commons + sum_x_nobles);
 
-    // -(y_i - b*x_i + c2) <= d => b*x_i - c2 - d <= y_i
-    lp.set_a(b, constraint_idx, nobles[i].x);
-    lp.set_a(c2, constraint_idx, -1);
-    lp.set_a(d, constraint_idx, -1);
-    lp.set_b(constraint_idx, nobles[i].y);
-    constraint_idx++;
+    // ===== SOLVE =====
+    Solution solution = CGAL::solve_linear_program(lp, ET());
+    if(solution.is_infeasible()) {
+      std::cout << "B" << std::endl;
+      return;
+    }
   }
-  // Constraints for commons
-  for (int i = 0; i < m; ++i) {
-    lp.set_a(b, constraint_idx, -commons[i].x);
-    lp.set_a(c2, constraint_idx, 1);
-    lp.set_a(d, constraint_idx, -1);
-    lp.set_b(constraint_idx, -commons[i].y);
-    constraint_idx++;
-
-    lp.set_a(b, constraint_idx, commons[i].x);
-    lp.set_a(c2, constraint_idx, -1);
-    lp.set_a(d, constraint_idx, -1);
-    lp.set_b(constraint_idx, commons[i].y);
-    constraint_idx++;
+  
+  int n_rows = n + m + 1;
+  
+  // ===== THIRD LINEAR PROGRAM (JAIME) =====
+  if(true) {  // Always optimize for Jamies requirement
+    // Minimize the (vertical) distance between the all the houses and the water canal
+    
+    // Add noble houses constraints
+    for(int i = 0; i < n; ++i) {
+      lp.set_a(a2, n_rows + i, noble_houses[i][0]);
+      lp.set_a(c2, n_rows + i, 1);
+      lp.set_a(d, n_rows + i, -1);
+      lp.set_b(n_rows + i, -noble_houses[i][1]);
+      
+      lp.set_a(a2, n_rows + i + n, -noble_houses[i][0]);
+      lp.set_a(c2, n_rows + i + n, -1);
+      lp.set_a(d, n_rows + i + n, -1);
+      lp.set_b(n_rows + i + n, noble_houses[i][1]);
+    }
+    
+    // Add common houses constraints
+    for(int i = 0; i < m; ++i) {
+      lp.set_a(a2, n_rows + 2*n + i, common_houses[i][0]);
+      lp.set_a(c2, n_rows + 2*n + i, 1);
+      lp.set_a(d, n_rows + 2*n + i, -1);
+      lp.set_b(n_rows + 2*n + i, -common_houses[i][1]);
+      
+      lp.set_a(a2, n_rows + 2*n + i + m, -common_houses[i][0]);
+      lp.set_a(c2, n_rows + 2*n + i + m, -1);
+      lp.set_a(d, n_rows + 2*n + i + m, -1);
+      lp.set_b(n_rows + 2*n + i + m, common_houses[i][1]);
+    }
+    
+    n_rows += 2 * n + 2 * m;
+    
+    // Ensure pipes are orthogonal
+    lp.set_a(b, n_rows + 1, 1);
+    lp.set_a(a2, n_rows + 1, 1); // b1 + a2 <= 0
+    lp.set_a(b, n_rows + 2, -1);
+    lp.set_a(a2, n_rows + 2, -1); // -b1 - a2 <= 0
+    
+    // Fix b2 to 1
+    lp.set_l(b2, true, 1);
+    lp.set_u(b2, true, 1);
+    
+    lp.set_l(d, true, 0);
+    
+    // Minimize the maximum distance d
+    lp.set_c(d, 1);
+    
+    // ===== SOLVE =====
+    Solution solution = CGAL::solve_linear_program(lp, ET());
+    if(solution.is_infeasible() || solution.is_unbounded()) {
+      std::cout << "error" << std::endl;
+    } else {
+      std::cout << (long) std::ceil(CGAL::to_double(solution.objective_value())) << std::endl;
+    }
   }
-
-  // Objective: minimize d
-  lp.set_c(d, 1);
-  lp.set_l(d, true, 0); // d >= 0
-
-  sol = CGAL::solve_linear_program(lp, ET());
-  double result = CGAL::to_double(sol.objective_value());
-  std::cout << (long)std::ceil(result) << "\n";
 }
 
 int main() {
   std::ios_base::sync_with_stdio(false);
-  std::cin.tie(NULL);
-  int t;
-  std::cin >> t;
-  while (t--) {
+  
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) {
     solve();
   }
-  return 0;
 }
 ```
 </details>
@@ -610,5 +470,13 @@ int main() {
 ## ⚡ Result
 
 ```plaintext
+Compiling: successful
 
+Judging solution >>>>
+   Test set 1 (30 pts / 2 s) : Correct answer      (0.07s)
+   Test set 2 (30 pts / 2 s) : Correct answer      (0.296s)
+   Test set 3 (20 pts / 2 s) : Correct answer      (0.212s)
+   Test set 4 (20 pts / 2 s) : Correct answer      (0.692s)
+
+Total score: 80
 ```
