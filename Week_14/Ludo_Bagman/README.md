@@ -32,7 +32,7 @@ The final challenge is incorporating difficult matches. They contribute to the t
 ## ✨ Solutions
 
 <details>
-<summary>Solution for Non-Difficult Matches (Test Sets 1-3)</summary>
+<summary>First Solution (Test Set 1, 2, 3)</summary>
 This problem can be modeled as a **minimum-cost maximum-flow** problem. The structure of having two distinct sets of teams (East and West) that play against each other naturally suggests a bipartite graph structure within our flow network.
 
 ### Graph Construction
@@ -74,6 +74,7 @@ With this graph, we can find the minimum-cost flow. A flow of 1 unit from `v_sou
 
 ```cpp
 #include <iostream>
+
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/cycle_canceling.hpp>
 #include <boost/graph/push_relabel_max_flow.hpp>
@@ -86,88 +87,92 @@ typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::directedS, boost:
     boost::property<boost::edge_capacity_t, long,
         boost::property<boost::edge_residual_capacity_t, long,
             boost::property<boost::edge_reverse_t, traits::edge_descriptor,
-                boost::property <boost::edge_weight_t, long> > > > > graph;
+                boost::property <boost::edge_weight_t, long> > > > > graph; // new! weightmap corresponds to costs
 
 typedef boost::graph_traits<graph>::vertex_descriptor           vertex_desc;
 typedef boost::graph_traits<graph>::edge_descriptor             edge_desc;
+typedef boost::graph_traits<graph>::out_edge_iterator           out_edge_it; // Iterator
 
-// A large enough capacity for "unlimited" flow on certain edges.
-const int MAX_CAPACITY = 250; 
+const int MAX_L = 250;
 
-// Custom edge adder class to simplify adding flow edges.
+// Custom edge adder class
 class edge_adder {
  graph &G;
+
  public:
   explicit edge_adder(graph &G) : G(G) {}
   void add_edge(int from, int to, long capacity, long cost) {
     auto c_map = boost::get(boost::edge_capacity, G);
     auto r_map = boost::get(boost::edge_reverse, G);
-    auto w_map = boost::get(boost::edge_weight, G);
+    auto w_map = boost::get(boost::edge_weight, G); // new!
     const edge_desc e = boost::add_edge(from, to, G).first;
     const edge_desc rev_e = boost::add_edge(to, from, G).first;
     c_map[e] = capacity;
     c_map[rev_e] = 0; // reverse edge has no capacity!
     r_map[e] = rev_e;
     r_map[rev_e] = e;
-    w_map[e] = cost;
-    w_map[rev_e] = -cost; // reverse edge has opposite cost
+    w_map[e] = cost;   // new assign cost
+    w_map[rev_e] = -cost;   // new negative cost
   }
 };
 
 void solve() {
-  int e, w, m, d, p, l;
-  std::cin >> e >> w >> m >> d >> p >> l;
+  // std::cout << "==================================================================" << std::endl;
+  // ===== READ INPUT =====
+  int e, w, m, d, p, l; std::cin >> e >> w >> m >> d >> p >> l;
 
-  // Total vertices: e teams + w teams + 4 special vertices
-  graph G(e + w + 4);
+  graph G(e + w);
   edge_adder adder(G);
   
-  // Define special vertices
-  const vertex_desc v_source = e + w;
-  const vertex_desc pseudo_source = e + w + 1;
-  const vertex_desc v_target = e + w + 2;
-  const vertex_desc pseudo_target = e + w + 3;
+  // Setup source and sink
+  const vertex_desc v_source = boost::add_vertex(G);
+  const vertex_desc pseudo_source = boost::add_vertex(G);
+  const vertex_desc v_target = boost::add_vertex(G);
+  const vertex_desc pseudo_target = boost::add_vertex(G);
   
-  // Connect sources to East teams
   adder.add_edge(v_source, pseudo_source, p - (l * e), 0);
+  adder.add_edge(pseudo_target, v_target, p - (l * w), 0);
+  
+  // Create source and sink connections
   for(int i = 0; i < e; ++i) {
     adder.add_edge(v_source, i, l, 0);
-    adder.add_edge(pseudo_source, i, MAX_CAPACITY, 0);
+    adder.add_edge(pseudo_source, i, MAX_L, 0);
   }
-  
-  // Connect West teams to sinks
-  adder.add_edge(pseudo_target, v_target, p - (l * w), 0);
   for(int i = 0; i < w; ++i) {
     adder.add_edge(e + i, v_target, l, 0);
-    adder.add_edge(e + i, pseudo_target, MAX_CAPACITY, 0);
+    adder.add_edge(e + i, pseudo_target, MAX_L, 0);
   }
   
-  // Add edges for non-difficult matches
+  // Read matches
   for(int i = 0; i < m; ++i) {
     int u, v, r; std::cin >> u >> v >> r;
     adder.add_edge(u, e + v, 1, r);
   }
   
-  // Difficult matches are ignored in this partial solution
+  // Read dangerous matches (ignore for now)
   for(int i = 0; i < d; ++i) {
     int u, v, r; std::cin >> u >> v >> r;
   }
   
-  // Find the min-cost max-flow
-  long flow = boost::push_relabel_max_flow(G, v_source, v_target);
+  // ===== SOLVE =====
+  int flow = boost::push_relabel_max_flow(G, v_source, v_target);
   boost::successive_shortest_path_nonnegative_weights(G, v_source, v_target);
-  long cost = boost::find_flow_cost(G);
+  int cost = boost::find_flow_cost(G);
   
-  // A schedule is valid if and only if we can schedule exactly p matches.
+  // ===== OUTPUT =====
+  // std::cout << flow << " " << cost << std::endl;
   if(flow == p) {
     std::cout << cost << std::endl;
-  } else {
+  } else if (flow < p) {
     std::cout << "No schedule!" << std::endl;
+  } else {
+    std::cout << "ERROR: flow (" << flow << "( is higher than p (" << p << ")" << std::endl;
   }
 }
 
 int main() {
   std::ios_base::sync_with_stdio(false);
+  
   int n_tests; std::cin >> n_tests;
   while(n_tests--) { solve(); }
 }
@@ -175,7 +180,7 @@ int main() {
 </details>
 
 <details>
-<summary>Final Solution (All Test Sets)</summary>
+<summary>Final Solution</summary>
 To build the final solution, we extend the min-cost max-flow model from the previous approach to correctly handle **difficult matches**. The core graph structure for non-difficult matches remains the same.
 
 ### The Key Insight
@@ -205,6 +210,7 @@ The final check remains the same: a valid schedule exists if and only if the max
 
 ```cpp
 #include <iostream>
+
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/cycle_canceling.hpp>
 #include <boost/graph/push_relabel_max_flow.hpp>
@@ -217,90 +223,93 @@ typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::directedS, boost:
     boost::property<boost::edge_capacity_t, long,
         boost::property<boost::edge_residual_capacity_t, long,
             boost::property<boost::edge_reverse_t, traits::edge_descriptor,
-                boost::property <boost::edge_weight_t, long> > > > > graph;
+                boost::property <boost::edge_weight_t, long> > > > > graph; // new! weightmap corresponds to costs
 
 typedef boost::graph_traits<graph>::vertex_descriptor           vertex_desc;
 typedef boost::graph_traits<graph>::edge_descriptor             edge_desc;
+typedef boost::graph_traits<graph>::out_edge_iterator           out_edge_it; // Iterator
 
-// A large enough capacity for "unlimited" flow on certain edges.
-const int MAX_CAPACITY = 250;
+const int MAX_L = 250;
 
-// Custom edge adder class to simplify adding flow edges.
+// Custom edge adder class
 class edge_adder {
  graph &G;
+
  public:
   explicit edge_adder(graph &G) : G(G) {}
   void add_edge(int from, int to, long capacity, long cost) {
     auto c_map = boost::get(boost::edge_capacity, G);
     auto r_map = boost::get(boost::edge_reverse, G);
-    auto w_map = boost::get(boost::edge_weight, G);
+    auto w_map = boost::get(boost::edge_weight, G); // new!
     const edge_desc e = boost::add_edge(from, to, G).first;
     const edge_desc rev_e = boost::add_edge(to, from, G).first;
     c_map[e] = capacity;
     c_map[rev_e] = 0; // reverse edge has no capacity!
     r_map[e] = rev_e;
     r_map[rev_e] = e;
-    w_map[e] = cost;
-    w_map[rev_e] = -cost; // reverse edge has opposite cost
+    w_map[e] = cost;   // new assign cost
+    w_map[rev_e] = -cost;   // new negative cost
   }
 };
 
 void solve() {
-  int e, w, m, d, p, l;
-  std::cin >> e >> w >> m >> d >> p >> l;
+  // std::cout << "==================================================================" << std::endl;
+  // ===== READ INPUT =====
+  int e, w, m, d, p, l; std::cin >> e >> w >> m >> d >> p >> l;
 
-  // Total vertices: e teams + w teams + 4 special vertices
-  graph G(e + w + 4);
+  graph G(e + w);
   edge_adder adder(G);
   
-  // Define special vertices
-  const vertex_desc v_source = e + w;
-  const vertex_desc pseudo_source = e + w + 1;
-  const vertex_desc v_target = e + w + 2;
-  const vertex_desc pseudo_target = e + w + 3;
+  // Setup source and sink
+  const vertex_desc v_source = boost::add_vertex(G);
+  const vertex_desc pseudo_source = boost::add_vertex(G);
+  const vertex_desc v_target = boost::add_vertex(G);
+  const vertex_desc pseudo_target = boost::add_vertex(G);
   
-  // Connect sources to East teams
   adder.add_edge(v_source, pseudo_source, p - (l * e), 0);
+  adder.add_edge(pseudo_target, v_target, p - (l * w), 0);
+  
+  // Create source and sink connections
   for(int i = 0; i < e; ++i) {
     adder.add_edge(v_source, i, l, 0);
-    adder.add_edge(pseudo_source, i, MAX_CAPACITY, 0);
+    adder.add_edge(pseudo_source, i, MAX_L, 0);
   }
-  
-  // Connect West teams to sinks
-  adder.add_edge(pseudo_target, v_target, p - (l * w), 0);
   for(int i = 0; i < w; ++i) {
     adder.add_edge(e + i, v_target, l, 0);
-    adder.add_edge(e + i, pseudo_target, MAX_CAPACITY, 0);
+    adder.add_edge(e + i, pseudo_target, MAX_L, 0);
   }
   
-  // Add edges for non-difficult matches
+  // Read matches
   for(int i = 0; i < m; ++i) {
     int u, v, r; std::cin >> u >> v >> r;
     adder.add_edge(u, e + v, 1, r);
   }
   
-  // Add edges for difficult matches
+  // Read dangerous matches (ignore for now)
   for(int i = 0; i < d; ++i) {
     int u, v, r; std::cin >> u >> v >> r;
-    // This edge models a difficult match as an optional choice
     adder.add_edge(pseudo_source, pseudo_target, 1 , r);
   }
   
-  // Find the min-cost max-flow
-  long flow = boost::push_relabel_max_flow(G, v_source, v_target);
+  // ===== SOLVE =====
+  int flow = boost::push_relabel_max_flow(G, v_source, v_target);
   boost::successive_shortest_path_nonnegative_weights(G, v_source, v_target);
-  long cost = boost::find_flow_cost(G);
+  int cost = boost::find_flow_cost(G);
   
-  // A schedule is valid if and only if we can schedule exactly p matches.
+  // ===== OUTPUT =====
+  // std::cout << flow << " " << cost << std::endl;
   if(flow == p) {
     std::cout << cost << std::endl;
-  } else {
+  } else if (flow < p) {
     std::cout << "No schedule!" << std::endl;
+  } else {
+    std::cout << "ERROR: flow (" << flow << "( is higher than p (" << p << ")" << std::endl;
   }
 }
 
 int main() {
   std::ios_base::sync_with_stdio(false);
+  
   int n_tests; std::cin >> n_tests;
   while(n_tests--) { solve(); }
 }
