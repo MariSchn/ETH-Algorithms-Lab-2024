@@ -71,9 +71,8 @@ For efficiency, it's best to sort the edges by length first. Then, for Question 
 ```cpp
 #include <iostream> 
 #include <vector>
-#include <iomanip>
+#include <limits>
 #include <algorithm>
-#include <tuple>
 
 #include <boost/pending/disjoint_sets.hpp>
 
@@ -82,80 +81,77 @@ For efficiency, it's best to sort the edges by length first. Then, for Question 
 #include <CGAL/Triangulation_vertex_base_with_info_2.h>
 #include <CGAL/Triangulation_face_base_2.h>
 
-// CGAL type definitions
 typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
-typedef std::size_t                                         Index;
-typedef CGAL::Triangulation_vertex_base_with_info_2<Index,K>Vb;
-typedef CGAL::Triangulation_face_base_2<K>                  Fb;
-typedef CGAL::Triangulation_data_structure_2<Vb,Fb>         Tds;
-typedef CGAL::Delaunay_triangulation_2<K,Tds>               Delaunay;
-typedef K::Point_2                                          Point;
-typedef std::pair<Point,Index>                              IPoint;
-typedef std::tuple<Index,Index,K::FT>                       Edge;
-typedef std::vector<Edge>                                   EdgeV;
+typedef std::size_t                                            Index;
+typedef CGAL::Triangulation_vertex_base_with_info_2<Index,K>   Vb;
+typedef CGAL::Triangulation_face_base_2<K>                     Fb;
+typedef CGAL::Triangulation_data_structure_2<Vb,Fb>            Tds;
+typedef CGAL::Delaunay_triangulation_2<K,Tds>                  Delaunay;
+
+typedef std::tuple<Index,Index,K::FT> Edge;
+typedef std::vector<Edge> EdgeV;
+
+typedef K::Point_2 Point;
+typedef std::pair<Point,Index> IPoint;
+
 
 void solve() {
-  long n, k, f_0;
-  double s_0_double;
-  std::cin >> n >> k >> f_0 >> s_0_double;
-  K::FT s_0(s_0_double);
+  // ===== READ INPUT =====
+  long n, k, f_0, s_0; std::cin >> n >> k >> f_0 >> s_0;
 
-  std::vector<IPoint> tents;
-  tents.reserve(n);
+  std::vector<IPoint> tents; tents.reserve(n);
   for(int i = 0; i < n; ++i) {
     int x, y; std::cin >> x >> y;
-    tents.emplace_back(Point(x, y), i);
+    tents.push_back(IPoint(Point(x, y), i));
   }
   
-  // Construct Delaunay triangulation
+  // ===== TRIANGULATION =====
   Delaunay t;
   t.insert(tents.begin(), tents.end());
   
-  // Extract all finite edges and their squared lengths
-  EdgeV edges;
-  edges.reserve(3*n);
+  // === Get all Edges from the Triangulation ===
+  EdgeV edges; edges.reserve(3*n);
   for (auto e = t.finite_edges_begin(); e != t.finite_edges_end(); ++e) {
     Index i1 = e->first->vertex((e->second+1)%3)->info();
     Index i2 = e->first->vertex((e->second+2)%3)->info();
+
+    if (i1 > i2) std::swap(i1, i2);
     edges.emplace_back(i1, i2, t.segment(e).squared_length());
   }
-
-  // Sort edges by increasing squared length
-  std::sort(edges.begin(), edges.end(), [](const Edge& e1, const Edge& e2) {
+  std::sort(edges.begin(), edges.end(), [](const Edge& e1, const Edge& e2) -> bool {
     return std::get<2>(e1) < std::get<2>(e2);
   });
   
-  // Question 1: Max s for f_0=n families (Test Sets 1&2)
-  // The answer is the shortest edge length in the triangulation.
-  long max_s = CGAL::to_double(std::get<2>(edges[0]));
-  
-  // Question 2: Max f for a given s_0
+  // Count number of components for distance s_0
   boost::disjoint_sets_with_storage<> uf(n);
-  long num_families = n;
-  for (const auto& edge : edges) {
-    if (std::get<2>(edge) >= s_0) {
-      break; // All subsequent edges are also too long
+  Index n_components = n;
+  for (EdgeV::const_iterator e = edges.begin(); e != edges.end(); ++e) {
+    Index c1 = uf.find_set(std::get<0>(*e));
+    Index c2 = uf.find_set(std::get<1>(*e));
+    K::FT dist = std::get<2>(*e);
+    
+    if(dist >= s_0) {
+      break;
     }
     
-    Index u = std::get<0>(edge);
-    Index v = std::get<1>(edge);
-    if (uf.find_set(u) != uf.find_set(v)) {
-      uf.link(u, v);
-      num_families--;
+    if (c1 != c2) {
+      uf.link(c1, c2);
+      if (--n_components == 1) break;
     }
   }
 
-  std::cout << max_s << " " << num_families << std::endl;
+  // ===== OUTPUT =====
+  std::cout << std::fixed << std::setprecision(0);
+  std::cout << (long) std::get<2>(edges[0]) << " " << n_components << std::endl;
 }
 
 int main() {
   std::ios_base::sync_with_stdio(false);
-  std::cout << std::fixed << std::setprecision(0);
-  int t; std::cin >> t;
-  while(t--) {
+  
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) {
     solve();
   }
-  return 0;
 }
 ```
 </details>
@@ -185,11 +181,11 @@ This part is identical to the previous solution. We build components by merging 
 
 ### C++ Code
 ```cpp
+///3
 #include <iostream> 
 #include <vector>
-#include <iomanip>
+#include <limits>
 #include <algorithm>
-#include <tuple>
 
 #include <boost/pending/disjoint_sets.hpp>
 
@@ -198,96 +194,95 @@ This part is identical to the previous solution. We build components by merging 
 #include <CGAL/Triangulation_vertex_base_with_info_2.h>
 #include <CGAL/Triangulation_face_base_2.h>
 
-// CGAL type definitions
 typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
-typedef std::size_t                                         Index;
-typedef CGAL::Triangulation_vertex_base_with_info_2<Index,K>Vb;
-typedef CGAL::Triangulation_face_base_2<K>                  Fb;
-typedef CGAL::Triangulation_data_structure_2<Vb,Fb>         Tds;
-typedef CGAL::Delaunay_triangulation_2<K,Tds>               Delaunay;
-typedef K::Point_2                                          Point;
-typedef std::pair<Point,Index>                              IPoint;
-typedef std::tuple<Index,Index,K::FT>                       Edge;
-typedef std::vector<Edge>                                   EdgeV;
+typedef std::size_t                                            Index;
+typedef CGAL::Triangulation_vertex_base_with_info_2<Index,K>   Vb;
+typedef CGAL::Triangulation_face_base_2<K>                     Fb;
+typedef CGAL::Triangulation_data_structure_2<Vb,Fb>            Tds;
+typedef CGAL::Delaunay_triangulation_2<K,Tds>                  Delaunay;
+
+typedef std::tuple<Index,Index,K::FT> Edge;
+typedef std::vector<Edge> EdgeV;
+
+typedef K::Point_2 Point;
+typedef std::pair<Point,Index> IPoint;
+
 
 void solve() {
-  long n, k, f_0;
-  double s_0_double;
-  std::cin >> n >> k >> f_0 >> s_0_double;
-  K::FT s_0(s_0_double);
+  // ===== READ INPUT =====
+  long n, k, f_0, s_0; std::cin >> n >> k >> f_0 >> s_0;
 
-  std::vector<IPoint> tents;
-  tents.reserve(n);
+  std::vector<IPoint> tents; tents.reserve(n);
   for(int i = 0; i < n; ++i) {
     int x, y; std::cin >> x >> y;
-    tents.emplace_back(Point(x, y), i);
+    tents.push_back(IPoint(Point(x, y), i));
   }
   
+  // ===== TRIANGULATION =====
   Delaunay t;
   t.insert(tents.begin(), tents.end());
   
-  EdgeV edges;
-  edges.reserve(3*n);
+  // === Get all Edges from the Triangulation ===
+  EdgeV edges; edges.reserve(3*n);
   for (auto e = t.finite_edges_begin(); e != t.finite_edges_end(); ++e) {
     Index i1 = e->first->vertex((e->second+1)%3)->info();
     Index i2 = e->first->vertex((e->second+2)%3)->info();
+
+    if (i1 > i2) std::swap(i1, i2);
     edges.emplace_back(i1, i2, t.segment(e).squared_length());
   }
-
-  std::sort(edges.begin(), edges.end(), [](const Edge& e1, const Edge& e2) {
+  std::sort(edges.begin(), edges.end(), [](const Edge& e1, const Edge& e2) -> bool {
     return std::get<2>(e1) < std::get<2>(e2);
   });
   
-  // Question 1: Max s for f_0 families
-  boost::disjoint_sets_with_storage<> uf_f(n);
-  long num_components_f = n;
-  K::FT max_s_val;
-  for (const auto& edge : edges) {
-    if (num_components_f < f_0) break; // Already found the edge
+  // Iterate and merge components until there are less than f_0 components left
+  boost::disjoint_sets_with_storage<> f_uf(n);
+  Index f_n_components = n;
+  K::FT max_s = 0;
+  for (EdgeV::const_iterator e = edges.begin(); e != edges.end(); ++e) {
+    Index c1 = f_uf.find_set(std::get<0>(*e));
+    Index c2 = f_uf.find_set(std::get<1>(*e));
+    K::FT dist = std::get<2>(*e);
     
-    Index u = std::get<0>(edge);
-    Index v = std::get<1>(edge);
-    if (uf_f.find_set(u) != uf_f.find_set(v)) {
-      if (num_components_f == f_0) {
-        max_s_val = std::get<2>(edge);
+    if (c1 != c2) {
+      f_uf.link(c1, c2);
+      if (f_n_components-- == f_0) {
+        max_s = dist;
+        break;
       }
-      uf_f.link(u, v);
-      num_components_f--;
     }
   }
-  // If we never dropped below f_0, any distance is possible (theoretically infinite)
-  // But practically, limited by max coord values. The problem constraints imply this won't be an issue.
-  // If f_0 > n, no solution exists. If f_0 <= n and the loop finishes, num_components_f >= f_0.
-  // The problem statement ensures f_0 >= 2, k*f_0 <= n.
-  // If the loop finishes without setting max_s_val (e.g., if f0 is 1), max_s would be very large. 
-  // However, we can simply say if the loop finishes, any distance worked.
-  // For this problem, we'll always find a transition point.
   
-  // Question 2: Max f for a given s_0
-  boost::disjoint_sets_with_storage<> uf_s(n);
-  long num_families_s = n;
-  for (const auto& edge : edges) {
-    if (std::get<2>(edge) >= s_0) break;
+  // Count number of components for distance s_0
+  boost::disjoint_sets_with_storage<> s_uf(n);
+  Index s_n_components = n;
+  for (EdgeV::const_iterator e = edges.begin(); e != edges.end(); ++e) {
+    Index c1 = s_uf.find_set(std::get<0>(*e));
+    Index c2 = s_uf.find_set(std::get<1>(*e));
+    K::FT dist = std::get<2>(*e);
     
-    Index u = std::get<0>(edge);
-    Index v = std::get<1>(edge);
-    if (uf_s.find_set(u) != uf_s.find_set(v)) {
-      uf_s.link(u, v);
-      num_families_s--;
+    if(dist >= s_0) {
+      break;
+    }
+    
+    if (c1 != c2) {
+      s_uf.link(c1, c2);
+      if (--s_n_components == 1) break;
     }
   }
 
-  std::cout << (long)CGAL::to_double(max_s_val) << " " << num_families_s << std::endl;
+  // ===== OUTPUT =====
+  std::cout << std::fixed << std::setprecision(0);
+  std::cout << max_s << " " << s_n_components << std::endl;
 }
 
 int main() {
   std::ios_base::sync_with_stdio(false);
-  std::cout << std::fixed << std::setprecision(0);
-  int t; std::cin >> t;
-  while(t--) {
+  
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) {
     solve();
   }
-  return 0;
 }
 ```
 </details>
@@ -334,164 +329,166 @@ The provided code implements such a greedy strategy for $k=1, 2, 3, 4$.
 
 ### C++ Code
 ```cpp
+#include <limits>
 #include <iostream>
-#include <vector>
 #include <iomanip>
-#include <algorithm>
-#include <tuple>
+#include <string>
 #include <cmath>
-
-#include <boost/pending/disjoint_sets.hpp>
+#include <algorithm>
+#include <vector>
 
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Delaunay_triangulation_2.h>
 #include <CGAL/Triangulation_vertex_base_with_info_2.h>
 #include <CGAL/Triangulation_face_base_2.h>
+#include <boost/pending/disjoint_sets.hpp>
 
+// Epic kernel is enough, no constructions needed, provided the squared distance
+// fits into a double (!)
 typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
-typedef std::size_t                                         Index;
-typedef CGAL::Triangulation_vertex_base_with_info_2<Index,K>Vb;
-typedef CGAL::Triangulation_face_base_2<K>                  Fb;
-typedef CGAL::Triangulation_data_structure_2<Vb,Fb>         Tds;
-typedef CGAL::Delaunay_triangulation_2<K,Tds>               Delaunay;
-typedef std::tuple<Index,Index,K::FT>                       Edge;
-typedef std::vector<Edge>                                   EdgeV;
+// we want to store an index with each vertex
+typedef std::size_t                                            Index;
+typedef CGAL::Triangulation_vertex_base_with_info_2<Index,K>   Vb;
+typedef CGAL::Triangulation_face_base_2<K>                     Fb;
+typedef CGAL::Triangulation_data_structure_2<Vb,Fb>            Tds;
+typedef CGAL::Delaunay_triangulation_2<K,Tds>                  Delaunay;
 
-// Calculates max families of size k given counts of components of smaller sizes.
-int max_num_families(std::vector<int>& comp_of_size, int k) {
-    if (k == 1) return comp_of_size[1];
+typedef std::tuple<Index,Index,K::FT> Edge;
+typedef std::vector<Edge> EdgeV;
 
-    int num_families = comp_of_size[k];
-    if (k == 2) {
-        num_families += comp_of_size[1] / 2;
-    } else if (k == 3) {
-        int match_two_one = std::min(comp_of_size[2], comp_of_size[1]);
-        num_families += match_two_one;
-        int rem2 = comp_of_size[2] - match_two_one;
-        int rem1 = comp_of_size[1] - match_two_one;
-        num_families += rem2 / 2 + rem1 / 3;
-    } else if (k == 4) {
+int max_num_fam(std::vector<int> &comp_of_size, int k) {
+    // vector is size == k+1
+    int num = comp_of_size[k];
+    if(k == 4) {
+        // match 3 with ones, then take pairs of 2, match rest
         int match_three_one = std::min(comp_of_size[3], comp_of_size[1]);
-        num_families += match_three_one;
-        int rem3 = comp_of_size[3] - match_three_one;
-        int rem1 = comp_of_size[1] - match_three_one;
+        int remaining3 = comp_of_size[3] - match_three_one;
+        int remaining1 = comp_of_size[1] - match_three_one;
+        // add remaining size 3 to 2
+        int remaining2 = comp_of_size[2] + remaining3;
+        // if num2 is not divisible by two, we can possibly combine
+        // the one leftover with the single
+        if(remaining2 % 2 == 1) remaining1 += 2;
+        num += match_three_one + remaining2 / 2 + remaining1 / 4;
         
-        num_families += comp_of_size[2] / 2;
-        int rem2 = comp_of_size[2] % 2;
-
-        int rem_pairs = rem3 + rem2;
-        num_families += rem_pairs / 2;
-        int rem_single_pairs = rem_pairs % 2;
-        
-        rem1 += rem_single_pairs * 2;
-        num_families += rem1 / 4;
+    } else if(k == 3) {
+        // match 2 with ones, add rest
+        int match_two_one = std::min(comp_of_size[2], comp_of_size[1]);
+        int remaining2 = comp_of_size[2] - match_two_one;
+        int remaining1 = comp_of_size[1] - match_two_one;
+        // the remaining 2size comp have to be div by 2 (two together is one family)
+        num += match_two_one + remaining2 / 2 + remaining1 / 3;
+    } else if(k == 2) {
+        // just take the single comp and divide by 2
+        num += comp_of_size[1] / 2;
     }
-    return num_families;
+    return num;
 }
 
-void solve() {
-    long n;
-    int k, f0;
-    double s0_double;
-    std::cin >> n >> k >> f0 >> s0_double;
-    K::FT s0(s0_double);
 
-    std::vector<std::pair<K::Point_2, Index>> points;
+void testcase() {
+    Index n, k, f0;
+    double s0;
+    std::cin >> n >> k >> f0 >> s0;
+
+    typedef std::pair<K::Point_2,Index> IPoint;
+    std::vector<IPoint> points;
     points.reserve(n);
     for (Index i = 0; i < n; ++i) {
         int x, y;
         std::cin >> x >> y;
         points.emplace_back(K::Point_2(x, y), i);
     }
-
     Delaunay t;
     t.insert(points.begin(), points.end());
     EdgeV edges;
-    edges.reserve(3 * n);
+    edges.reserve(3*n); // there can be no more in a planar graph
     for (auto e = t.finite_edges_begin(); e != t.finite_edges_end(); ++e) {
-        Index i1 = e->first->vertex((e->second + 1) % 3)->info();
-        Index i2 = e->first->vertex((e->second + 2) % 3)->info();
+        Index i1 = e->first->vertex((e->second+1)%3)->info();
+        Index i2 = e->first->vertex((e->second+2)%3)->info();
+        // ensure smaller index comes first
+        if (i1 > i2) std::swap(i1, i2);
         edges.emplace_back(i1, i2, t.segment(e).squared_length());
     }
     std::sort(edges.begin(), edges.end(),
-        [](const Edge& e1, const Edge& e2) {
+            [](const Edge& e1, const Edge& e2) -> bool {
             return std::get<2>(e1) < std::get<2>(e2);
-        });
-
-    // Question 1: Find max s for f0 families
-    boost::disjoint_sets_with_storage<> uf1(n);
-    std::vector<int> num_tents1(n, 1);
-    std::vector<int> comp_of_size1(k + 1, 0);
-    if (k >= 1) comp_of_size1[1] = n;
-    
-    K::FT max_s = 0;
-    if (max_num_families(comp_of_size1, k) >= f0) {
-        for (const auto& e : edges) {
-            Index u_root = uf1.find_set(std::get<0>(e));
-            Index v_root = uf1.find_set(std::get<1>(e));
-            if (u_root != v_root) {
-                int size1 = num_tents1[u_root];
-                int size2 = num_tents1[v_root];
-                
-                if (k >= 1) { // Guard against k=0
-                    comp_of_size1[size1]--;
-                    comp_of_size1[size2]--;
-                }
-
-                uf1.link(u_root, v_root);
-                Index new_root = uf1.find_set(u_root);
-                int new_size = std::min((long)k, (long)size1 + size2);
-                num_tents1[new_root] = new_size;
-                if (k >= 1) comp_of_size1[new_size]++;
-
-                if (max_num_families(comp_of_size1, k) < f0) {
-                    max_s = std::get<2>(e);
-                    break;
-                }
-            }
-        }
-    }
+                });
 
 
-    // Question 2: Find max f for distance s0
-    boost::disjoint_sets_with_storage<> uf2(n);
-    std::vector<int> num_tents2(n, 1);
-    std::vector<int> comp_of_size2(k + 1, 0);
-    if (k >= 1) comp_of_size2[1] = n;
+    // for testcases 1-2: just look at smallest distance, bc otherwise not enough tents
+    // std::cout << long(std::get<2>(edges[0])) << " ";
 
-    for (const auto& e : edges) {
-        if (std::get<2>(e) >= s0) break;
-        
-        Index u_root = uf2.find_set(std::get<0>(e));
-        Index v_root = uf2.find_set(std::get<1>(e));
-        if (u_root != v_root) {
-            int size1 = num_tents2[u_root];
-            int size2 = num_tents2[v_root];
-            
-            if (k >= 1) {
-                comp_of_size2[size1]--;
-                comp_of_size2[size2]--;
-            }
 
-            uf2.link(u_root, v_root);
-            Index new_root = uf2.find_set(u_root);
-            int new_size = std::min((long)k, (long)size1 + size2);
-            num_tents2[new_root] = new_size;
-            if (k >= 1) comp_of_size2[new_size]++;
+    boost::disjoint_sets_with_storage<> uf(n);
+    std::vector<Index> num_tents(n, 1);
+    Index n_components = n;
+    std::vector<int> comp_of_size(k + 1, 0);
+    comp_of_size[1] = n;
+    double last_dist = 0;
+    for (EdgeV::const_iterator e = edges.begin(); e != edges.end(); ++e) {
+        // determine components of endpoints
+        Index c1 = uf.find_set(std::get<0>(*e));
+        Index c2 = uf.find_set(std::get<1>(*e));
+        last_dist = std::get<2>(*e);
+        if (c1 != c2) {
+            Index n1 = num_tents[c1];
+            Index n2 = num_tents[c2];
+            uf.link(c1, c2);
+            Index c3 = uf.find_set(std::get<1>(*e));
+            // set unused indices to zero
+            num_tents[c1] = num_tents[c2] = 0;
+            // cap it at k
+            num_tents[c3] = std::min(n1 + n2, k);
+            comp_of_size[n1]--; comp_of_size[n2]--;
+            comp_of_size[num_tents[c3]]++;
+            if (max_num_fam(comp_of_size, k) < f0) break;
         }
     }
     
-    int max_f = max_num_families(comp_of_size2, k);
-    std::cout << (long)CGAL::to_double(max_s) << " " << max_f << std::endl;
+    std::cout << long(last_dist) << " ";
+
+
+    // repeat process with adding edges < s0, then find max num families
+    boost::disjoint_sets_with_storage<> uf_s0(n);
+    num_tents = std::vector<Index>(n, 1);
+    comp_of_size = std::vector<int>(k + 1, 0);
+    comp_of_size[1] = n;
+
+    n_components = n;
+    for (EdgeV::const_iterator e = edges.begin(); e != edges.end(); ++e) {
+        // determine components of endpoints
+        Index c1 = uf_s0.find_set(std::get<0>(*e));
+        Index c2 = uf_s0.find_set(std::get<1>(*e));
+        double dist = std::get<2>(*e);
+        if(dist >= s0) {
+            break;
+        }
+        if (c1 != c2) {
+            Index n1 = num_tents[c1];
+            Index n2 = num_tents[c2];
+            uf_s0.link(c1, c2);
+            Index c3 = uf_s0.find_set(std::get<1>(*e));
+            // set unused indices to zero
+            num_tents[c1] = num_tents[c2] = 0;
+            // cap component size at k
+            num_tents[c3] = std::min(n1 + n2, k);
+            comp_of_size[n1]--; comp_of_size[n2]--;
+            comp_of_size[num_tents[c3]]++;
+            if (--n_components == 1) break;
+        }
+    }
+    std::cout << max_num_fam(comp_of_size, k) << std::endl;
+    return;
 }
 
 int main() {
     std::ios_base::sync_with_stdio(false);
-    std::cout << std::fixed << std::setprecision(0);
+
     int t;
     std::cin >> t;
-    while (t--) testcase();
-    return 0;
+    for (int i = 0; i < t; ++i)
+        testcase();
 }
 ```
 </details>

@@ -67,64 +67,51 @@ Scores can be very large ($x \le 10^{14}$), so it's essential to use 64-bit inte
 ```cpp
 #include <iostream>
 #include <vector>
-#include <algorithm>
 
 void solve() {
-  long n, m;
-  long long x;
-  long k;
-  std::cin >> n >> m >> x >> k;
+  // ===== READ INPUT =====
+  long n, m, x, k; std::cin >> n >> m >> x >> k;
   
-  // adj[u] stores pairs {v, p} for canals from u to v with p points.
-  std::vector<std::vector<std::pair<int, int>>> adj(n);
+  std::vector<std::vector<std::pair<int, int>>> edges(n);
   for(int i = 0; i < m; ++i) {
-    int u, v, p;
-    std::cin >> u >> v >> p;
-    adj[u].emplace_back(v, p);
+    int u, v, p; std::cin >> u >> v >> p;
+    edges[u].emplace_back(v, p);
   }
   
-  // dp[i][j]: max score starting from hole j with exactly i moves.
-  std::vector<std::vector<long long>> dp(k + 1, std::vector<long long>(n, 0));
+  // ===== SOLVE =====
+  std::vector<std::vector<long>> dp(k + 1, std::vector<long>(n, 0));  // Number of Turns left x Hole -> Max Achievable Score
   
-  // Fill DP table bottom-up, for 1 to k moves.
-  for(int i = 1; i <= k; ++i) {
-    for(int j = 0; j < n; ++j) {
-      if(adj[j].empty()) {
-        // Weayaya hole: free action to return to start. Score is same as starting from hole 0.
-        // Since we loop j from 0 to n-1, dp[i][0] is computed before this line is reached for any j > 0.
-        dp[i][j] = dp[i][0];
+  // Fill DP table bottom up
+  for(int turn = 1; turn < k + 1; ++turn) {
+    for(int hole = 0; hole < n; ++hole) {
+      if(edges[hole].empty()) {
+        // If the node has no edges, the "free action" of going back to the beginning is performed
+        dp[turn][hole] = dp[turn][0];
       } else {
-        // dp[i][j] is initialized to 0. We find the max over all outgoing canals.
-        for(const auto& edge : adj[j]) {
-          int v = edge.first;
-          int p = edge.second;
-          dp[i][j] = std::max(dp[i][j], (long long)p + dp[i-1][v]);
+        // If the node has edges the maximum achievable score is the maximum of the score achievable from its children with one move less + the score of going to that child
+        for(const std::pair<int, int> &edge : edges[hole]) {
+          dp[turn][hole] = std::max(dp[turn][hole], dp[turn - 1][edge.first] + edge.second);
         }
       }
     }
   }
   
-  // Find the minimum number of moves 'i' to achieve score x from the start.
-  for(int i = 0; i <= k; ++i) {
-    if(dp[i][0] >= x) {
-      std::cout << i << std::endl;
+  // ===== OUTPUT =====
+  // Search for first turn, where score x is reached
+  for(int turn = 0; turn < k + 1; ++turn) {
+    if(dp[turn][0] >= x) {
+      std::cout << turn << std::endl;
       return;
     }
   }
-  
   std::cout << "Impossible" << std::endl;
 }
 
 int main() {
   std::ios_base::sync_with_stdio(false);
-  std::cin.tie(NULL);
   
-  int t;
-  std::cin >> t;
-  while(t--) {
-    solve();
-  }
-  return 0;
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) { solve(); }
 }
 ```
 </details>

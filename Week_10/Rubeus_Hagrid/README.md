@@ -35,6 +35,121 @@ To minimize loss, you should visit A first if $N_B \times T_A < N_A \times T_B$,
 ## ✨ Solutions
 
 <details>
+
+<summary>First Solution (Test Set 1, 2, 3)</summary>
+
+This solution correctly identifies the core approach: using a **greedy strategy** to order the exploration of subtrees based on their efficiency. It implements a single-pass DFS that attempts to compute all necessary values during the traversal.
+
+The algorithm works as follows:
+1. **Single-pass DFS**: Unlike the final solution, this approach tries to calculate all node statistics (`n_nodes`, `traverse_time`, and `value`) in a single recursive traversal.
+2. **Greedy ordering**: At each node, it sorts the children based on a criterion that aims to prioritize more efficient subtrees first.
+3. **Cross-loss calculation**: It attempts to account for the galleons lost in unvisited subtrees while exploring others by using cumulative sums.
+
+However, this implementation has several issues that limit its effectiveness:
+- **Incorrect sorting criterion**: The code sorts by `n_nodes * traverse_time` in descending order, which doesn't correctly implement the optimal greedy strategy of minimizing the time-per-node ratio.
+- **Complex value calculation**: The single-pass approach leads to convoluted logic for calculating the final values, particularly in handling the cross-losses between subtrees.
+- **Potential precision issues**: The cumulative sum approach and the way elapsed time is handled can lead to incorrect calculations in more complex scenarios.
+
+Despite these flaws, the solution manages to pass several test sets because it captures the essential idea of prioritizing subtree exploration order and accounts for some aspects of the time-dependent galleon loss.
+
+### Code
+```cpp
+#include <iostream>
+#include <vector>
+#include <algorithm>
+
+struct Node {
+  int idx; // Used for Debugging
+  long n_nodes; // Number of Nodes in the (sub)rree which has this node as root
+  long traverse_time; // Time it takes from the root to traverse the (sub)tree which has this node as root (Including time to go to the node)
+  long raw_value; // Initial amount of gold in the chamber/node
+  long value; // Amount of gold obtained from this (sub)tree, respecting the elapsed time
+  std::vector<std::pair<Node*, int>> children;
+};
+
+void dfs(Node *root, long elapsed_time) {
+  root->value = root->raw_value - elapsed_time;
+  root->n_nodes = 1;
+  root->traverse_time = elapsed_time;
+  
+  // ===== LEAF NODE =====
+  if(root->children.empty()) {
+    return;
+  }
+  
+  // ===== INNER NODE =====
+  // Calculate/Fill fields for all children
+  for(std::pair<Node*, int> child_pair : root->children) {
+    Node *child = child_pair.first;
+    int distance = child_pair.second;
+    
+    dfs(child, elapsed_time + distance);
+    child->traverse_time += distance; // Add distance again as we need to go return from the child
+  }
+  // Note: Now each node in below "root" has its field filled
+  
+  // Sort children based on how many nodes we clear in the time it takes to clear them (descending)
+  std::sort(root->children.begin(), root->children.end(), [](const std::pair<Node*, int> &a, const std::pair<Node*, int> &b){
+    return a.first->n_nodes * a.first->traverse_time > b.first->n_nodes * b.first->traverse_time;
+  });
+  
+  // Compute cumulative sum of n_nodes
+  std::vector<long> cum_sum(root->children.size(), 0);
+  for(size_t i = 1; i < root->children.size(); ++i) {
+    cum_sum[i] = cum_sum[i-1] + root->children[i-1].first->n_nodes;
+  }
+  
+  // Update the fields for the "root" based on the children
+  for(size_t i = 0; i < root->children.size(); ++i) {
+    Node *child = root->children[i].first;
+      
+    root->n_nodes += child->n_nodes;
+    root->traverse_time += child->traverse_time - elapsed_time; // Avoid adding elapsed_time for each child
+    root->value += child->value + (elapsed_time - child->traverse_time) * cum_sum[i];
+  }
+  
+  // std::cout << "Node " << root->idx << " has n_nodes: " << root->n_nodes << " traverse_time: " << root->traverse_time << " value: " << root->value << std::endl;
+}
+
+
+void solve() {
+  // ===== READ INPUT =====
+  int n; std::cin >> n;
+  
+  std::vector<Node> nodes(n + 1);
+  nodes[0].idx = 0;
+  for(int i = 1; i < n + 1; ++i) {
+    int g; std::cin >> g;
+    nodes[i].raw_value = g;
+    nodes[i].idx = i;
+  }
+  
+  for(int i = 0; i < n; ++i) {
+    int u, v, l; std::cin >> u >> v >> l;
+    nodes[u].children.emplace_back(&nodes[v], l);
+  }
+  
+  // ===== CALCULATE VALUES FOR EACH NODE =====
+  dfs(&nodes[0], 0);
+  
+  // ===== OUTPUT =====
+  std::cout << nodes[0].value << std::endl;
+}
+
+int main() {
+  std::ios_base::sync_with_stdio(false);
+  
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) {
+    // std::cout << "======================" << std::endl;
+    solve();
+  }
+} 
+```
+
+</details>
+
+<details>
 <summary>Final Solution</summary>
 This problem can be modeled using a tree data structure. The surface entry point is the root of the tree, the chambers are the nodes, and the tunnels are the edges. The property that "from every chamber there is a unique sequence of tunnels leading up to the surface" confirms that the structure is indeed a tree.
 
@@ -71,125 +186,93 @@ The final answer is the total value calculated for the root node (the surface en
 #include <vector>
 #include <algorithm>
 
-// Represents a chamber or the entry point.
 struct Node {
-  int idx;                // Original index, useful for debugging.
-  long n_nodes = 1;       // Number of nodes in the subtree rooted here.
-  long traverse_time = 0; // Half the time to fully traverse the subtree.
-  long raw_value;         // Initial number of galleons.
-  long value;             // Galleons collected from this subtree.
+  int idx;                // Used for Debugging (set during input reading)
+  long n_nodes = 1;       // Number of Nodes in the (sub)tree which has this node as root (set in fill_fields)
+  long traverse_time = 0; // Time it takes from the root to traverse the (sub)tree which has this node as root (set in fill_fields)
+  long raw_value;         // Initial amount of gold in the chamber/node (set during input reading)
+  long value;             // Amount of gold obtained from this (sub)tree, respecting the elapsed time (set in calculate_values)
   std::vector<std::pair<Node*, int>> children;
 };
 
-// First DFS pass: Computes n_nodes and traverse_time for each node.
-// This is a post-order traversal.
 void fill_fields(Node *root) {
-  // For a leaf node, default values are correct.
+  // ===== LEAF NODE =====
   if(root->children.empty()) {
+    // Leaf nodes already have the fields set either by default or while reading the input
     return;
   }
   
-  // For an inner node, recurse on children first.
-  for(auto const& child_pair : root->children) {
+  // ===== INNER NODE =====
+  for(std::pair<Node*, int> child_pair : root->children) {
     Node *child = child_pair.first;
     int distance = child_pair.second;
     
     fill_fields(child);
     
-    // Aggregate values from children.
     root->n_nodes += child->n_nodes;
-    // traverse_time is half the total time to explore the subtree and return.
-    // Time to child and back is 2*distance. Half is distance.
-    // Time within child's subtree is child->traverse_time.
     root->traverse_time += child->traverse_time + distance;
   }
 }
 
-// Second DFS pass: Calculates the maximum galleons collected.
 void calculate_values(Node *root, long elapsed_time) {
-  // Collect galleons at the current node.
-  // The entry point (node 0) has no galleons.
-  if (root->idx != 0) {
-      root->value = root->raw_value - elapsed_time;
-  } else {
-      root->value = 0;
-  }
+  root->value = root->raw_value - elapsed_time;
 
-  // Base case: Leaf node.
+  // ===== LEAF NODE =====
   if(root->children.empty()) {
     return;
   }
   
-  // Sort children based on the greedy heuristic: (Time/Nodes) ratio.
-  // We use cross-multiplication to avoid floating-point numbers.
-  // Sorts by (traverse_time + distance) / n_nodes in ascending order.
+  // ===== INNER NODE =====
+  // Sort children based on n_nodes / (traverse_time + distance)
   std::sort(root->children.begin(), root->children.end(), [](const std::pair<Node*, int> &a, const std::pair<Node*, int> &b){
-    // Ratio for a: (a.first->traverse_time + a.second) / a.first->n_nodes
-    // Ratio for b: (b.first->traverse_time + b.second) / b.first->n_nodes
-    // Compare T_a/N_a < T_b/N_b  <=>  T_a*N_b < T_b*N_a
-    long time_a = a.first->traverse_time + a.second;
-    long nodes_a = a.first->n_nodes;
-    long time_b = b.first->traverse_time + b.second;
-    long nodes_b = b.first->n_nodes;
-    return time_a * nodes_b < time_b * nodes_a;
+    return b.first->n_nodes * (a.first->traverse_time + a.second) < a.first->n_nodes * (b.first->traverse_time + b.second);
   });
   
-  // Traverse children in the optimal order.
-  for(auto const& child_pair : root->children) {
+  // Calculate value for "root"
+  for(std::pair<Node*, int> child_pair : root->children) {
     Node *child = child_pair.first;
     int distance = child_pair.second;
  
-    // Time increases by 'distance' to reach the child.
     calculate_values(child, elapsed_time + distance);
       
-    // Add the collected value from the child's subtree.
     root->value += child->value;
-    
-    // Update elapsed_time for the next sibling.
-    // The time spent in the child's subtree is twice its half-traversal-time.
-    elapsed_time += 2 * (child->traverse_time + distance);
+    elapsed_time += 2 * (child->traverse_time + distance); // * 2 as we need to pass all edges twice once on the way in once on the way out
   }
 }
 
 
 void solve() {
-  int n;
-  std::cin >> n;
+  // ===== READ INPUT =====
+  int n; std::cin >> n;
   
   std::vector<Node> nodes(n + 1);
   nodes[0].idx = 0;
-  for(int i = 1; i <= n; ++i) {
-    long g;
-    std::cin >> g;
+  for(int i = 1; i < n + 1; ++i) {
+    int g; std::cin >> g;
     nodes[i].raw_value = g;
     nodes[i].idx = i;
   }
   
   for(int i = 0; i < n; ++i) {
-    int u, v, l;
-    std::cin >> u >> v >> l;
+    int u, v, l; std::cin >> u >> v >> l;
     nodes[u].children.emplace_back(&nodes[v], l);
   }
   
-  // Pass 1: Gather subtree information.
+  // ===== CALCULATE VALUES FOR EACH NODE =====
   fill_fields(&nodes[0]);
-  
-  // Pass 2: Calculate max galleons using the greedy strategy.
   calculate_values(&nodes[0], 0);
   
+  // ===== OUTPUT =====
   std::cout << nodes[0].value << std::endl;
 }
 
 int main() {
   std::ios_base::sync_with_stdio(false);
-  std::cin.tie(NULL);
   
-  int n_tests;
-  std::cin >> n_tests;
+  int n_tests; std::cin >> n_tests;
   while(n_tests--) {
     solve();
   }
-  return 0;
 }
 ```
 </details>
