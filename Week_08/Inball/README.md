@@ -74,13 +74,12 @@ This approach is correct but involves many divisions on `CGAL::Gmpq` rational nu
 ```cpp
 #include <iostream>
 #include <vector>
-#include <cmath>
 
 #include <CGAL/QP_models.h>
 #include <CGAL/QP_functions.h>
+#include <CGAL/Gmpz.h>
 #include <CGAL/Gmpq.h>
 
-// We use Gmpq for exact rational arithmetic
 typedef CGAL::Gmpq IT;
 typedef CGAL::Gmpq ET;
 
@@ -91,69 +90,63 @@ int main() {
   std::ios_base::sync_with_stdio(false);
   
   while(true) {
-    int n;
-    std::cin >> n;
-    if (n == 0) break;
-    int d;
-    std::cin >> d;
+    // ===== READ INPUT =====
+    int n; std::cin >> n;
+    if(n == 0) break;
+    int d; std::cin >> d;
+    
     
     std::vector<std::vector<IT>> A(n, std::vector<IT>(d));
     std::vector<IT> norms(n);
     std::vector<IT> b(n);
-    for (int i = 0; i < n; ++i) {
-      double norm_sq = 0;
-      for (int j = 0; j < d; ++j) {
-        long val;
-        std::cin >> val;
-        A[i][j] = val;
-        norm_sq += val * val;
+    for(int i = 0; i < n; ++i) {
+      double norm = 0;
+      for(int j = 0; j < d; ++j) {
+        std::cin >> A[i][j];
+        norm += std::pow(CGAL::to_double(A[i][j]), 2);
       }
       
-      // The problem guarantees the norm is an integer, so sqrt is safe.
-      norms[i] = std::sqrt(norm_sq);
+      // Using std::sqrt is usually "dangerous" but as the problem specified
+      // that all norms are integers, this should be fine
+      norms[i] = std::sqrt(norm);
       
-      long b_val;
-      std::cin >> b_val;
-      b[i] = b_val;
+      std::cin >> b[i];
     }
     
-    // Explicitly normalize all constraints
-    for (int i = 0; i < n; ++i) {
-      for (int j = 0; j < d; ++j) {
+    // ===== NORMALIZE ALL CONSTRAINTS =====
+    for(int i = 0; i < n; ++i) {
+      for(int j = 0; j < d; ++j) {
         A[i][j] /= norms[i];
       }
       b[i] /= norms[i];
     }
     
-    // Construct the Linear Program
-    const int r_idx = d; // Use variable 'd' to represent the radius r
+    // ===== CONSTRUCT LINEAR PROGRAM =====
+    const int r = d;
     
     Program lp(CGAL::SMALLER, false, 0, false, 0);
     
-    // Set up constraints: a'_i^T * x + r <= b'_i
-    for (int i = 0; i < n; ++i) {
-      for (int j = 0; j < d; ++j) {
+    for(int i = 0; i < n; ++i) {
+      for(int j = 0; j < d; ++j) {
         lp.set_a(j, i, A[i][j]);
       }
-      lp.set_a(r_idx, i, 1);
+      
+      lp.set_a(r, i, 1);
       lp.set_b(i, b[i]);
     }
     
-    // Constraint: r >= 0
-    lp.set_l(r_idx, true, 0);
+    lp.set_l(r, true, 0);
+    lp.set_c(r, -1); // Maximize r => Invert objective
     
-    // Objective: maximize r (which is equivalent to minimizing -r)
-    lp.set_c(r_idx, -1);
-    
+    // ===== SOLVE AND OUTPUT =====
     Solution s = CGAL::solve_linear_program(lp, ET());
     
-    if (s.is_infeasible()) {
+    if(s.is_infeasible()) {
       std::cout << "none" << std::endl;
-    } else if (s.is_unbounded()) {
+    } else if(s.is_unbounded()) {
       std::cout << "inf" << std::endl;
     } else {
-      // We minimized -r, so the optimal radius is -s.objective_value()
-      std::cout << (long) floor(CGAL::to_double(-s.objective_value())) << std::endl;
+      std::cout << (long) CGAL::to_double(-s.objective_value()) << std::endl;
     }
   }
 }
@@ -195,13 +188,12 @@ This single change implements the optimized constraint and leads to a much faste
 ```cpp
 #include <iostream>
 #include <vector>
-#include <cmath>
 
 #include <CGAL/QP_models.h>
 #include <CGAL/QP_functions.h>
+#include <CGAL/Gmpz.h>
 #include <CGAL/Gmpq.h>
 
-// We use Gmpq for exact rational arithmetic
 typedef CGAL::Gmpq IT;
 typedef CGAL::Gmpq ET;
 
@@ -212,59 +204,51 @@ int main() {
   std::ios_base::sync_with_stdio(false);
   
   while(true) {
-    int n;
-    std::cin >> n;
-    if (n == 0) break;
-    int d;
-    std::cin >> d;
+    // ===== READ INPUT =====
+    int n; std::cin >> n;
+    if(n == 0) break;
+    int d; std::cin >> d;
     
-    // We use long to read input to avoid overflow before converting to IT
-    std::vector<std::vector<long>> A_long(n, std::vector<long>(d));
+    std::vector<std::vector<IT>> A(n, std::vector<IT>(d));
     std::vector<IT> norms(n);
-    std::vector<long> b_long(n);
-    
-    for (int i = 0; i < n; ++i) {
-      double norm_sq = 0;
-      for (int j = 0; j < d; ++j) {
-        std::cin >> A_long[i][j];
-        norm_sq += A_long[i][j] * A_long[i][j];
+    std::vector<IT> b(n);
+    for(int i = 0; i < n; ++i) {
+      double norm = 0;
+      for(int j = 0; j < d; ++j) {
+        std::cin >> A[i][j];
+        norm += std::pow(CGAL::to_double(A[i][j]), 2);
       }
-      std::cin >> b_long[i];
+      std::cin >> b[i];
     
-      // The problem guarantees the norm is an integer, so sqrt is safe.
-      norms[i] = std::sqrt(norm_sq);
+      norms[i] = std::sqrt(norm);
     }
     
-    // Construct the Linear Program
-    const int r_idx = d; // Use variable 'd' to represent the radius r
+    // ===== CONSTRUCT LINEAR PROGRAM =====
+    const int r = d;
     
     Program lp(CGAL::SMALLER, false, 0, false, 0);
     
-    // Set up constraints: a_i^T * x + ||a_i|| * r <= b_i
-    for (int i = 0; i < n; ++i) {
-      for (int j = 0; j < d; ++j) {
-        lp.set_a(j, i, A_long[i][j]);
+    for(int i = 0; i < n; ++i) {
+      for(int j = 0; j < d; ++j) {
+        lp.set_a(j, i, A[i][j]);
       }
-      // This is the key optimization: use the norm as the coefficient for r
-      lp.set_a(r_idx, i, norms[i]); 
-      lp.set_b(i, b_long[i]);
+      
+      lp.set_a(r, i, norms[i]);
+      lp.set_b(i, b[i]);
     }
     
-    // Constraint: r >= 0
-    lp.set_l(r_idx, true, 0);
+    lp.set_l(r, true, 0);
+    lp.set_c(r, -1); // Maximize r => Invert objective
     
-    // Objective: maximize r (which is equivalent to minimizing -r)
-    lp.set_c(r_idx, -1);
-    
+    // ===== SOLVE AND OUTPUT =====
     Solution s = CGAL::solve_linear_program(lp, ET());
     
-    if (s.is_infeasible()) {
+    if(s.is_infeasible()) {
       std::cout << "none" << std::endl;
-    } else if (s.is_unbounded()) {
+    } else if(s.is_unbounded()) {
       std::cout << "inf" << std::endl;
     } else {
-      // We minimized -r, so the optimal radius is -s.objective_value()
-      std::cout << (long) floor(CGAL::to_double(-s.objective_value())) << std::endl;
+      std::cout << (long) CGAL::to_double(-s.objective_value()) << std::endl;
     }
   }
 }
@@ -277,14 +261,9 @@ int main() {
 Compiling: successful
 
 Judging solution >>>>
-   Test set 1        (20 pts / 1 s) : Correct answer      (0.018s)
-   Hidden test set 1 (05 pts / 1 s) : Correct answer      (0.018s)
-   Test set 2        (20 pts / 1 s) : Correct answer      (0.085s)
-   Hidden test set 2 (05 pts / 1 s) : Correct answer      (0.085s)
-   Test set 3        (20 pts / 1 s) : Correct answer      (0.033s)
-   Hidden test set 3 (05 pts / 1 s) : Correct answer      (0.033s)
-   Test set 4        (20 pts / 1 s) : Correct answer      (0.37s)
-   Hidden test set 4 (05 pts / 1 s) : Correct answer      (0.143s)
+   Test set 1 (35 pts / 2 s) : Correct answer      (0.026s)
+   Test set 2 (35 pts / 2 s) : Correct answer      (0.233s)
+   Test set 3 (30 pts / 2 s) : Correct answer      (1.907s)
 
 Total score: 100
 ```
