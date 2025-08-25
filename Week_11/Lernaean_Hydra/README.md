@@ -64,98 +64,115 @@ The minimum total cuts to slay the Hydra is the minimum value found in the last 
 ```cpp
 #include <iostream>
 #include <vector>
+#include <unordered_map>
 #include <limits>
-#include <algorithm>
+#include <cmath>
+
+typedef std::vector<int> VI;
+typedef std::vector<VI> VVI;
+typedef std::vector<VVI> VVVI;
+
+typedef std::vector<long> VL;
+typedef std::vector<VL> VVL;
+
+
+// Each pattern can only be used once
+// To kill head i, all heads j < i need to be killed before
+
+// Last Cut as DP dimension -> not feasible as there are n possibilities and in the end we would have to store n^9
+
 
 const long INF = std::numeric_limits<long>::max();
 
 void solve() {
-    int n, m, k, d;
-    std::cin >> n >> m >> k >> d;
+  // ===== READ INPUT =====
+  int n, m, k, d; std::cin >> n >> m >> k >> d;
+  
+  VVVI head_to_patterns(n);
+  VI head_to_num_patterns(n, 0);
+  for(int i = 0; i < m; ++i) {
+    // Read Pattern i
+    std::vector<int> pattern; pattern.reserve(k);
+    for(int j = 0; j < k; ++j) {
+      int h; std::cin >> h; 
+      pattern.push_back(h);
+    }
+    
+    // Store Pattern i for the according head
+    head_to_patterns[pattern[k-1]].push_back(pattern);
+    head_to_num_patterns[pattern[k-1]]++;
+  }
 
-    std::vector<std::vector<std::vector<int>>> head_to_patterns(n);
-    for (int i = 0; i < m; ++i) {
-        std::vector<int> pattern(k);
-        for (int j = 0; j < k; ++j) {
-            std::cin >> pattern[j];
+  // ===== SOLVE =====
+  VVL dp(n, VL(d, std::numeric_limits<long>::max()));
+  
+  // Initialize DP table for the first head
+  for(int p = 0; p < head_to_num_patterns[0]; ++p) {
+    dp[0][p] = k;
+  }
+  
+  for(int i = 1; i < n; ++i) {
+    for(int p = 0; p < head_to_num_patterns[i]; ++p) {
+      // Check if it would be possible to execute the pattern individually
+      bool possible = true;
+      for(int h = 0; h < k; ++h) {
+        if(head_to_patterns[i][p][h] < i) { 
+          possible = false;
+          break;
         }
-        head_to_patterns[pattern[k - 1]].push_back(pattern);
-    }
-
-    std::vector<std::vector<long>> dp(n, std::vector<long>(d, INF));
-
-    // Base case: Eradicating head 0
-    for (int p = 0; p < head_to_patterns[0].size(); ++p) {
-        dp[0][p] = k;
-    }
-
-    // Fill DP table for heads 1 to n-1
-    for (int i = 1; i < n; ++i) {
-        for (int p = 0; p < head_to_patterns[i].size(); ++p) {
-            const auto& current_pattern = head_to_patterns[i][p];
-            
-            // Case 1: No overlap
-            bool possible_without_overlap = true;
-            for (int h = 0; h < k; ++h) {
-                if (current_pattern[h] < i) {
-                    possible_without_overlap = false;
-                    break;
-                }
-            }
-            if (possible_without_overlap) {
-                for (int prev_p = 0; prev_p < head_to_patterns[i - 1].size(); ++prev_p) {
-                    if (dp[i - 1][prev_p] != INF) {
-                        dp[i][p] = std::min(dp[i][p], dp[i - 1][prev_p] + k);
-                    }
-                }
-            }
-            
-            // Case 2: With overlap
-            for (int prev_p = 0; prev_p < head_to_patterns[i - 1].size(); ++prev_p) {
-                if (dp[i - 1][prev_p] == INF) continue;
-                
-                const auto& prev_pattern = head_to_patterns[i - 1][prev_p];
-                for (int n_matches = 1; n_matches < k; ++n_matches) {
-                    bool match = true;
-                    for (int h = 0; h < n_matches; ++h) {
-                        if (prev_pattern[k - n_matches + h] != current_pattern[h]) {
-                            match = false;
-                            break;
-                        }
-                    }
-                    
-                    if (match) {
-                        // This is where the bug is: no check on the remaining k - n_matches cuts
-                        dp[i][p] = std::min(dp[i][p], dp[i - 1][prev_p] + k - n_matches);
-                    }
-                }
-            }
+      }
+      
+      // Check if there is any match between the current pattern p and any previous pattern prev_p
+      for(int prev_p = 0; prev_p < head_to_num_patterns[i-1]; ++prev_p) {
+        // Check if the previous pattern was even possible
+        if(dp[i-1][prev_p] == INF) { continue; }
+        
+        // Check for 1 matching cut
+        if(head_to_patterns[i-1][prev_p][k-1] == head_to_patterns[i][p][0]) {
+          dp[i][p] = std::min(dp[i][p], dp[i-1][prev_p] + k - 1);
         }
-    }
-
-    long min_cuts = INF;
-    if (n > 0 && !head_to_patterns[n - 1].empty()) {
-        for (int p = 0; p < head_to_patterns[n - 1].size(); ++p) {
-            min_cuts = std::min(min_cuts, dp[n - 1][p]);
+        
+        // Check for 2 matching cuts
+        if(k > 2) {
+          if(head_to_patterns[i-1][prev_p][k-1] == head_to_patterns[i][p][1] &&
+             head_to_patterns[i-1][prev_p][k-2] == head_to_patterns[i][p][0]
+          ) {
+            dp[i][p] = std::min(dp[i][p], dp[i-1][prev_p] + k - 2);
+          }
         }
+      }
+      
+      // If it was possible to kill using only the pattern check if that is better
+      if(possible) {
+        for(int prev_p = 0; prev_p < head_to_num_patterns[i-1]; ++prev_p) {
+          // Check if the previous pattern was even possible
+          if(dp[i-1][prev_p] == INF) { continue; }
+          
+          dp[i][p] = std::min(dp[i][p], dp[i-1][prev_p] + k);
+        }
+      }
     }
-
-    if (min_cuts == INF) {
-        std::cout << "Impossible" << std::endl;
-    } else {
-        std::cout << min_cuts << std::endl;
-    }
+  }
+  
+  // Find minimum cuts to kill the last head
+  long min_cuts = std::numeric_limits<long>::max();
+  for(int p = 0; p < head_to_num_patterns[n-1]; ++p) {
+    min_cuts = std::min(min_cuts, dp[n-1][p]);
+  }
+  
+  // ===== OUTPUT =====
+  if(min_cuts == std::numeric_limits<long>::max()) {
+    std::cout << "Impossible!" << std::endl;
+  } else {
+    std::cout << min_cuts << std::endl;
+  }
 }
 
 int main() {
-    std::ios_base::sync_with_stdio(false);
-    std::cin.tie(NULL);
-    int t;
-    std::cin >> t;
-    while (t--) {
-        solve();
-    }
-    return 0;
+  std::ios_base::sync_with_stdio(false);
+  
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) { solve(); }
 }
 ```
 
@@ -186,79 +203,100 @@ By adding this validity check, the algorithm correctly handles all constraints o
 #include <limits>
 #include <algorithm>
 
+typedef std::vector<int> VI;
+typedef std::vector<VI> VVI;
+typedef std::vector<VVI> VVVI;
+
+typedef std::vector<long> VL;
+typedef std::vector<VL> VVL;
+
 const long INF = std::numeric_limits<long>::max();
 
+// Function to calculate overlap between two patterns
+int calculate_overlap(const VI &a, const VI &b, int k) {
+    for (int o = k; o >= 0; --o) { // Try overlaps of size o from k down to 0
+        bool valid = true;
+        for (int i = 0; i < o; ++i) {
+            if (a[k - o + i] != b[i]) {
+                valid = false;
+                break;
+            }
+        }
+        if (valid) return o;
+    }
+    return 0;
+}
+
 void solve() {
+    // ===== READ INPUT =====
     int n, m, k, d;
     std::cin >> n >> m >> k >> d;
 
-    // Group patterns by the head they eradicate
-    std::vector<std::vector<std::vector<int>>> head_to_patterns(n);
+    VVVI head_to_patterns(n);
+    VI head_to_num_patterns(n, 0);
     for (int i = 0; i < m; ++i) {
+        // Read Pattern i
         std::vector<int> pattern(k);
         for (int j = 0; j < k; ++j) {
             std::cin >> pattern[j];
         }
+
+        // Store Pattern i for the appropriate head
         head_to_patterns[pattern[k - 1]].push_back(pattern);
+        head_to_num_patterns[pattern[k - 1]]++;
     }
 
-    // DP state: dp[i][p] = min cuts to kill heads 0..i, using pattern p for head i.
-    std::vector<std::vector<long>> dp(n, std::vector<long>(d, INF));
+    // ===== SOLVE =====
+    // Current Head i x Current Pattern p to kill Head i
+    VVL dp(n, VL(d, INF));
 
-    // Base case: Eradicating head 0 takes k cuts, as there's no prior sequence.
-    for (int p = 0; p < head_to_patterns[0].size(); ++p) {
-        dp[0][p] = k;
+    // Initialize DP table for the first head
+    for (int p = 0; p < head_to_num_patterns[0]; ++p) {
+        dp[0][p] = k; // All patterns take k cuts initially
     }
 
-    // Fill DP table for heads 1 to n-1
+    // Fill remaining entries
     for (int i = 1; i < n; ++i) {
-        for (int p = 0; p < head_to_patterns[i].size(); ++p) {
-            const auto& current_pattern = head_to_patterns[i][p];
-            
-            // Case 1: No overlap. Requires all cuts in current_pattern to be >= i.
-            bool possible_without_overlap = true;
+        for (int p = 0; p < head_to_num_patterns[i]; ++p) {
+            const VI &current_pattern = head_to_patterns[i][p];
+
+            // Check if the pattern can independently eradicate the current head
+            bool possible = true;
             for (int h = 0; h < k; ++h) {
                 if (current_pattern[h] < i) {
-                    possible_without_overlap = false;
+                    possible = false;
                     break;
                 }
             }
-            if (possible_without_overlap) {
-                for (int prev_p = 0; prev_p < head_to_patterns[i - 1].size(); ++prev_p) {
-                    if (dp[i - 1][prev_p] != INF) {
-                        dp[i][p] = std::min(dp[i][p], dp[i - 1][prev_p] + k);
-                    }
+
+            // Update entry for the current head when no overlap is considered
+            if (possible) {
+                for (int prev_p = 0; prev_p < head_to_num_patterns[i - 1]; ++prev_p) {
+                    if (dp[i - 1][prev_p] == INF) continue; // Skip unreachable states
+                    
+                    dp[i][p] = std::min(dp[i][p], dp[i - 1][prev_p] + k);
                 }
             }
-            
-            // Case 2: With overlap.
-            for (int prev_p = 0; prev_p < head_to_patterns[i - 1].size(); ++prev_p) {
-                if (dp[i - 1][prev_p] == INF) continue;
-                
-                const auto& prev_pattern = head_to_patterns[i - 1][prev_p];
-                for (int n_matches = 1; n_matches < k; ++n_matches) {
-                    // THE FIX: Check if the new, non-overlapping cuts are valid
-                    bool remaining_cuts_possible = true;
-                    for (int h = n_matches; h < k; ++h) {
-                        if (current_pattern[h] < i) {
-                            remaining_cuts_possible = false;
-                            break;
-                        }
-                    }
-                    if (!remaining_cuts_possible) continue;
 
-                    // Check if the overlapping parts of the patterns match
-                    bool match = true;
-                    for (int h = 0; h < n_matches; ++h) {
-                        if (prev_pattern[k - n_matches + h] != current_pattern[h]) {
-                            match = false;
-                            break;
-                        }
+            // Check overlaps between the current pattern and all patterns of the previous head
+            for (int prev_p = 0; prev_p < head_to_num_patterns[i - 1]; ++prev_p) {
+                if (dp[i - 1][prev_p] == INF) continue; // Skip unreachable states
+
+                const VI &prev_pattern = head_to_patterns[i - 1][prev_p];
+                int o = calculate_overlap(prev_pattern, current_pattern, k);
+
+                // Check if the overlap forms a valid transition
+                bool valid = true;
+                for (int h = o; h < k; ++h) {
+                    if (current_pattern[h] < i) {
+                        valid = false;
+                        break;
                     }
-                    
-                    if (match) {
-                        dp[i][p] = std::min(dp[i][p], dp[i - 1][prev_p] + k - n_matches);
-                    }
+                }
+
+                // Update DP table for valid transitions
+                if (valid) {
+                    dp[i][p] = std::min(dp[i][p], dp[i - 1][prev_p] + k - o);
                 }
             }
         }
@@ -266,22 +304,21 @@ void solve() {
 
     // Find the minimum cuts to kill the last head
     long min_cuts = INF;
-    if (n > 0 && !head_to_patterns[n - 1].empty()) {
-        for (int p = 0; p < head_to_patterns[n - 1].size(); ++p) {
-            min_cuts = std::min(min_cuts, dp[n - 1][p]);
-        }
+    for (int p = 0; p < head_to_num_patterns[n - 1]; ++p) {
+        min_cuts = std::min(min_cuts, dp[n - 1][p]);
     }
 
+    // ===== OUTPUT =====
     if (min_cuts == INF) {
-        std::cout << "Impossible" << std::endl;
+        std::cout << "Impossible!\n";
     } else {
-        std::cout << min_cuts << std::endl;
+        std::cout << min_cuts << "\n";
     }
 }
 
 int main() {
     std::ios_base::sync_with_stdio(false);
-    std::cin.tie(NULL);
+
     int t;
     std::cin >> t;
     while (t--) {
@@ -289,6 +326,7 @@ int main() {
     }
     return 0;
 }
+
 ```
 </details>
 

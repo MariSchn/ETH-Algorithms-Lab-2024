@@ -106,8 +106,7 @@ The C++ solution below uses the Boost Graph Library to implement this logic.
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/push_relabel_max_flow.hpp>
 
-// Define the graph type using the Boost Graph Library.
-// This setup is standard for max-flow problems.
+// Graph Type with nested interior edge properties for flow algorithms
 typedef boost::adjacency_list_traits<boost::vecS, boost::vecS, boost::directedS> traits;
 typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::directedS, boost::no_property,
     boost::property<boost::edge_capacity_t, long,
@@ -117,7 +116,7 @@ typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::directedS, boost:
 typedef traits::vertex_descriptor vertex_desc;
 typedef traits::edge_descriptor edge_desc;
 
-// A helper class to simplify adding edges and their reverse edges for flow algorithms.
+// Custom edge adder class, highly recommended
 class edge_adder {
   graph &G;
 
@@ -130,65 +129,66 @@ class edge_adder {
     const auto e = boost::add_edge(from, to, G).first;
     const auto rev_e = boost::add_edge(to, from, G).first;
     c_map[e] = capacity;
-    c_map[rev_e] = 0; // Reverse edge has zero initial capacity
+    c_map[rev_e] = 0; // reverse edge has no capacity!
     r_map[e] = rev_e;
     r_map[rev_e] = e;
   }
 };
 
+/*
+
+- Solution has to include at least one city with positive b_i
+- City with positive balance is only good if it has less debt than balance
+- A solution must pay of all its debts and have at least 1$ left
+
+- Test Set 2: "Unweighted" -> 
+
+*/
+
+
 void solve() {
-  // ===== Read Input =====
-  int n, m;
-  std::cin >> n >> m;
+  // ===== READ INPUT =====
+  int n, m; std::cin >> n >> m;
   
-  std::vector<long> balances(n);
-  for(int i = 0; i < n; ++i) {
-    std::cin >> balances[i];
-  }
+  std::vector<int> balances(n);
+  for(int i = 0; i < n; ++i) { std::cin >> balances[i]; }
   
-  std::vector<std::tuple<int, int, int>> debts;
-  debts.reserve(m);
+  std::vector<std::tuple<int, int, int>> debts; debts.reserve(m);
   for(int i = 0; i < m; ++i) {
-    int u, v, d;
-    std::cin >> u >> v >> d;
+    int u, v, d; std::cin >> u >> v >> d;
     debts.emplace_back(u, v, d);
   }
   
-  // ===== Solve using Min-Cut / Max-Flow =====
-  // Create a graph with n vertices for provinces, plus a source and a sink.
-  graph G(n + 2);
+  // ===== SOLVE =====
+  graph G(n);
   edge_adder adder(G);
-  const vertex_desc v_source = n;
-  const vertex_desc v_sink = n + 1;
+  const vertex_desc v_source = boost::add_vertex(G);
+  const vertex_desc v_sink = boost::add_vertex(G);
   
-  long sum_positive_balances = 0;
+  int sum_positive_balances = 0;
   
-  // Connect source and sink to province vertices based on balances.
+  // Source and Sink connections
   for(int i = 0; i < n; ++i) {
     if(balances[i] > 0) {
-      // Asset: connect source to province with capacity = balance
       adder.add_edge(v_source, i, balances[i]);
       sum_positive_balances += balances[i];
     } else {
-      // Liability: connect province to sink with capacity = -balance
       adder.add_edge(i, v_sink, -balances[i]);
     }
   }
   
-  // Add edges between provinces for debt relations.
-  for(const auto &debt : debts) {
-    int u = std::get<0>(debt);
-    int v = std::get<1>(debt);
-    int d = std::get<2>(debt);
-    // Debt from u to v: connect u to v with capacity = debt amount
-    adder.add_edge(u, v, d);
+  // Add debt edges
+  for(const std::tuple<int, int, int> &debt : debts) {
+    adder.add_edge(
+      std::get<0>(debt),
+      std::get<1>(debt),  
+      std::get<2>(debt)
+    );
   }
   
-  // Calculate max flow from source to sink.
   long flow = boost::push_relabel_max_flow(G, v_source, v_sink);
   
-  // ===== Output =====
-  // A free-standing union exists if max_flow < total_positive_balances
+  // ===== OUTPUT =====
   if(flow < sum_positive_balances) {
     std::cout << "yes" << std::endl;
   } else {
@@ -198,14 +198,9 @@ void solve() {
 
 int main() {
   std::ios_base::sync_with_stdio(false);
-  std::cin.tie(NULL);
   
-  int n_tests;
-  std::cin >> n_tests;
-  while(n_tests--) {
-    solve();
-  }
-  return 0;
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) { solve(); }
 }
 ```
 </details>

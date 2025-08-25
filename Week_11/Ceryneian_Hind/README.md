@@ -66,11 +66,9 @@ The following code implements this strategy using the Boost Graph Library, which
 #include <vector>
 #include <limits>
 
-// Include Boost Graph Library for max-flow
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/push_relabel_max_flow.hpp>
 
-// Define graph types for convenience
 typedef boost::adjacency_list_traits<boost::vecS, boost::vecS, boost::directedS> traits;
 typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::directedS, boost::no_property,
     boost::property<boost::edge_capacity_t, long,
@@ -80,7 +78,6 @@ typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::directedS, boost:
 typedef traits::vertex_descriptor vertex_desc;
 typedef traits::edge_descriptor edge_desc;
 
-// Helper class to add edges and their reverse counterparts
 class edge_adder {
   graph &G;
 
@@ -93,7 +90,7 @@ class edge_adder {
     const auto e = boost::add_edge(from, to, G).first;
     const auto rev_e = boost::add_edge(to, from, G).first;
     c_map[e] = capacity;
-    c_map[rev_e] = 0; // Reverse edge has 0 initial capacity
+    c_map[rev_e] = 0; // reverse edge has no capacity!
     r_map[e] = rev_e;
     r_map[rev_e] = e;
   }
@@ -102,70 +99,60 @@ class edge_adder {
 const long MAX_LONG = std::numeric_limits<long>::max();
 
 void solve() {
-  int n, m;
-  std::cin >> n >> m;
+  // ===== READ INPUT =====
+  int n, m; std::cin >> n >> m;
   
   std::vector<int> conveniences(n);
-  long positive_sum = 0;
   for(int i = 0; i < n; ++i) { 
-    int s;
-    std::cin >> s;
+    int s; std::cin >> s;
     conveniences[i] = s; 
-    if (s > 0) {
-      positive_sum += s;
-    }
   }
   
-  std::vector<std::pair<int, int>> edges;
-  edges.reserve(m);
+  std::vector<std::pair<int, int>> edges; edges.reserve(m);
   for(int i = 0; i < m; ++i) {
-    int u, v;
-    std::cin >> u >> v;
+    int u, v; std::cin >> u >> v;
     edges.emplace_back(u, v);
   }
   
-  // Create a graph with n+2 vertices: n for locations, 1 for source, 1 for sink
-  graph G(n + 2);
+  // ===== SOLVE =====
+  graph G(n);
   edge_adder adder(G);
   
-  const vertex_desc v_source = n;
-  const vertex_desc v_sink = n + 1;
+  const vertex_desc v_source = boost::add_vertex(G);
+  const vertex_desc v_sink = boost::add_vertex(G);
   
-  // Add edges from source to positive-score locations
-  // and from negative-score locations to sink
+  // Add source and sink connections
+  int positive_sum = 0;
   for(int i = 0; i < n; ++i) {
     if(conveniences[i] > 0) {
       adder.add_edge(v_source, i, conveniences[i]);
+      positive_sum += conveniences[i];
     } else {
       adder.add_edge(i, v_sink, -conveniences[i]);
     }
   }
   
-  // Add original path edges with "infinite" capacity
-  for(const std::pair<int, int>& e : edges) {
+  // Add edges
+  for(const std::pair<int, int> e : edges) {
     adder.add_edge(e.first, e.second, MAX_LONG);
   }
   
-  // Calculate max flow, which equals min cut
   long flow = boost::push_relabel_max_flow(G, v_source, v_sink);
 
-  long max_score = positive_sum - flow;
-  if (max_score > 0) {
-    std::cout << max_score << std::endl;
+  // ===== OUTPUT =====
+  if (positive_sum - flow > 0) {
+    std::cout << positive_sum - flow << std::endl;
   } else {
     std::cout << "impossible" << std::endl;
   }
+  
 }
 
 int main() {
   std::ios_base::sync_with_stdio(false);
-  std::cin.tie(NULL);
   
-  int n_tests;
-  std::cin >> n_tests;
-  while(n_tests--) {
-    solve();
-  }
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) { solve(); }
 }
 ```
 </details>

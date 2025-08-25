@@ -64,126 +64,145 @@ The main bottleneck is the `possible(k)` function. A naive implementation that c
 The provided code attempts an optimization. It first builds a Delaunay triangulation on *all* points to get a smaller set of candidate edges. However, a simple Delaunay triangulation is insufficient, as it only guarantees to include the shortest edge connecting a point to its neighbors, not all edges within a radius $r$. The code compensates for this by performing a search (like DFS or BFS) from each vertex on the triangulation to find all reachable neighbors within the radius, which still results in a large number of edges. This approach is efficient enough for the first two test sets but fails on larger inputs.
 
 ```cpp
+///1
 #include <iostream>
 #include <vector>
-#include <stack>
-#include <tuple>
-#include <algorithm>
-#include <boost/pending/disjoint_sets.hpp>
 
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Delaunay_triangulation_2.h>
 #include <CGAL/Triangulation_vertex_base_with_info_2.h>
 #include <CGAL/Triangulation_face_base_2.h>
+#include <boost/pending/disjoint_sets.hpp>
+#include <vector>
+#include <tuple>
+#include <algorithm>
+#include <iostream>
 
+// Epic kernel is enough, no constructions needed, provided the squared distance
+// fits into a double (!)
 typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
-typedef int Index;
-typedef CGAL::Triangulation_vertex_base_with_info_2<Index, K> Vb;
-typedef CGAL::Triangulation_face_base_2<K> Fb;
-typedef CGAL::Triangulation_data_structure_2<Vb, Fb> Tds;
-typedef CGAL::Delaunay_triangulation_2<K, Tds> Delaunay;
-typedef Delaunay::Vertex_handle Vertex_handle;
-typedef std::pair<K::Point_2, Index> IPoint;
-typedef std::tuple<Index, Index, K::FT> Edge;
+// we want to store an index with each vertex
+typedef int                                                    Index;
+typedef CGAL::Triangulation_vertex_base_with_info_2<Index,K>   Vb;
+typedef CGAL::Triangulation_face_base_2<K>                     Fb;
+typedef CGAL::Triangulation_data_structure_2<Vb,Fb>            Tds;
+typedef CGAL::Delaunay_triangulation_2<K,Tds>                  Delaunay;
+
+typedef std::tuple<Index,Index,K::FT> Edge;
 typedef std::vector<Edge> EdgeV;
 
-// Checks if an alliance of size k is possible
+typedef std::pair<K::Point_2,Index> IPoint;
+
+std::ostream& operator<<(std::ostream& o, const Edge& e) {
+  return o << std::get<0>(e) << " " << std::get<1>(e) << " " << std::get<2>(e);
+}
+
+const bool DEBUG = false;
+
 bool possible(const EdgeV &edges, int k, int n, K::FT r_squared) {
+  // Setup and initialize Union-Find Data Structure
   boost::disjoint_sets_with_storage<> uf(n);
-  std::vector<int> component_sizes(n, 0);
-  // Initialize sizes for planets that are available
-  for(int i = k; i < n; ++i) {
-    component_sizes[i] = 1;
-  }
-
-  // Process edges to form components
-  for (const auto& e : edges) {
-    Index v1 = std::get<0>(e);
-    Index v2 = std::get<1>(e);
-    K::FT dist = std::get<2>(e);
-
-    // Only consider edges connecting available planets within range
-    if (v1 >= k && v2 >= k && dist <= r_squared) {
-      Index c1 = uf.find_set(v1);
-      Index c2 = uf.find_set(v2);
-
-      if (c1 != c2) {
-        int size1 = component_sizes[c1];
-        int size2 = component_sizes[c2];
-        uf.link(c1, c2);
-        Index new_root = uf.find_set(v1);
-        component_sizes[new_root] = size1 + size2;
-      }
+  std::vector<int> component_sizes(n, 1);
+  for (EdgeV::const_iterator e = edges.begin(); e != edges.end(); ++e) {
+    Index v1 = std::get<0>(*e);
+    Index v2 = std::get<1>(*e);
+    
+    // Determine Components of Endpoints
+    Index c1 = uf.find_set(v1);
+    Index c2 = uf.find_set(v2);
+    K::FT dist = std::get<2>(*e);
+    
+    if (
+      c1 != c2 && 
+      v1 >= k && v2 >= k &&
+      dist <= r_squared
+    ) {
+      if (DEBUG) std::cout << "Merged " << v1 << " and " << v2 << std::endl;
+      int size1 = component_sizes[c1];
+      int size2 = component_sizes[c2];
+      uf.link(c1, c2);
+      
+      Index c3 = uf.find_set(v1);
+      component_sizes[c3] = size1 + size2;
     }
   }
-
-  // Find the size of the largest component
+  
+  // Find biggest component
   int max_size = 0;
-  for (int i = k; i < n; ++i) {
-    if (uf.find_set(i) == i) { // Only check roots of components
-        max_size = std::max(max_size, component_sizes[i]);
-    }
+  if (DEBUG) std::cout << "Component Sizes ";
+  for(int i = 0; i < n; ++i) {
+    if (DEBUG) std::cout << component_sizes[i] << " ";
+    max_size = std::max(max_size, component_sizes[i]);
   }
-
+  if (DEBUG) std::cout << std::endl;
+  
   return max_size >= k;
 }
 
 void solve() {
-  int n;
-  long r;
+  // std::cout << "========================================" << std::endl;
+  // ===== READ INPUT =====
+  int n; long r; K::FT r_squared;
   std::cin >> n >> r;
-  K::FT r_squared = K::FT(r) * r;
+  r_squared = r;
+  r_squared = r_squared * r_squared;
 
-  std::vector<IPoint> planets;
-  planets.reserve(n);
+  std::vector<IPoint> planets; planets.reserve(n);
   for (Index i = 0; i < n; ++i) {
-    int x, y;
-    std::cin >> x >> y;
+    int x, y; std::cin >> x >> y;
     planets.emplace_back(K::Point_2(x, y), i);
   }
-
-  // Pre-computation step: generate candidate edges
+  
+  // ===== SOLVE =====
   Delaunay t;
   t.insert(planets.begin(), planets.end());
-
-  EdgeV edges;
-  edges.reserve(3 * n);
-  for (auto e_it = t.finite_edges_begin(); e_it != t.finite_edges_end(); ++e_it) {
-    Index i1 = e_it->first->vertex((e_it->second + 1) % 3)->info();
-    Index i2 = e_it->first->vertex((e_it->second + 2) % 3)->info();
-    if (CGAL::squared_distance(planets[i1].first, planets[i2].first) <= r_squared) {
-        edges.emplace_back(i1, i2, CGAL::squared_distance(planets[i1].first, planets[i2].first));
+  
+  // Extract all edges along with their distance
+  EdgeV edges; edges.reserve(n * n);
+  for(int i = 0; i < n; ++i) {
+    for(int j = i + 1; j < n; ++j) {
+      edges.emplace_back(i, j, CGAL::squared_distance(planets[i].first, planets[j].first));
     }
   }
-
-  // Binary search for the maximum k
-  int low = 1, high = n, ans = 0;
-  while (low <= high) {
-    int mid = low + (high - low) / 2;
-    if (mid == 0) { // k must be at least 1
-        low = mid + 1;
-        continue;
+  // EdgeV edges; edges.reserve(3*n);
+  // for (auto e = t.finite_edges_begin(); e != t.finite_edges_end(); ++e) {
+  //   Index i1 = e->first->vertex((e->second+1)%3)->info();
+  //   Index i2 = e->first->vertex((e->second+2)%3)->info();
+  //   if (i1 > i2) std::swap(i1, i2);
+    
+  //   edges.emplace_back(i1, i2, t.segment(e).squared_length());
+  // }
+  
+  // Binary search over possible k
+  int min = 0;
+  int max = n;
+  
+  while(min < max) {
+    int middle = (min + max) / 2;
+    if (DEBUG) std::cout << "=== k=" << middle << " ===" << std::endl; 
+    
+    if(min >= max - 1) {
+      break;
     }
-    if (possible(edges, mid, n, r_squared)) {
-      ans = mid;
-      low = mid + 1;
+    
+    if(possible(edges, middle, n, r_squared)) {
+      if (DEBUG) std::cout << "k=" << middle << " is possible" << std::endl;
+      min = middle;
     } else {
-      high = mid - 1;
+      if (DEBUG) std::cout << "k=" << middle << " is not possible" << std::endl;
+      max = middle;
     }
   }
-
-  std::cout << ans << std::endl;
+  
+  // ===== OUTPUT =====
+  std::cout << min << std::endl;
 }
 
 int main() {
   std::ios_base::sync_with_stdio(false);
-  std::cin.tie(NULL);
-  int t;
-  std::cin >> t;
-  while (t--) {
-    solve();
-  }
-  return 0;
+  
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) { solve(); }
 }
 ```
 </details>
@@ -219,116 +238,142 @@ For a fixed $k$, we do the following:
 ```cpp
 #include <iostream>
 #include <vector>
-#include <tuple>
-#include <algorithm>
-#include <boost/pending/disjoint_sets.hpp>
+#include <stack>
 
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Delaunay_triangulation_2.h>
 #include <CGAL/Triangulation_vertex_base_with_info_2.h>
 #include <CGAL/Triangulation_face_base_2.h>
+#include <boost/pending/disjoint_sets.hpp>
+#include <vector>
+#include <tuple>
+#include <algorithm>
+#include <iostream>
 
+// Epic kernel is enough, no constructions needed, provided the squared distance
+// fits into a double (!)
 typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
-typedef int Index;
-typedef CGAL::Triangulation_vertex_base_with_info_2<Index, K> Vb;
-typedef CGAL::Triangulation_face_base_2<K> Fb;
-typedef CGAL::Triangulation_data_structure_2<Vb, Fb> Tds;
-typedef CGAL::Delaunay_triangulation_2<K, Tds> Delaunay;
-typedef std::pair<K::Point_2, Index> IPoint;
+// we want to store an index with each vertex
+typedef int                                                    Index;
+typedef CGAL::Triangulation_vertex_base_with_info_2<Index,K>   Vb;
+typedef CGAL::Triangulation_face_base_2<K>                     Fb;
+typedef CGAL::Triangulation_data_structure_2<Vb,Fb>            Tds;
+typedef CGAL::Delaunay_triangulation_2<K,Tds>                  Delaunay;
+typedef Delaunay::Vertex_handle Vertex_handle;
 
-// Checks if an alliance of size k is possible
-bool possible(const std::vector<IPoint>& planets, int k, int n, K::FT r_squared) {
-  if (k > n) return false;
-  
-  // 1. Build triangulation only on available planets {p_k, ..., p_{n-1}}
+
+typedef std::tuple<Index,Index,K::FT> Edge;
+typedef std::vector<Edge> EdgeV;
+
+typedef std::pair<K::Point_2,Index> IPoint;
+
+std::ostream& operator<<(std::ostream& o, const Edge& e) {
+  return o << std::get<0>(e) << " " << std::get<1>(e) << " " << std::get<2>(e);
+}
+
+const bool DEBUG = false;
+
+bool possible(const std::vector<IPoint> planets, int k, int n, K::FT r_squared) {
+  // Triangulate the points starting from k
   Delaunay t;
   t.insert(planets.begin() + k, planets.end());
-
-  // 2. Use Union-Find to find connected components
-  boost::disjoint_sets_with_storage<> uf(n);
-  std::vector<int> component_sizes(n, 0);
-  for(int i = k; i < n; ++i) {
-      component_sizes[i] = 1;
-  }
   
-  // 3. Iterate over triangulation edges
+  // Extract edges
+  EdgeV edges;
+  edges.reserve(3*n); // there can be no more in a planar graph
   for (auto e = t.finite_edges_begin(); e != t.finite_edges_end(); ++e) {
-    if (t.segment(e).squared_length() <= r_squared) {
-      Index i1 = e->first->vertex((e->second + 1) % 3)->info();
-      Index i2 = e->first->vertex((e->second + 2) % 3)->info();
+    Index i1 = e->first->vertex((e->second+1)%3)->info();
+    Index i2 = e->first->vertex((e->second+2)%3)->info();
+    // ensure smaller index comes first
+    if (i1 > i2) std::swap(i1, i2);
+    edges.emplace_back(i1, i2, t.segment(e).squared_length());
+  }
+  
+  // Sort edges
+  std::sort(edges.begin(), edges.end(),
+      [](const Edge& e1, const Edge& e2) -> bool {
+        return std::get<2>(e1) < std::get<2>(e2);
+            });
+  
+  // Setup and initialize Union-Find Data Structure
+  boost::disjoint_sets_with_storage<> uf(n);
+  std::vector<int> component_sizes(n, 1);
+  for (EdgeV::const_iterator e = edges.begin(); e != edges.end(); ++e) {
+    Index v1 = std::get<0>(*e);
+    Index v2 = std::get<1>(*e);
+    
+    // Determine Components of Endpoints
+    Index c1 = uf.find_set(v1);
+    Index c2 = uf.find_set(v2);
+    K::FT dist = std::get<2>(*e);
+    
+    if (
+      c1 != c2 && 
+      dist <= r_squared
+    ) {
+      int size1 = component_sizes[c1];
+      int size2 = component_sizes[c2];
+      uf.link(c1, c2);
       
-      Index c1 = uf.find_set(i1);
-      Index c2 = uf.find_set(i2);
-      
-      if (c1 != c2) {
-        int size1 = component_sizes[c1];
-        int size2 = component_sizes[c2];
-        uf.link(c1, c2);
-        Index new_root = uf.find_set(i1);
-        component_sizes[new_root] = size1 + size2;
-      }
+      Index c3 = uf.find_set(v1);
+      component_sizes[c3] = size1 + size2;
     }
   }
   
-  // 4. Find the largest component size
+  // Find biggest component
   int max_size = 0;
-  for (int i = k; i < n; ++i) {
-    if (uf.find_set(i) == i) { // Only check roots of components
-        max_size = std::max(max_size, component_sizes[i]);
-    }
+  for(int i = 0; i < n; ++i) {
+    max_size = std::max(max_size, component_sizes[i]);
   }
 
-  // 5. Check if the condition is met
   return max_size >= k;
 }
 
 void solve() {
-  int n;
-  long r;
+  // std::cout << "========================================" << std::endl;
+  // ===== READ INPUT =====
+  int n; long r; K::FT r_squared;
   std::cin >> n >> r;
-  K::FT r_squared = K::FT(r) * r;
+  r_squared = r;
+  r_squared = r_squared * r_squared;
 
-  std::vector<IPoint> planets;
-  planets.reserve(n);
+  std::vector<IPoint> planets; planets.reserve(n);
   for (Index i = 0; i < n; ++i) {
-    int x, y;
-    std::cin >> x >> y;
+    int x, y; std::cin >> x >> y;
     planets.emplace_back(K::Point_2(x, y), i);
   }
-
-  // Binary search for the maximum k
-  int low = 1, high = n, ans = 0;
-  while (low <= high) {
-    int mid = low + (high - low) / 2;
-    if (mid == 0) { // k must be at least 1
-        low = mid + 1;
-        continue;
+  
+  // ===== SOLVE =====
+  // Binary search over possible k
+  int min = 0;
+  int max = n;
+  
+  while(min < max) {
+    int middle = (min + max) / 2;
+    if (DEBUG) std::cout << "=== k=" << middle << " ===" << std::endl; 
+    
+    if(min >= max - 1) {
+      break;
     }
-    if (possible(planets, mid, n, r_squared)) {
-      ans = mid;
-      low = mid + 1;
+    
+    if(possible(planets, middle, n, r_squared)) {
+      if (DEBUG) std::cout << "k=" << middle << " is possible" << std::endl;
+      min = middle;
     } else {
-      high = mid - 1;
+      if (DEBUG) std::cout << "k=" << middle << " is not possible" << std::endl;
+      max = middle;
     }
   }
-
-  // The smallest k can be is 1, as we can always choose one planet.
-  // We handle the edge case where n=0 or no solution is found by initializing ans.
-  // The problem states n>=2, so an alliance of size 1 is always possible.
-  if (ans == 0 && n > 0) ans = 1;
-
-  std::cout << ans << std::endl;
+  
+  // ===== OUTPUT =====
+  std::cout << min << std::endl;
 }
 
 int main() {
   std::ios_base::sync_with_stdio(false);
-  std::cin.tie(NULL);
-  int t;
-  std::cin >> t;
-  while (t--) {
-    solve();
-  }
-  return 0;
+  
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) { solve(); }
 }
 ```
 </details>

@@ -74,143 +74,368 @@ With these unit changes, our constraints can be written with integer coefficient
 ```cpp
 #include <iostream>
 #include <vector>
+
+#include <CGAL/Exact_predicates_exact_constructions_kernel.h>
 #include <CGAL/QP_models.h>
 #include <CGAL/QP_functions.h>
 #include <CGAL/Gmpz.h>
 
-// Use Gmpz for exact representation of numbers
-typedef CGAL::Gmpz ET;
-// Use doubles for input type, as it's sufficient for the coefficients
-typedef double IT;
+typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
+typedef K::Point_2 Point;
+typedef K::Segment_2 Segment;
+typedef K::Circle_2 Circle;
 
-// Setup the linear program and solution types
+typedef double IT;
+typedef CGAL::Gmpz ET;
 typedef CGAL::Quadratic_program<IT> Program;
 typedef CGAL::Quadratic_program_solution<ET> Solution;
 
-// Struct to hold warehouse data
+bool DEBUG = false;
+bool PRINT_CONSTRAINTS = true;
+
 struct Warehouse {
-  int supply; // Supply of Beer in ml
-  int alcohol_per_liter; // Alcohol content in ml per liter of beer
+  Point pos;
+  int s;  // Supply of Beer in ml
+  int a;  // Alcohol per Liter of Beer in ml
   
-  Warehouse(int s, int a) : supply(s * 1000), alcohol_per_liter(a * 10) {}
+  Warehouse(int x, int y, int s, int a) : pos(x, y), s(s * 1000), a(a * 10) {}
 };
 
-// Struct to hold stadium data
 struct Stadium {
-  int demand; // Demand of Beer in ml
-  int alcohol_limit; // Upper Limit on the pure alcohol in ml
+  Point pos;
+  int d;  // Demand of Beer in ml
+  int u;  // Upper Limit on the pure alcohol in ml
   
-  Stadium(int d, int u) : demand(d * 1000), alcohol_limit(u * 1000) {}
+  Stadium(int x, int y, int d, int u) : pos(x, y), d(d * 1000), u(u * 1000) {}
 };
 
-// Custom floor function for CGAL's exact number type
-long floor_to_long(const CGAL::Quotient<ET>& x) {
+long floor_to_double(const CGAL::Quotient<ET>& x)
+{
   double a = std::floor(CGAL::to_double(x));
   while (a > x) a -= 1;
-  while (a + 1 <= x) a += 1;
-  return static_cast<long>(a);
+  while (a+1 <= x) a += 1;
+  return a;
 }
 
 void solve() {
-  int n, m, c;
-  std::cin >> n >> m >> c;
-
-  std::vector<Warehouse> warehouses;
-  warehouses.reserve(n);
-  for (int i = 0; i < n; ++i) {
-    int x, y, s, a;
-    std::cin >> x >> y >> s >> a;
-    warehouses.emplace_back(s, a);
+  if (DEBUG) { std::cout << "================================================================" << std::endl; }
+  // ===== READ INPUT =====
+  int n, m, c; std::cin >> n >> m >> c;
+  
+  std::vector<Warehouse> warehouses; warehouses.reserve(n);
+  std::vector<Stadium> stadiums; stadiums.reserve(m);
+  std::vector<Circle> contour_lines; contour_lines.reserve(c); 
+  std::vector<std::vector<int>> revenues(n, std::vector<int>(m)); 
+  
+  // Read warehouses
+  for(int i = 0; i < n; ++i) {
+    int x, y, s, a; std::cin >> x >> y >> s >> a;
+    warehouses.emplace_back(x, y, s, a);
   }
-
-  std::vector<Stadium> stadiums;
-  stadiums.reserve(m);
-  for (int i = 0; i < m; ++i) {
-    int x, y, d, u;
-    std::cin >> x >> y >> d >> u;
-    stadiums.emplace_back(d, u);
+  
+  // Read stadiums
+  for(int i = 0; i < m; ++i) {
+    int x, y, d, u; std::cin >> x >> y >> d >> u;
+    stadiums.emplace_back(x, y, d, u);
   }
-
-  std::vector<std::vector<int>> revenues(n, std::vector<int>(m));
-  for (int i = 0; i < n; ++i) {
-    for (int j = 0; j < m; ++j) {
+  
+  // Read revenues
+  for(int i = 0; i < n; ++i) {
+    for(int j = 0; j < m; ++j) {
       std::cin >> revenues[i][j];
     }
   }
-
-  // For Test Sets 1 & 2, we ignore contour lines (variable c is read but not used)
   
-  // Create a linear program: variables x >= 0, no upper bound
-  Program lp(CGAL::SMALLER, true, 0, false, 0);
-  int constraint_idx = 0;
-
-  // Set up the objective function and constraints
-  for (int w = 0; w < n; ++w) {
-    for (int s = 0; s < m; ++s) {
-      int var_idx = w * m + s;
-      // LP minimizes, so we negate the revenue to maximize it
-      lp.set_c(var_idx, -revenues[w][s]);
-    }
+  // Read contour lines
+  for(int i = 0; i < c; ++i) {
+    int x, y, r; std::cin >> x >> y >> r;
+    contour_lines.emplace_back(Point(x, y), std::pow(r, 2)); // ? Does r need to be squared ?
   }
-
-  // Constraint 1: Supply limits for each warehouse
-  for (int w = 0; w < n; ++w) {
-    for (int s = 0; s < m; ++s) {
-      // x_ws is in liters, so multiply by 1000 for ml
-      lp.set_a(w * m + s, constraint_idx, 1000);
-    }
-    lp.set_b(constraint_idx, warehouses[w].supply);
-    constraint_idx++;
-  }
-
-  // Constraints 2 & 3: Demand and alcohol limits for each stadium
-  for (int s = 0; s < m; ++s) {
-    // Constraint 2: Alcohol Limit
-    for (int w = 0; w < n; ++w) {
-      // x_ws (liters) * alcohol_per_liter (ml/liter) <= alcohol_limit (ml)
-      lp.set_a(w * m + s, constraint_idx, warehouses[s].alcohol_per_liter);
-    }
-    lp.set_b(constraint_idx, stadiums[s].alcohol_limit);
-    constraint_idx++;
-
-    // Constraint 3: Demand Equality
-    // We model sum(x_ws) = D_s with two inequalities:
-    // sum(x_ws) <= D_s  and  sum(x_ws) >= D_s
-    for (int w = 0; w < n; ++w) {
-        // sum(1000 * x_ws) <= demand_in_ml
-        lp.set_a(w * m + s, constraint_idx, 1000);
-        // -sum(1000 * x_ws) <= -demand_in_ml
-        lp.set_a(w * m + s, constraint_idx + 1, -1000);
-    }
-    lp.set_b(constraint_idx, stadiums[s].demand);
-    lp.set_b(constraint_idx + 1, -stadiums[s].demand);
-    constraint_idx += 2;
-  }
-
-  // Solve the LP
-  Solution sol = CGAL::solve_linear_program(lp, ET());
   
-  if (sol.is_infeasible()) {
+  // ===== CONSTRUCT LINEAR PROGRAM =====
+  // Variables are numbered by warehouse_idx * stadium_idx (n * m)
+  Program lp(CGAL::SMALLER, true, 0, false, 0); 
+  int n_constraints = 0;
+  
+  // Define Objective Function
+  for(int w = 0; w < n; ++w) {
+    for(int s = 0; s < m; ++s) {
+      lp.set_c(w * n + s, -revenues[w][s]);  // TODO: Respect Contour Lines
+    }
+  }
+  
+  // Add constraints to ensure that the amount of Beer sent does not exceed supply
+  for(int w = 0; w < n; ++w) {
+    for(int s = 0; s < m; ++s) {
+      if(DEBUG && PRINT_CONSTRAINTS) { std::cout << "a_" << w << "," << s << " * " << 1000 << " "; }
+      lp.set_a(w * n + s, n_constraints, 1000);
+    }
+    if(DEBUG && PRINT_CONSTRAINTS) { std::cout << "<= " << warehouses[w].s << std::endl; }
+    lp.set_b(n_constraints, warehouses[w].s);
+    
+    n_constraints += 1;
+  }
+  
+  // Add constraints that the pure alocohol for each stadium does not exceed upper limit and
+  // Add constraints to ensure the the Beer delivered is equal to the demand for each stadium
+  if (DEBUG && PRINT_CONSTRAINTS) {
+    for(int s = 0; s < m; ++s) {
+      // Constraint to respect Alcohol limit
+      for(int w = 0; w < n; ++w) {
+        std::cout << "a_" << w << "," << s << " * " << warehouses[w].a << " ";
+        lp.set_a(w * n + s, n_constraints, warehouses[w].a);
+      }
+      std::cout << "<= " << stadiums[s].u << std::endl;
+      lp.set_b(n_constraints, stadiums[s].u);
+      
+      // Constraints to exactly meet Beer demand
+      for(int w = 0; w < n; ++w) {
+        std::cout << "a_" << w << "," << s << " * " << 1000 << " ";
+        lp.set_a(w * n + s, n_constraints + 1, 1000);
+      }
+      std::cout << "<= " << stadiums[s].d << std::endl;
+      lp.set_b(n_constraints + 1, stadiums[s].d);
+      
+      for(int w = 0; w < n; ++w) {        
+        std::cout << "a_" << w << "," << s << " * " << -1000 << " ";
+        lp.set_a(w * n + s, n_constraints + 2, -1000);
+      }
+      std::cout << "<= " << -stadiums[s].d << std::endl;
+      lp.set_b(n_constraints + 2, -stadiums[s].d);
+      
+      n_constraints += 3;
+    }
+  } else {
+    for(int s = 0; s < m; ++s) {
+      for(int w = 0; w < n; ++w) {
+        // Constraint to respect Alcohol limit
+        lp.set_a(w * n + s, n_constraints, warehouses[w].a);
+        
+        // Constraints to exactly meet Beer demand
+        lp.set_a(w * n + s, n_constraints + 1, 1000);
+        lp.set_a(w * n + s, n_constraints + 2, -1000);
+      }
+      lp.set_b(n_constraints, stadiums[s].u);
+      lp.set_b(n_constraints + 1, stadiums[s].d);
+      lp.set_b(n_constraints + 2, -stadiums[s].d);
+      
+      n_constraints += 3;
+    }
+  }
+  
+  if (DEBUG) { std::cout << "Total number of constraints " << n_constraints << std::endl; }
+  
+  // ===== SOLVE LP AND OUTPUT =====
+  Solution s = CGAL::solve_linear_program(lp, ET());
+  if (DEBUG) { std::cout << s << std::endl; }
+  
+  if (s.is_infeasible()) { 
     std::cout << "no" << std::endl;
   } else {
-    // The result is a fraction; convert to double and take the floor
-    // Negate again because we minimized -profit
-    std::cout << floor_to_long(-sol.objective_value()) << std::endl;
+    std::cout << floor_to_double(-s.objective_value()) << std::endl;
   }
 }
 
 int main() {
   std::ios_base::sync_with_stdio(false);
-  std::cin.tie(NULL);
-  int t;
-  std::cin >> t;
-  while (t--) {
-    solve();
-  }
-  return 0;
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) { solve(); }
 }
 ```
 </details>
+
+<details>
+
+<summary>Second Solution (Test Set 1, 2, 3)</summary>
+
+This solution extends the first approach to handle contour lines and transportation costs. It maintains the same **Linear Programming** formulation but now incorporates the cost calculation that was missing in the first solution.
+
+### Key Additions
+
+**Transportation Cost Calculation:**
+The solution correctly implements the logic for determining when a contour line is crossed. A delivery from warehouse $w$ to stadium $s$ crosses a contour line if one location is inside the circle and the other is outside. This is checked using CGAL's `has_on_bounded_side()` method.
+
+**Modified Objective Function:**
+The profit per liter for shipping from warehouse $w$ to stadium $s$ becomes:
+$$\text{profit}_{w,s} = \text{revenue}_{w,s} - \frac{\text{intersections}_{w,s}}{100}$$
+
+To maintain integer coefficients in the LP, the objective function is scaled by 100:
+$$\text{coefficient}_{w,s} = 100 \times \text{revenue}_{w,s} - \text{intersections}_{w,s}$$
+
+### Implementation Approach
+
+The solution uses a **brute force method** to count contour line intersections:
+```cpp
+for (int w = 0; w < n; ++w) {
+  for (int s = 0; s < m; ++s) {
+    for (const auto& contour : contour_lines) {
+      bool warehouse_inside = contour.has_on_bounded_side(warehouses[w].pos);
+      bool stadium_inside = contour.has_on_bounded_side(stadiums[s].pos);
+      if (warehouse_inside != stadium_inside) {
+        n_intersections[w][s]++;
+      }
+    }
+  }
+}
+```
+
+This has a time complexity of $O(N \times M \times C)$, which works for Test Sets 1-3 where $C$ is relatively small, but becomes too slow for Test Set 4 where $C$ can be up to $10^6$.
+
+### Limitations
+
+While this solution correctly handles the transportation costs and passes more test sets than the first solution, it doesn't scale to the largest test cases due to the inefficient contour line processing. The brute force approach becomes a bottleneck when the number of contour lines is very large.
+
+### Code
+```cpp
+#include <iostream>
+#include <vector>
+#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
+#include <CGAL/QP_models.h>
+#include <CGAL/QP_functions.h>
+#include <CGAL/Gmpz.h>
+#include <CGAL/Delaunay_triangulation_2.h>
+
+typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
+typedef CGAL::Delaunay_triangulation_2<K> Triangulation;
+
+typedef K::Point_2 Point;
+typedef K::Circle_2 Circle;
+
+typedef int IT;
+typedef CGAL::Gmpz ET;
+typedef CGAL::Quadratic_program<IT> Program;
+typedef CGAL::Quadratic_program_solution<ET> Solution;
+
+#define ASSERT(c) do { if (!(c)) throw std::runtime_error("Assertion failed: " #c); } while (0)
+
+struct Warehouse {
+  Point pos;
+  int s;  // Supply of Beer in ml
+  int a;  // Alcohol per Liter of Beer in ml
+  
+  Warehouse(int x, int y, int s, int a) : pos(x, y), s(s * 1000), a(a * 10) {}
+};
+
+struct Stadium {
+  Point pos;
+  int d;  // Demand of Beer in ml
+  int u;  // Upper Limit on the pure alcohol in ml
+  
+  Stadium(int x, int y, int d, int u) : pos(x, y), d(d * 1000), u(u * 1000) {}
+};
+
+long floor_to_double(const CGAL::Quotient<ET>& x) {
+  double a = std::floor(CGAL::to_double(x));
+  while (a > x) a -= 1;
+  while (a+1 <= x) a += 1;
+  return a;
+}
+
+void solve() {
+  int n, m, c; std::cin >> n >> m >> c;
+  
+  std::vector<Warehouse> warehouses;
+  std::vector<Stadium> stadiums;
+  std::vector<Circle> contour_lines;
+  std::vector<std::vector<int>> revenues(n, std::vector<int>(m));
+  
+  // Read warehouses
+  for (int i = 0; i < n; ++i) {
+    int x, y, s, a;
+    std::cin >> x >> y >> s >> a;
+    warehouses.emplace_back(x, y, s, a);
+  }
+  
+  // Read stadiums
+  for (int i = 0; i < m; ++i) {
+    int x, y, d, u;
+    std::cin >> x >> y >> d >> u;
+    stadiums.emplace_back(x, y, d, u);
+  }
+  
+  // Read revenues
+  for (int i = 0; i < n; ++i) {
+    for (int j = 0; j < m; ++j) {
+      std::cin >> revenues[i][j];
+    }
+  }
+  
+  // Read contour lines
+  for (int i = 0; i < c; ++i) {
+    int x, y, r;
+    std::cin >> x >> y >> r;
+    contour_lines.emplace_back(Point(x, y), r * r);
+  }
+  
+  // ===== COUNT CONTOUR LINE INTERSECTIONS =====
+  std::vector<std::vector<int>> n_intersections(n, std::vector<int>(m, 0));
+  for (int w = 0; w < n; ++w) {
+    for (int s = 0; s < m; ++s) {
+      for (const auto& contour : contour_lines) {
+        bool warehouse_inside = contour.has_on_bounded_side(warehouses[w].pos);
+        bool stadium_inside = contour.has_on_bounded_side(stadiums[s].pos);
+        if (warehouse_inside != stadium_inside) {
+          n_intersections[w][s]++;
+        }
+      }
+    }
+  }
+  
+  // ===== CONSTRUCT LINEAR PROGRAM =====
+  Program lp(CGAL::SMALLER, true, 0, false, 0); 
+  int n_constraints = 0;
+  
+  // Objective Function
+  for (int w = 0; w < n; ++w) {
+    for (int s = 0; s < m; ++s) {
+      lp.set_c(w * m + s, -(revenues[w][s] * 100 - n_intersections[w][s]));
+    }
+  }
+  
+  // Supply Constraints
+  for (int w = 0; w < n; ++w) {
+    for (int s = 0; s < m; ++s) {
+      lp.set_a(w * m + s, n_constraints, 1000);
+    }
+    lp.set_b(n_constraints, warehouses[w].s);
+    n_constraints++;
+  }
+  
+  // Demand and Alcohol Constraints
+  for (int s = 0; s < m; ++s) {
+    for (int w = 0; w < n; ++w) {
+      lp.set_a(w * m + s, n_constraints, warehouses[w].a); // Alcohol limit
+      lp.set_a(w * m + s, n_constraints + 1, 1000);        // Demand equality
+      lp.set_a(w * m + s, n_constraints + 2, -1000);       // Demand equality (negative)
+    }
+    lp.set_b(n_constraints, stadiums[s].u);   // Upper limit on alcohol
+    lp.set_b(n_constraints + 1, stadiums[s].d); // Exact demand
+    lp.set_b(n_constraints + 2, -stadiums[s].d); // Exact demand (negative)
+    n_constraints += 3;
+  }
+  
+  // Solve LP
+  Solution solution = CGAL::solve_linear_program(lp, ET());
+  std::cout << std::fixed << std::setprecision(0);
+  
+  if (solution.is_infeasible()) {
+    std::cout << "no" << std::endl;
+  } else {
+    std::cout << floor_to_double(-solution.objective_value() / 100) << std::endl;
+  }
+}
+
+int main() {
+  std::ios_base::sync_with_stdio(false);
+  int t; std::cin >> t;
+  while (t--) { solve(); }
+}
+
+```
+
+</details>
+
+
 <details>
 <summary>Final Solution</summary>
 
@@ -260,177 +485,173 @@ With the $t_{w,s}$ values pre-calculated, we set up and solve the LP just as bef
 ```cpp
 #include <iostream>
 #include <vector>
-#include <iomanip>
 
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
-#include <CGAL/Delaunay_triangulation_2.h>
 #include <CGAL/QP_models.h>
 #include <CGAL/QP_functions.h>
 #include <CGAL/Gmpz.h>
 
+#include <CGAL/Delaunay_triangulation_2.h>
+
 typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
-typedef CGAL::Delaunay_triangulation_2<K> Triangulation;
+typedef CGAL::Delaunay_triangulation_2<K>  Triangulation;
+
 typedef K::Point_2 Point;
+typedef K::Segment_2 Segment;
 typedef K::Circle_2 Circle;
 
-// Use Gmpz for exact representation of numbers
-typedef CGAL::Gmpz ET;
-// Use integers for input type in the LP
 typedef int IT;
-
+typedef CGAL::Gmpz ET;
 typedef CGAL::Quadratic_program<IT> Program;
 typedef CGAL::Quadratic_program_solution<ET> Solution;
 
-// Struct to hold warehouse data
+#define ASSERT(c) do { if (!(c)) throw std::runtime_error("Assertion failed: " #c); } while (0)
+
 struct Warehouse {
   Point pos;
-  int supply; // Supply of Beer in ml
-  int alcohol_per_liter; // Alcohol content in ml per liter of beer
+  int s;  // Supply of Beer in ml
+  int a;  // Alcohol per Liter of Beer in ml
   
-  Warehouse(int x, int y, int s, int a) : pos(x, y), supply(s * 1000), alcohol_per_liter(a * 10) {}
+  Warehouse(int x, int y, int s, int a) : pos(x, y), s(s * 1000), a(a * 10) {}
 };
 
-// Struct to hold stadium data
 struct Stadium {
   Point pos;
-  int demand; // Demand of Beer in ml
-  int alcohol_limit; // Upper Limit on the pure alcohol in ml
+  int d;  // Demand of Beer in ml
+  int u;  // Upper Limit on the pure alcohol in ml
   
-  Stadium(int x, int y, int d, int u) : pos(x, y), demand(d * 1000), alcohol_limit(u * 1000) {}
+  Stadium(int x, int y, int d, int u) : pos(x, y), d(d * 1000), u(u * 1000) {}
 };
 
-// Custom floor function for CGAL's exact number type
-long floor_to_long(const CGAL::Quotient<ET>& x) {
+long floor_to_double(const CGAL::Quotient<ET>& x) {
   double a = std::floor(CGAL::to_double(x));
   while (a > x) a -= 1;
-  while (a + 1 <= x) a += 1;
-  return static_cast<long>(a);
+  while (a+1 <= x) a += 1;
+  return a;
 }
 
 void solve() {
-  int n, m, c;
-  std::cin >> n >> m >> c;
-
-  std::vector<Point> locations;
-  locations.reserve(n + m);
-  std::vector<Warehouse> warehouses;
-  warehouses.reserve(n);
-  for (int i = 0; i < n; ++i) {
-    long x, y;
-    int s, a;
-    std::cin >> x >> y >> s >> a;
+  // ===== READ INPUT =====
+  int n, m, c; std::cin >> n >> m >> c;
+  
+  std::vector<Point> points; points.reserve(n + m);
+  std::vector<Warehouse> warehouses; warehouses.reserve(n);
+  std::vector<Stadium> stadiums; stadiums.reserve(m);
+  std::vector<Circle> contour_lines; contour_lines.reserve(c); 
+  std::vector<std::vector<int>> revenues(n, std::vector<int>(m)); 
+  
+  // Read warehouses
+  for(int i = 0; i < n; ++i) {
+    int x, y, s, a; std::cin >> x >> y >> s >> a;
     warehouses.emplace_back(x, y, s, a);
-    locations.push_back(Point(x, y));
+    points.emplace_back(x, y);
   }
-
-  std::vector<Stadium> stadiums;
-  stadiums.reserve(m);
-  for (int i = 0; i < m; ++i) {
-    long x, y;
-    int d, u;
-    std::cin >> x >> y >> d >> u;
+  
+  // Read stadiums
+  for(int i = 0; i < m; ++i) {
+    int x, y, d, u; std::cin >> x >> y >> d >> u;
     stadiums.emplace_back(x, y, d, u);
-    locations.push_back(Point(x, y));
+    points.emplace_back(x, y);
   }
-
-  std::vector<std::vector<int>> revenues(n, std::vector<int>(m));
-  for (int i = 0; i < n; ++i) {
-    for (int j = 0; j < m; ++j) {
+  
+  // Read revenues
+  for(int i = 0; i < n; ++i) {
+    for(int j = 0; j < m; ++j) {
       std::cin >> revenues[i][j];
     }
   }
-
-  std::vector<Circle> contours;
-  contours.reserve(c);
-  for (int i = 0; i < c; ++i) {
-    long x, y, r;
-    std::cin >> x >> y >> r;
-    contours.emplace_back(Point(x, y), (K::FT)r * r);
+  
+  // Read contour lines
+  for(int i = 0; i < c; ++i) {
+    int x, y, r; std::cin >> x >> y >> r;
+    contour_lines.emplace_back(Point(x, y), std::pow(r, 2));
   }
-
-  // Filter relevant contour lines
+  
+  // ===== COUNT CONTOUR LINE INTERSECTIONS =====
+  // Triangulate warehouses and stadiums
+  
   Triangulation t;
-  t.insert(locations.begin(), locations.end());
-
-  std::vector<Circle> relevant_contours;
-  for (const auto& contour : contours) {
-    Point center = contour.center();
-    Point nearest_loc = t.nearest_vertex(center)->point();
-    if (CGAL::squared_distance(center, nearest_loc) < contour.squared_radius()) {
-      relevant_contours.push_back(contour);
+  t.insert(points.begin(), points.end());
+  
+  // Find the contour lines that are actually relevant (have something inside)
+  std::vector<Circle*> relevant_contours; relevant_contours.reserve(100);
+  for(int i = 0; i < c; ++i) {
+    Point center = contour_lines[i].center();
+    Point nearest = t.nearest_vertex(center)->point();
+    
+    if(CGAL::squared_distance(center, nearest) <= contour_lines[i].squared_radius()) {
+      relevant_contours.push_back(&contour_lines[i]);
     }
   }
   
-  // Count intersections for each warehouse-stadium pair
-  std::vector<std::vector<int>> intersections(n, std::vector<int>(m, 0));
-  for (int w = 0; w < n; ++w) {
-    for (int s = 0; s < m; ++s) {
-      for (const auto& contour : relevant_contours) {
-        bool w_inside = contour.has_on_bounded_side(warehouses[w].pos);
-        bool s_inside = contour.has_on_bounded_side(stadiums[s].pos);
-        if (w_inside != s_inside) {
-          intersections[w][s]++;
+  // Count intersections between warehouses and stadiums with contour lines
+  std::vector<std::vector<int>> n_intersections(n, std::vector<int>(m, 0));
+  for(int w = 0; w < n; ++w) {
+    for(int s = 0; s < m; ++s) {
+      for(const Circle *contour : relevant_contours) {
+        if(contour->has_on_bounded_side(warehouses[w].pos) != contour->has_on_bounded_side(stadiums[s].pos)) {
+          n_intersections[w][s]++;
         }
       }
     }
   }
-
-  // Create a linear program
-  Program lp(CGAL::SMALLER, true, 0, false, 0);
-  int constraint_idx = 0;
-
-  // Set up the objective function (multiplied by 100 for integer coefficients)
-  for (int w = 0; w < n; ++w) {
-    for (int s = 0; s < m; ++s) {
-      int var_idx = w * m + s;
-      int cost = 100 * revenues[w][s] - intersections[w][s];
-      lp.set_c(var_idx, -cost); // Negate to maximize
+  
+  // ===== CONSTRUCT LINEAR PROGRAM =====
+  // Variables are numbered by warehouse_idx * n + stadium_idx (w * m + s)
+  Program lp(CGAL::SMALLER, true, 0, false, 0); 
+  int n_constraints = 0;
+  
+  // Define Objective Function
+  for(int w = 0; w < n; ++w) {
+    for(int s = 0; s < m; ++s) {
+      lp.set_c(w * m + s, -(100 * revenues[w][s] - n_intersections[w][s]));
     }
   }
-
-  // Constraint 1: Supply limits
-  for (int w = 0; w < n; ++w) {
-    for (int s = 0; s < m; ++s) {
-      lp.set_a(w * m + s, constraint_idx, 1000);
+  
+  // Add constraints to ensure that the amount of Beer sent does not exceed supply
+  for(int w = 0; w < n; ++w) {
+    for(int s = 0; s < m; ++s) {
+      lp.set_a(w * m + s, n_constraints, 1000);
     }
-    lp.set_b(constraint_idx, warehouses[w].supply);
-    constraint_idx++;
+    lp.set_b(n_constraints, warehouses[w].s);
+    
+    n_constraints += 1;
   }
-
-  // Constraints 2 & 3: Demand and alcohol limits
-  for (int s = 0; s < m; ++s) {
-    for (int w = 0; w < n; ++w) {
-      // Alcohol limit
-      lp.set_a(w * m + s, constraint_idx, warehouses[w].alcohol_per_liter);
-      // Demand equality
-      lp.set_a(w * m + s, constraint_idx + 1, 1000);
-      lp.set_a(w * m + s, constraint_idx + 2, -1000);
+  
+  // Add constraints that the pure alocohol for each stadium does not exceed upper limit and
+  // Add constraints to ensure the the Beer delivered is equal to the demand for each stadium
+  for(int s = 0; s < m; ++s) {
+    for(int w = 0; w < n; ++w) {
+      // Constraint to respect Alcohol limit
+      lp.set_a(w * m + s, n_constraints, warehouses[w].a);
+      
+      // Constraints to exactly meet Beer demand
+      lp.set_a(w * m + s, n_constraints + 1, 1000);
+      lp.set_a(w * m + s, n_constraints + 2, -1000);
     }
-    lp.set_b(constraint_idx, stadiums[s].alcohol_limit);
-    lp.set_b(constraint_idx + 1, stadiums[s].demand);
-    lp.set_b(constraint_idx + 2, -stadiums[s].demand);
-    constraint_idx += 3;
+    lp.set_b(n_constraints, stadiums[s].u);
+    lp.set_b(n_constraints + 1, stadiums[s].d);
+    lp.set_b(n_constraints + 2, -stadiums[s].d);
+    
+    n_constraints += 3;
   }
+  
+  // ===== SOLVE LP AND OUTPUT =====
+  Solution s = CGAL::solve_linear_program(lp, ET());
+  
+  std::cout << std::fixed << std::setprecision(0);
 
-  Solution sol = CGAL::solve_linear_program(lp, ET());
-
-  if (sol.is_infeasible()) {
+  if (s.is_infeasible()) { 
     std::cout << "no" << std::endl;
   } else {
-    // Objective value is 100*profit. Divide by 100 and floor.
-    std::cout << floor_to_long(-sol.objective_value() / 100) << std::endl;
+    std::cout << floor_to_double(-s.objective_value() / 100) << std::endl;
   }
 }
 
 int main() {
   std::ios_base::sync_with_stdio(false);
-  std::cin.tie(NULL);
-  int t;
-  std::cin >> t;
-  while (t--) {
-    solve();
-  }
-  return 0;
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) { solve(); }
 }
 ```
 </details>
@@ -438,5 +659,13 @@ int main() {
 ## ⚡ Result
 
 ```plaintext
+Compiling: successful
 
+Judging solution >>>>
+   Test set 1 (25 pts / 4 s) : Correct answer      (0.096s)
+   Test set 2 (25 pts / 4 s) : Correct answer      (0.269s)
+   Test set 3 (25 pts / 4 s) : Correct answer      (0.282s)
+   Test set 4 (25 pts / 4 s) : Time limit exceeded
+
+Total score: 75
 ```
