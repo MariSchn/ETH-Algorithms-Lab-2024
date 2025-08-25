@@ -42,69 +42,73 @@ For the first test set, we are given a crucial hint: there is an optimal solutio
 Since the problem guarantees that this specific partition is optimal, a single max-flow computation is sufficient. The code handles multiple limbs between the same two figures by adding their capacities, which is implicitly done by adding parallel edges in the graph representation.
 
 ```cpp
-#include <iostream>
-#include <vector>
+#include<iostream>
+#include<vector>
+#include<queue>
+
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/push_relabel_max_flow.hpp>
+#include <boost/tuple/tuple.hpp>
 
-// Define the graph type using the Boost Graph Library
-typedef boost::adjacency_list_traits<boost::vecS, boost::vecS, boost::directedS> traits;
+typedef  boost::adjacency_list_traits<boost::vecS, boost::vecS, boost::directedS> traits;
 typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::directedS, boost::no_property,
-    boost::property<boost::edge_capacity_t, long,
+  boost::property<boost::edge_capacity_t, long,
     boost::property<boost::edge_residual_capacity_t, long,
-    boost::property<boost::edge_reverse_t, traits::edge_descriptor>>>> graph;
-typedef traits::edge_descriptor edge_desc;
+      boost::property<boost::edge_reverse_t, traits::edge_descriptor> > > >  graph;
+// Interior Property Maps
+typedef  boost::graph_traits<graph>::edge_descriptor      edge_desc;
+typedef  boost::graph_traits<graph>::out_edge_iterator      out_edge_it;
 
-// Helper class to add edges and their reverse counterparts
 class edge_adder {
-    graph &G;
-public:
-    explicit edge_adder(graph &G) : G(G) {}
-    void add_edge(int from, int to, long capacity) {
-        auto c_map = boost::get(boost::edge_capacity, G);
-        auto r_map = boost::get(boost::edge_reverse, G);
-        const auto e = boost::add_edge(from, to, G).first;
-        const auto rev_e = boost::add_edge(to, from, G).first;
-        c_map[e] = capacity;
-        c_map[rev_e] = capacity; // For an undirected cut, both directions have the same capacity
-        r_map[e] = rev_e;
-        r_map[rev_e] = e;
-    }
+ graph &G;
+
+ public:
+  explicit edge_adder(graph &G) : G(G) {}
+
+  void add_edge(int from, int to, long capacity) {
+    auto c_map = boost::get(boost::edge_capacity, G);
+    auto r_map = boost::get(boost::edge_reverse, G);
+    const edge_desc e = boost::add_edge(from, to, G).first;
+    const edge_desc rev_e = boost::add_edge(to, from, G).first;
+    c_map[e] = capacity;
+    c_map[rev_e] = 0; // reverse edge has no capacity!
+    r_map[e] = rev_e;
+    r_map[rev_e] = e;
+  }
 };
 
 void solve() {
-    int n, m;
-    std::cin >> n >> m;
-
-    graph G(n);
-    edge_adder adder(G);
-
-    // Read limbs and build the graph
-    for (int i = 0; i < m; ++i) {
-        int a, b, c;
-        std::cin >> a >> b >> c;
-        adder.add_edge(a, b, c);
-    }
-
-    // For Test Set 1, we can fix source = 0 and sink = n - 1
-    const int v_source = 0;
-    const int v_sink = n - 1;
-
-    // The min-cut value is equal to the max-flow value
-    long flow = boost::push_relabel_max_flow(G, v_source, v_sink);
-
-    std::cout << flow << std::endl;
+  // ===== READ INPUT & CONSTRUCT GRAPH =====
+  int n, m; std::cin >> n >> m;
+  
+  graph G(n);
+  edge_adder adder(G);
+  auto rc_map = boost::get(boost::edge_residual_capacity, G);
+  
+  // ? Accumulate parallel edges? 
+  for(int i = 0; i < m; ++i) {
+    int a, b, c; std::cin >> a >> b >> c;
+    adder.add_edge(a, b, c);
+  }
+  
+  // ====== CALCULATE MIN CUT =====
+  // !!! For Test Set 1 we can fix source = 0, sink = n - 1 !!!
+  const int v_source = 0;
+  const int v_sink = n - 1;
+  
+  // Find a min cut via maxflow
+  int flow = boost::push_relabel_max_flow(G, v_source, v_sink);
+  
+  std::cout << flow << std::endl;
 }
 
 int main() {
-    std::ios_base::sync_with_stdio(false);
-    std::cin.tie(NULL);
-    int t;
-    std::cin >> t;
-    while (t--) {
-        solve();
-    }
-    return 0;
+  std::ios_base::sync_with_stdio(false);
+  
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) {
+    solve();
+  }
 }
 ```
 </details>
@@ -134,75 +138,79 @@ This approach is effectively a brute-force search for the best partner vertex fo
 *Note: A more efficient implementation would avoid rebuilding the entire graph. One could save the initial capacities and restore them before each max-flow call. The provided code is simpler but correct for the given constraints.*
 
 ```cpp
-#include <iostream>
-#include <vector>
-#include <limits>
-#include <algorithm>
+#include<iostream>
+#include<vector>
+#include<queue>
+#include<limits>
+#include<cmath>
+
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/push_relabel_max_flow.hpp>
+#include <boost/tuple/tuple.hpp>
 
-typedef boost::adjacency_list_traits<boost::vecS, boost::vecS, boost::directedS> traits;
+typedef  boost::adjacency_list_traits<boost::vecS, boost::vecS, boost::directedS> traits;
 typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::directedS, boost::no_property,
-    boost::property<boost::edge_capacity_t, long,
+  boost::property<boost::edge_capacity_t, long,
     boost::property<boost::edge_residual_capacity_t, long,
-    boost::property<boost::edge_reverse_t, traits::edge_descriptor>>>> graph;
-typedef traits::edge_descriptor edge_desc;
+      boost::property<boost::edge_reverse_t, traits::edge_descriptor> > > >  graph;
+// Interior Property Maps
+typedef  boost::graph_traits<graph>::edge_descriptor      edge_desc;
+typedef  boost::graph_traits<graph>::out_edge_iterator      out_edge_it;
 
 class edge_adder {
-    graph &G;
-public:
-    explicit edge_adder(graph &G) : G(G) {}
-    void add_edge(int from, int to, long capacity) {
-        auto c_map = boost::get(boost::edge_capacity, G);
-        auto r_map = boost::get(boost::edge_reverse, G);
-        const auto e = boost::add_edge(from, to, G).first;
-        const auto rev_e = boost::add_edge(to, from, G).first;
-        c_map[e] = capacity;
-        c_map[rev_e] = capacity;
-        r_map[e] = rev_e;
-        r_map[rev_e] = e;
-    }
+ graph &G;
+
+ public:
+  explicit edge_adder(graph &G) : G(G) {}
+
+  void add_edge(int from, int to, long capacity) {
+    auto c_map = boost::get(boost::edge_capacity, G);
+    auto r_map = boost::get(boost::edge_reverse, G);
+    const edge_desc e = boost::add_edge(from, to, G).first;
+    const edge_desc rev_e = boost::add_edge(to, from, G).first;
+    c_map[e] = capacity;
+    c_map[rev_e] = 0; // reverse edge has no capacity!
+    r_map[e] = rev_e;
+    r_map[rev_e] = e;
+  }
 };
 
 void solve() {
-    int n, m;
-    std::cin >> n >> m;
+  // ===== READ INPUT & CONSTRUCT GRAPH =====
+  int n, m; std::cin >> n >> m;
+  
+  graph G(n);
+  edge_adder adder(G);
+  auto rc_map = boost::get(boost::edge_residual_capacity, G);
+  
+  // ? Accumulate parallel edges? 
+  for(int i = 0; i < m; ++i) {
+    int a, b, c; std::cin >> a >> b >> c;
+    adder.add_edge(a, b, c);
+  }
+  
+  // ====== CALCULATE MIN CUT =====
+  // !!! For Test Set 2 we can fix v_source = 0 !!!
+  const int v_source = 0;
+  
+  int min_cut = std::numeric_limits<int>::max();
+  
+  // Consider all other nodes as sinks and look for the min cut
+  for(int i = 0; i < n; ++i) {
+    int flow = boost::push_relabel_max_flow(G, v_source, i);
+    min_cut = std::min(min_cut, flow);
+  }
 
-    // Storing edges to rebuild the graph for each iteration
-    std::vector<std::tuple<int, int, int>> edges;
-    for (int i = 0; i < m; ++i) {
-        int a, b, c;
-        std::cin >> a >> b >> c;
-        edges.emplace_back(a, b, c);
-    }
-    
-    const int v_source = 0;
-    long min_cut = std::numeric_limits<long>::max();
-
-    // Iterate through all possible sinks (excluding the source)
-    for (int i = 1; i < n; ++i) {
-        graph G(n);
-        edge_adder adder(G);
-        for(const auto& edge : edges) {
-            adder.add_edge(std::get<0>(edge), std::get<1>(edge), std::get<2>(edge));
-        }
-
-        long flow = boost::push_relabel_max_flow(G, v_source, i);
-        min_cut = std::min(min_cut, flow);
-    }
-
-    std::cout << min_cut << std::endl;
+  std::cout << min_cut << std::endl;
 }
 
 int main() {
-    std::ios_base::sync_with_stdio(false);
-    std::cin.tie(NULL);
-    int t;
-    std::cin >> t;
-    while (t--) {
-        solve();
-    }
-    return 0;
+  std::ios_base::sync_with_stdio(false);
+  
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) {
+    solve();
+  }
 }
 ```
 </details>
@@ -227,103 +235,89 @@ This leads to a simple, albeit inefficient, algorithm:
 The number of pairs $(s, t)$ is $N \times (N-1)$, which is $O(N^2)$. The push-relabel max-flow algorithm has a complexity of roughly $O(N^3)$ in practice on general graphs. Therefore, the total time complexity of this approach is $O(N^2 \cdot N^3) = O(N^5)$. For Test Set 3 with $N \le 50$, this is feasible, but it is too slow for the full constraints.
 
 ```cpp
-#include <iostream>
-#include <vector>
-#include <limits>
-#include <algorithm>
-#include <tuple>
+#include<iostream>
+#include<vector>
+#include<queue>
+#include<limits>
+#include<cmath>
+
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/push_relabel_max_flow.hpp>
+#include <boost/tuple/tuple.hpp>
 
-typedef boost::adjacency_list_traits<boost::vecS, boost::vecS, boost::directedS> traits;
+typedef  boost::adjacency_list_traits<boost::vecS, boost::vecS, boost::directedS> traits;
 typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::directedS, boost::no_property,
-    boost::property<boost::edge_capacity_t, long,
+  boost::property<boost::edge_capacity_t, long,
     boost::property<boost::edge_residual_capacity_t, long,
-    boost::property<boost::edge_reverse_t, traits::edge_descriptor>>>> graph;
-typedef traits::edge_descriptor edge_desc;
+      boost::property<boost::edge_reverse_t, traits::edge_descriptor> > > >  graph;
+// Interior Property Maps
+typedef  boost::graph_traits<graph>::edge_descriptor      edge_desc;
+typedef  boost::graph_traits<graph>::out_edge_iterator      out_edge_it;
 
 class edge_adder {
-    graph &G;
-public:
-    explicit edge_adder(graph &G) : G(G) {}
-    void add_edge(int from, int to, long capacity) {
-        auto c_map = boost::get(boost::edge_capacity, G);
-        auto r_map = boost::get(boost::edge_reverse, G);
-        const auto e = boost::add_edge(from, to, G).first;
-        const auto rev_e = boost::add_edge(to, from, G).first;
-        c_map[e] = capacity;
-        c_map[rev_e] = capacity;
-        r_map[e] = rev_e;
-        r_map[rev_e] = e;
-    }
+ graph &G;
+
+ public:
+  explicit edge_adder(graph &G) : G(G) {}
+
+  void add_edge(int from, int to, long capacity) {
+    auto c_map = boost::get(boost::edge_capacity, G);
+    auto r_map = boost::get(boost::edge_reverse, G);
+    const edge_desc e = boost::add_edge(from, to, G).first;
+    const edge_desc rev_e = boost::add_edge(to, from, G).first;
+    c_map[e] = capacity;
+    c_map[rev_e] = 0; // reverse edge has no capacity!
+    r_map[e] = rev_e;
+    r_map[rev_e] = e;
+  }
 };
 
 void solve() {
-    int n, m;
-    std::cin >> n >> m;
-
-    // Use an adjacency matrix to aggregate capacities of parallel edges
-    std::vector<std::vector<int>> adj_mat(n, std::vector<int>(n, 0));
-    for (int i = 0; i < m; ++i) {
-        int u, v, c;
-        std::cin >> u >> v >> c;
-        adj_mat[u][v] += c;
-        adj_mat[v][u] += c;
+  // ===== READ INPUT =====
+  int n, m; std::cin >> n >> m;
+  
+  std::vector<std::vector<int>> adj_mat(n, std::vector<int>(n, 0));
+  for(int i = 0; i < m; ++i) {
+    int a, b, c; std::cin >> a >> b >> c;
+    adj_mat[a][b] += c;
+  }
+  
+  // ===== CONSTRUCT GRAPH =====
+  graph G(n);
+  edge_adder adder(G);
+  auto rc_map = boost::get(boost::edge_residual_capacity, G);
+  
+  for(int i = 0; i < n; ++i) {
+    for(int j = 0; j < n; ++j) {
+      if(adj_mat[i][j]) {
+        adder.add_edge(i, j, adj_mat[i][j]);
+      }
     }
-
-    graph G(n);
-    edge_adder adder(G);
-    for (int i = 0; i < n; ++i) {
-        for (int j = i + 1; j < n; ++j) {
-            if (adj_mat[i][j] > 0) {
-                adder.add_edge(i, j, adj_mat[i][j]);
-            }
-        }
+  }
+  
+  // ====== CALCULATE MIN CUT =====
+  int min_cut = std::numeric_limits<int>::max();
+  
+  // Consider all other nodes as sinks and look for the min cut
+  for(int v_source = 0; v_source < n; ++v_source) {
+    for(int v_sink = 0; v_sink < n; ++v_sink) {
+      int flow = boost::push_relabel_max_flow(G, v_source, v_sink);
+      min_cut = std::min(min_cut, flow);
     }
-    
-    long min_cut = std::numeric_limits<long>::max();
+  }
 
-    // Brute-force over all pairs of source and sink
-    for (int s = 0; s < n; ++s) {
-        for (int t = 0; t < n; ++t) {
-            if (s == t) continue;
-            // The max_flow function in Boost modifies the graph, 
-            // but for this specific problem, we can find the min s-t cut
-            // and the min t-s cut by just iterating. 
-            // A correct implementation would require rebuilding the graph.
-            // However, a simpler approach exists (see Final Solution).
-            // Let's use the efficient approach from the final solution here.
-            long flow = boost::push_relabel_max_flow(G, s, t);
-            min_cut = std::min(min_cut, flow);
-        }
-    }
-
-    // A simpler version of the brute-force is to iterate over one fixed node,
-    // which leads to the final solution. The O(N^5) logic is sound but impractical.
-    // The correct minimal cut will be found by the final solution's logic.
-    const auto& G_const = G;
-    min_cut = std::numeric_limits<long>::max();
-    for(int i = 1; i < n; ++i) {
-        graph G_copy = G_const;
-        min_cut = std::min(min_cut, boost::push_relabel_max_flow(G_copy, 0, i));
-    }
-
-
-    std::cout << min_cut << std::endl;
+  std::cout << min_cut << std::endl;
 }
 
 int main() {
-    std::ios_base::sync_with_stdio(false);
-    std::cin.tie(NULL);
-    int t;
-    std::cin >> t;
-    while (t--) {
-        solve();
-    }
-    return 0;
+  std::ios_base::sync_with_stdio(false);
+  
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) {
+    solve();
+  }
 }
 ```
-*Note: The code in this section has been adjusted to reflect the more efficient approach of the Final Solution, as a pure $O(N^5)$ implementation is unnecessarily complex and slow. The core idea of checking all pairs remains the conceptual basis for this brute-force approach.*
 </details>
 <details>
 <summary>Final Solution</summary>
@@ -353,75 +347,84 @@ This reduces the number of max-flow computations from $O(N^2)$ to $O(N-1)$, yiel
 *Note: In an undirected graph, the min $s-t$ cut is the same as the min $t-s$ cut. So we only need to iterate through all `max_flow(0, i)` for `i=1...n-1`. The provided code calculates both `max_flow(0, i)` and `max_flow(i, 0)` which is redundant but correct.*
 
 ```cpp
-#include <iostream>
-#include <vector>
-#include <limits>
-#include <algorithm>
-#include <tuple>
+#include<iostream>
+#include<vector>
+#include<queue>
+#include<limits>
+#include<cmath>
+
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/push_relabel_max_flow.hpp>
+#include <boost/tuple/tuple.hpp>
 
-typedef boost::adjacency_list_traits<boost::vecS, boost::vecS, boost::directedS> traits;
+typedef  boost::adjacency_list_traits<boost::vecS, boost::vecS, boost::directedS> traits;
 typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::directedS, boost::no_property,
-    boost::property<boost::edge_capacity_t, long,
+  boost::property<boost::edge_capacity_t, long,
     boost::property<boost::edge_residual_capacity_t, long,
-    boost::property<boost::edge_reverse_t, traits::edge_descriptor>>>> graph;
-typedef traits::edge_descriptor edge_desc;
+      boost::property<boost::edge_reverse_t, traits::edge_descriptor> > > >  graph;
+// Interior Property Maps
+typedef  boost::graph_traits<graph>::edge_descriptor      edge_desc;
+typedef  boost::graph_traits<graph>::out_edge_iterator      out_edge_it;
 
 class edge_adder {
-    graph &G;
-public:
-    explicit edge_adder(graph &G) : G(G) {}
-    void add_edge(int from, int to, long capacity) {
-        auto c_map = boost::get(boost::edge_capacity, G);
-        auto r_map = boost::get(boost::edge_reverse, G);
-        const auto e = boost::add_edge(from, to, G).first;
-        const auto rev_e = boost::add_edge(to, from, G).first;
-        c_map[e] = capacity;
-        c_map[rev_e] = capacity;
-        r_map[e] = rev_e;
-        r_map[rev_e] = e;
-    }
+ graph &G;
+
+ public:
+  explicit edge_adder(graph &G) : G(G) {}
+
+  void add_edge(int from, int to, long capacity) {
+    auto c_map = boost::get(boost::edge_capacity, G);
+    auto r_map = boost::get(boost::edge_reverse, G);
+    const edge_desc e = boost::add_edge(from, to, G).first;
+    const edge_desc rev_e = boost::add_edge(to, from, G).first;
+    c_map[e] = capacity;
+    c_map[rev_e] = 0; // reverse edge has no capacity!
+    r_map[e] = rev_e;
+    r_map[rev_e] = e;
+  }
 };
 
 void solve() {
-    int n, m;
-    std::cin >> n >> m;
+  // ===== READ INPUT =====
+  int n, m; std::cin >> n >> m;
+  
+  std::vector<std::vector<int>> adj_mat(n, std::vector<int>(n, 0));
+  for(int i = 0; i < m; ++i) {
+    int a, b, c; std::cin >> a >> b >> c;
+    adj_mat[a][b] += c;
+  }
+  
+  // ===== CONSTRUCT GRAPH =====
+  graph G(n);
+  edge_adder adder(G);
 
-    // To avoid recomputing, store the original graph structure
-    std::vector<std::tuple<int, int, int>> edges;
-    for (int i = 0; i < m; ++i) {
-        int u, v, c;
-        std::cin >> u >> v >> c;
-        edges.emplace_back(u, v, c);
+  for(int i = 0; i < n; ++i) {
+    for(int j = 0; j < n; ++j) {
+      if(adj_mat[i][j]) {
+        adder.add_edge(i, j, adj_mat[i][j]);
+      }
     }
-    
-    long min_cut = std::numeric_limits<long>::max();
+  }
+  
+  // ====== CALCULATE MIN CUT =====
+  int min_cut = std::numeric_limits<int>::max();
+  
+  // Consider all other nodes as sinks and look for the min cut
+  for(int i = 0; i < n; ++i) {
+    min_cut = std::min(min_cut, (int) boost::push_relabel_max_flow(G, 0, i));
+    min_cut = std::min(min_cut, (int) boost::push_relabel_max_flow(G, i, 0));
+  }
 
-    // Iterate through all nodes as potential sinks, with node 0 as source
-    for (int i = 1; i < n; ++i) {
-        graph G(n);
-        edge_adder adder(G);
-        for(const auto& edge : edges) {
-            adder.add_edge(std::get<0>(edge), std::get<1>(edge), std::get<2>(edge));
-        }
-        
-        long flow = boost::push_relabel_max_flow(G, 0, i);
-        min_cut = std::min(min_cut, flow);
-    }
-
-    std::cout << min_cut << std::endl;
+  std::cout << min_cut << std::endl;
 }
 
 int main() {
-    std::ios_base::sync_with_stdio(false);
-    std::cin.tie(NULL);
-    int t;
-    std::cin >> t;
-    while (t--) {
-        solve();
-    }
-    return 0;
+  std::ios_base::sync_with_stdio(false);
+  
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) {
+    solve();
+  }
 }
 ```
 </details>

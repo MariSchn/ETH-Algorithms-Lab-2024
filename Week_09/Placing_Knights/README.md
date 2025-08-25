@@ -70,27 +70,32 @@ The solution uses the Boost Graph Library to implement the max-flow algorithm.
 This count gives the size of the maximum independent set, which is the maximum number of knights we can place.
 
 ```cpp
-#include <iostream>
-#include <vector>
-#include <queue>
+///3
+#include<iostream>
+#include<vector>
+#include<queue>
 
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/push_relabel_max_flow.hpp>
 
-// Type definitions for the Boost Graph Library
 typedef boost::adjacency_list_traits<boost::vecS, boost::vecS, boost::directedS> traits;
 typedef boost::adjacency_list<boost::vecS, 
                               boost::vecS, 
                               boost::directedS, 
                               boost::no_property,
                               boost::property<boost::edge_capacity_t, long,
-                                  boost::property<boost::edge_residual_capacity_t, long,
-                                      boost::property<boost::edge_reverse_t, traits::edge_descriptor>>>> graph;
+                                              boost::property<boost::edge_residual_capacity_t, long,
+                                                              boost::property<boost::edge_reverse_t, traits::edge_descriptor>>>> graph;
 typedef traits::vertex_descriptor vertex_desc;
 typedef traits::edge_descriptor edge_desc;
-typedef boost::graph_traits<graph>::out_edge_iterator out_edge_it;
+typedef boost::graph_traits<graph>::out_edge_iterator      out_edge_it;
 
-// A helper class to add edges and their reverse counterparts for the flow network
+// Create a vector containing all possible moves for a knight
+std::vector<std::pair<int, int>> OFFSETS = {
+    {-1, -2}, {-1, 2}, {1, -2}, {1, 2},
+    {-2, -1}, {-2, 1}, {2, -1}, {2, 1}
+};
+
 class edge_adder {
   graph &G;
   public:
@@ -101,87 +106,110 @@ class edge_adder {
       const auto e = boost::add_edge(from, to, G).first;
       const auto rev_e = boost::add_edge(to, from, G).first;
       c_map[e] = capacity;
-      c_map[rev_e] = 0; // Reverse edge has zero initial capacity
+      c_map[rev_e] = 0; // reverse edge has no capacity!
       r_map[e] = rev_e;
       r_map[rev_e] = e;
     }
 };
 
-// All 8 possible knight moves
-const std::vector<std::pair<int, int>> OFFSETS = {
-    {-1, -2}, {-1, 2}, {1, -2}, {1, 2},
-    {-2, -1}, {-2, 1}, {2, -1}, {2, 1}
-};
-
-// Convert 2D board coordinates to a 1D vertex index
 int get_index(int row, int col, int n) {
   return row * n + col;
 }
 
 void solve() {
-  int n;
-  std::cin >> n;
+  // ===== READ INPUT =====
+  int n; std::cin >> n;
   
   std::vector<std::vector<int>> board(n, std::vector<int>(n));
-  int valid_squares = 0;
   for(int row = 0; row < n; ++row) {
     for(int col = 0; col < n; ++col) {
       std::cin >> board[row][col];
-      if (board[row][col] == 1) {
-          valid_squares++;
-      }
     }
   }
   
-  // Create a graph with n*n vertices for the board, plus a source and sink
+  // ===== BUILD GRAPH =====
+  // Add all nodes, even if there are holes to make indexing easier
+  // We can just not connect the "hole nodes" to any other nodes
   graph G(n * n); 
   edge_adder adder(G);
+  auto rc_map = boost::get(boost::edge_residual_capacity, G);
   
   const vertex_desc v_source = boost::add_vertex(G);
   const vertex_desc v_sink = boost::add_vertex(G);
   
-  // Build the flow network
   for(int row = 0; row < n; ++row) {
     for(int col = 0; col < n; ++col) {
-      if(board[row][col] == 0) continue; // Skip holes
+      if(board[row][col] == 0) continue;
       int idx = get_index(row, col, n);
 
-      // Partition based on board color
-      if((row + col) % 2 == 0) { // "White" squares
+      // Connect to source or sink
+      if((row + col) % 2 == 0) {
         adder.add_edge(v_source, idx, 1);
-        // Add edges to reachable "black" squares
-        for(const std::pair<int, int> &offset : OFFSETS) {
-          int next_row = row + offset.first;
-          int next_col = col + offset.second;
-          
-          if (next_row >= 0 && next_row < n && next_col >= 0 && next_col < n && board[next_row][next_col] == 1) {
-            adder.add_edge(idx, get_index(next_row, next_col, n), 1);
-          }
-        }
-      } else { // "Black" squares
+      }
+      else { 
         adder.add_edge(idx, v_sink, 1);
+        continue;
+      }
+      
+      // Connect to nodes reachable by knight
+      for(const std::pair<int, int> &offset : OFFSETS) {
+        int adjusted_row = row + offset.first;
+        int adjusted_col = col + offset.second;
+        
+        if((adjusted_row < 0 || adjusted_row >= n) ||  // Row out of bounds
+           (adjusted_col < 0 || adjusted_col >= n) ||  // Col out of bounds
+           (board[adjusted_row][adjusted_col] == 0)    // Space is a hole
+           ){
+          continue;
+        }
+        adder.add_edge(idx, get_index(adjusted_row, adjusted_col, n), 1);
       }
     }
   }
   
-  // Compute max flow
-  long flow = boost::push_relabel_max_flow(G, v_source, v_sink);
+  // ===== COMPUTE MAX FLOW AND SET S =====
+  boost::push_relabel_max_flow(G, v_source, v_sink);
   
-  // The size of the maximum independent set is the total number of valid squares
-  // minus the size of the maximum matching (which equals the max flow).
-  std::cout << valid_squares - flow << std::endl;
+  std::vector<int> vis(n * n + 2, false); // visited flags
+  std::queue<int> Q; // BFS queue (from std:: not boost::)
+  vis[v_source] = true; // Mark the source as visited
+  Q.push(v_source);
+  while (!Q.empty()) {
+    const int u = Q.front();
+    Q.pop();
+    out_edge_it ebeg, eend;
+    for (boost::tie(ebeg, eend) = boost::out_edges(u, G); ebeg != eend; ++ebeg) {
+      const int v = boost::target(*ebeg, G);
+      // Only follow edges with spare capacity
+      if (rc_map[*ebeg] == 0 || vis[v]) continue;
+      vis[v] = true;
+      Q.push(v);
+    }
+  }
+  
+  // ===== COUNT SIZE OF INDEPENDENT SET =====
+  int count = 0;
+  for(int row = 0; row < n; ++row) {
+    for(int col = 0; col < n; col++) {
+      if(board[row][col] == 0) continue;
+      int idx = get_index(row, col, n);
+      
+      if((row + col) % 2 == 0) count += vis[idx];
+      else count += 1 - vis[idx];
+    }
+  }
+  
+  // ===== OUTPUT =====
+  std::cout << count << std::endl;
 }
 
 int main() {
   std::ios_base::sync_with_stdio(false);
   
-  int t;
-  std::cin >> t;
-  while(t--) {
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) {
     solve();
   }
-  
-  return 0;
 }
 ```
 </details>

@@ -55,95 +55,103 @@ A bone is "covered" if it lies within a tree's shadow. This means its distance $
 ```cpp
 #include <iostream>
 #include <vector>
+
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Delaunay_triangulation_2.h>
 #include <CGAL/Triangulation_vertex_base_with_info_2.h>
 #include <CGAL/Triangulation_face_base_2.h>
 #include <boost/pending/disjoint_sets.hpp>
 
-// CGAL type definitions
 typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
-typedef std::size_t                                         Index;
-typedef CGAL::Triangulation_vertex_base_with_info_2<Index,K>  Vb;
-typedef CGAL::Triangulation_face_base_2<K>                    Fb;
-typedef CGAL::Triangulation_data_structure_2<Vb,Fb>           Tds;
-typedef CGAL::Delaunay_triangulation_2<K,Tds>                 Delaunay;
 
-// Custom types for points and edges
-typedef K::Point_2 Point;
-typedef std::pair<Point,Index> IPoint;
+typedef std::size_t                                            Index;
+typedef CGAL::Triangulation_vertex_base_with_info_2<Index,K>   Vb;
+typedef CGAL::Triangulation_face_base_2<K>                     Fb;
+typedef CGAL::Triangulation_data_structure_2<Vb,Fb>            Tds;
+typedef CGAL::Delaunay_triangulation_2<K,Tds>                  Delaunay;
+
 typedef std::tuple<Index,Index,K::FT> Edge;
 
+typedef K::Point_2 Point;
+typedef std::pair<Point,Index> IPoint;
+
+std::ostream& operator<<(std::ostream& o, const Edge& e) {
+  return o << std::get<0>(e) << " " << std::get<1>(e) << " " << std::get<2>(e);
+}
+
 void solve() {
-  // Read input
-  int n, m, k; long s;
-  std::cin >> n >> m >> s >> k;
+  // ===== READ INPUT =====
+  int n, m, k; long s; std::cin >> n >> m >> s >> k;
   
-  std::vector<IPoint> trees;
-  trees.reserve(n);
+  std::vector<IPoint> trees; trees.reserve(n);
   for(int i = 0; i < n; ++i) {
     int x, y; std::cin >> x >> y;
     trees.emplace_back(Point(x, y), i);
   }
   
-  std::vector<Point> bones;
-  bones.reserve(m);
+  std::vector<Point> bones; bones.reserve(m);
   for(int i = 0; i < m; ++i) {
     int x, y; std::cin >> x >> y;
     bones.emplace_back(x, y);
   }
   
-  // Build Delaunay triangulation of tree locations
+  // ===== SOLVE =====
   Delaunay t;
   t.insert(trees.begin(), trees.end());
   
-  // Extract edges from the triangulation
-  std::vector<Edge> edges;
-  edges.reserve(3*n); // An approximation for the number of edges
+  // Calculate edges with their distances
+  std::vector<Edge> edges; edges.reserve(3*n);
   for (auto e = t.finite_edges_begin(); e != t.finite_edges_end(); ++e) {
     Index i1 = e->first->vertex((e->second+1)%3)->info();
     Index i2 = e->first->vertex((e->second+2)%3)->info();
-    if(i1 > i2) std::swap(i1, i2); // Avoid duplicate edges
+    if(i1 > i2) { std::swap(i1, i2); }
+    
     edges.emplace_back(i1, i2, t.segment(e).squared_length());
   }
- 
-  // Build connected components using Union-Find for the given radius s
+  
+  std::sort(edges.begin(), edges.end(),
+    [](const Edge& e1, const Edge& e2) -> bool {
+      return std::get<2>(e1) < std::get<2>(e2);
+          });
+  
+  // Determine (connected) components using Union Find
   boost::disjoint_sets_with_storage<> uf(n);
-  for (const auto& e : edges) {
-    if (std::get<2>(e) <= s) {
-      uf.union_set(std::get<0>(e), std::get<1>(e));
+  for (auto e = edges.begin(); e != edges.end(); ++e) {
+    Index c1 = uf.find_set(std::get<0>(*e));
+    Index c2 = uf.find_set(std::get<1>(*e));
+    K::FT dist = std::get<2>(*e);
+
+    if (c1 != c2 && dist <= s) {
+      uf.link(c1, c2);
     }
   }
   
-  // Count bones per component
+  // Find maximum number of bones for radius given by s
   std::vector<int> num_bones(n, 0);
   for(const Point &bone : bones) {
-    auto vh = t.nearest_vertex(bone);
-    // Check if bone is within the shadow: 4 * dist^2 <= s
-    if (4 * CGAL::squared_distance(bone, vh->point()) <= s) {
-      Index component_root = uf.find_set(vh->info());
-      num_bones[component_root]++;
-    }
+    auto vertex_handle = t.nearest_vertex(bone);
+    
+    if(4 * CGAL::squared_distance(bone, vertex_handle->point()) > s) { continue; }
+     
+    Index component = uf.find_set(vertex_handle->info());
+    num_bones[component]++;
   }
   
-  // Find the component with the maximum number of bones
+  // Find maximum number of bones among components
   int max_num_bones = 0;
-  for(int i = 0; i < n; ++i) {
-    if (uf.find_set(i) == i) { // Iterate over component representatives
-        max_num_bones = std::max(max_num_bones, num_bones[i]);
-    }
+  for(const int &n : num_bones) {
+    max_num_bones = std::max(max_num_bones, n);
   }
   
-  // Output result (for test sets 1 & 2, q is fixed)
+  // ===== OUTPUT =====
   std::cout << max_num_bones << " " << s * 4 << std::endl;
 }
 
 int main() {
   std::ios_base::sync_with_stdio(false);
-  std::cin.tie(NULL);
+  
   int n_tests; std::cin >> n_tests;
   while(n_tests--) { solve(); }
-  return 0;
 }
 ```
 </details>
@@ -184,8 +192,6 @@ There are two types of events, each occurring at a critical squared radius $q = 
 ```cpp
 #include <iostream>
 #include <vector>
-#include <algorithm>
-#include <iomanip>
 
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Delaunay_triangulation_2.h>
@@ -193,132 +199,133 @@ There are two types of events, each occurring at a critical squared radius $q = 
 #include <CGAL/Triangulation_face_base_2.h>
 #include <boost/pending/disjoint_sets.hpp>
 
-// CGAL type definitions
 typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
-typedef std::size_t                                         Index;
-typedef CGAL::Triangulation_vertex_base_with_info_2<Index,K>  Vb;
-typedef CGAL::Triangulation_face_base_2<K>                    Fb;
-typedef CGAL::Triangulation_data_structure_2<Vb,Fb>           Tds;
-typedef CGAL::Delaunay_triangulation_2<K,Tds>                 Delaunay;
 
-// Custom types for points and edges
-typedef K::Point_2 Point;
-typedef std::pair<Point,Index> IPoint;
+typedef std::size_t                                            Index;
+typedef CGAL::Triangulation_vertex_base_with_info_2<Index,K>   Vb;
+typedef CGAL::Triangulation_face_base_2<K>                     Fb;
+typedef CGAL::Triangulation_data_structure_2<Vb,Fb>            Tds;
+typedef CGAL::Delaunay_triangulation_2<K,Tds>                  Delaunay;
+
 typedef std::tuple<Index,Index,K::FT> Edge;
 
+typedef K::Point_2 Point;
+typedef std::pair<Point,Index> IPoint;
+
+std::ostream& operator<<(std::ostream& o, const Edge& e) {
+  return o << std::get<0>(e) << " " << std::get<1>(e) << " " << std::get<2>(e);
+}
+
 void solve() {
-  // Read input
-  int n, m, k; long s_long;
-  std::cin >> n >> m >> s_long >> k;
-  K::FT s = s_long;
+  // ===== READ INPUT =====
+  int n, m, k; long s; std::cin >> n >> m >> s >> k;
   
-  std::vector<IPoint> trees;
-  trees.reserve(n);
+  std::vector<IPoint> trees; trees.reserve(n);
   for(int i = 0; i < n; ++i) {
     int x, y; std::cin >> x >> y;
     trees.emplace_back(Point(x, y), i);
   }
   
-  std::vector<Point> bones;
-  bones.reserve(m);
+  std::vector<Point> bones; bones.reserve(m);
   for(int i = 0; i < m; ++i) {
     int x, y; std::cin >> x >> y;
     bones.emplace_back(x, y);
   }
   
-  // Build Delaunay triangulation
+  // ===== SOLVE =====
   Delaunay t;
   t.insert(trees.begin(), trees.end());
   
-  // === Part 1: Calculate a ===
+  // === Calculate a ===
   
-  std::vector<Edge> tree_edges;
-  tree_edges.reserve(3*n);
+  // Calculate edges with their distances
+  std::vector<Edge> edges; edges.reserve(3*n);
   for (auto e = t.finite_edges_begin(); e != t.finite_edges_end(); ++e) {
     Index i1 = e->first->vertex((e->second+1)%3)->info();
     Index i2 = e->first->vertex((e->second+2)%3)->info();
-    tree_edges.emplace_back(i1, i2, t.segment(e).squared_length());
+    if(i1 > i2) { std::swap(i1, i2); }
+    
+    edges.emplace_back(i1, i2, t.segment(e).squared_length());
   }
   
-  boost::disjoint_sets_with_storage<> uf_a(n);
-  for (const auto& e : tree_edges) {
-    if (std::get<2>(e) <= s) {
-      uf_a.union_set(std::get<0>(e), std::get<1>(e));
+  // Determine (connected) components using Union Find
+  boost::disjoint_sets_with_storage<> uf(n);
+  for (auto e = edges.begin(); e != edges.end(); ++e) {
+    Index c1 = uf.find_set(std::get<0>(*e));
+    Index c2 = uf.find_set(std::get<1>(*e));
+    K::FT dist = std::get<2>(*e);
+
+    if (c1 != c2 && dist <= s) {
+      uf.link(c1, c2);
     }
   }
   
-  std::vector<int> bones_in_comp_a(n, 0);
+  // Find number of bones for radius given by s
+  std::vector<int> num_bones(n, 0);
   for(const Point &bone : bones) {
-    auto vh = t.nearest_vertex(bone);
-    if (4 * CGAL::squared_distance(bone, vh->point()) <= s) {
-      bones_in_comp_a[uf_a.find_set(vh->info())]++;
-    }
+    auto vertex_handle = t.nearest_vertex(bone);
+    if(4 * CGAL::squared_distance(bone, vertex_handle->point()) > s) { continue; }
+     
+    Index component = uf.find_set(vertex_handle->info());
+    num_bones[component]++;
   }
   
+  // Find maximum number of bones among components
   int max_num_bones = 0;
-  for (int count : bones_in_comp_a) {
-    max_num_bones = std::max(max_num_bones, count);
+  for(const int &n : num_bones) {
+    max_num_bones = std::max(max_num_bones, n);
   }
   
-  // === Part 2: Calculate q ===
-  
-  std::vector<Edge> all_events = tree_edges;
-  all_events.reserve(3*n + m);
+  // === Calculate q ===
+  // Calculate q by adding the edges between bones and trees and stopping the UF as soon as k bones are reached in one component
+  std::vector<int> bones_per_component(n + m, 0);
   for(int i = 0; i < m; ++i) {
-    auto vh = t.nearest_vertex(bones[i]);
-    // Event: bone i gets covered by tree vh->info()
-    // Index for bone i is n+i
-    // Cost is 4 * dist^2
-    all_events.emplace_back(n + i, vh->info(), 4 * CGAL::squared_distance(bones[i], vh->point()));
+    // Find Edge for the bone i
+    auto vertex_handle = t.nearest_vertex(bones[i]);
+    edges.emplace_back(n + i, vertex_handle->info(), 4 * CGAL::squared_distance(bones[i], vertex_handle->point()));
+    bones_per_component[n + i] = 1;
   }
   
-  std::sort(all_events.begin(), all_events.end(), [](const Edge& e1, const Edge& e2) {
+  // Sort, now with the edges between bones and trees
+  std::sort(edges.begin(), edges.end(), [](const Edge& e1, const Edge& e2) -> bool {
       return std::get<2>(e1) < std::get<2>(e2);
   });
   
-  boost::disjoint_sets_with_storage<> uf_q(n + m);
-  std::vector<int> bones_in_comp_q(n + m, 0);
-  for (int i = 0; i < m; ++i) {
-    bones_in_comp_q[n + i] = 1; // Each bone is a component with 1 bone
-  }
-
-  K::FT q = -1;
-  // Special case: if k=0, q=0. If k=1 and there is at least one bone, find the smallest bone-tree distance.
-  if (k <= max_num_bones) { // Check if k is already achievable with radius r
-     // This part is tricky. We need to find the minimum radius to achieve k bones.
-     // The loop below will find it correctly.
-  }
-  
-  for (const auto& e : all_events) {
-    Index c1 = uf_q.find_set(std::get<0>(e));
-    Index c2 = uf_q.find_set(std::get<1>(e));
-    K::FT cost = std::get<2>(e);
+  // Determine (connected) components using Union Find
+  boost::disjoint_sets_with_storage<> bones_uf(n + m);
+  K::FT q;
+  for (auto e = edges.begin(); e != edges.end(); ++e) {
+    Index c1 = bones_uf.find_set(std::get<0>(*e));
+    Index c2 = bones_uf.find_set(std::get<1>(*e));
+    K::FT dist = std::get<2>(*e);
 
     if (c1 != c2) {
-      int merged_bones = bones_in_comp_q[c1] + bones_in_comp_q[c2];
-      uf_q.link(c1, c2);
-      Index new_root = uf_q.find_set(c1);
-      bones_in_comp_q[c1] = bones_in_comp_q[c2] = 0; // Clear old counts
-      bones_in_comp_q[new_root] = merged_bones;
+      bones_uf.link(c1, c2);
+      Index c3 = bones_uf.find_set(std::get<0>(*e));
       
-      if(merged_bones >= k) {
-        q = cost;
+      int total_bones = bones_per_component[c1] + bones_per_component[c2];
+      bones_per_component[c1] = 0;
+      bones_per_component[c2] = 0;
+      bones_per_component[c3] = total_bones;
+      
+      if(bones_per_component[c3] >= k) {
+        // Found radius at which k bones can be obtained
+        q = dist;
         break;
       }
     }
   }
   
-  // Output result
+  // ===== OUTPUT =====
   std::cout << std::fixed << std::setprecision(0);
   std::cout << max_num_bones << " " << q << std::endl;
 }
 
 int main() {
   std::ios_base::sync_with_stdio(false);
-  std::cin.tie(NULL);
+  
   int n_tests; std::cin >> n_tests;
   while(n_tests--) { solve(); }
-  return 0;
 }
 ```
 </details>

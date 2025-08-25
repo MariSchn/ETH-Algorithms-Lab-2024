@@ -57,11 +57,6 @@ We construct a flow network with a source node `S`, a sink node `T`, and one nod
         *   **Capacity:** $v_i$ (the freezer's capacity).
         *   **Cost:** $e_i$ (the cost to freeze one meal).
 
-<center>
-<img src="https://i.imgur.com/vH9J0yA.png" alt="Graph model for the Canteen problem" width="600"/>
-<em>A visual representation of the graph for N=3 days.</em>
-</center>
-
 ### Algorithm
 
 After constructing the graph, we can find the min-cost max-flow. Since our graph has negative edge weights (due to the profit edges), we cannot use simpler algorithms that require non-negative weights. A common approach for graphs with negative weights is:
@@ -100,19 +95,20 @@ class edge_adder {
   void add_edge(int from, int to, long capacity, long cost) {
     auto c_map = boost::get(boost::edge_capacity, G);
     auto r_map = boost::get(boost::edge_reverse, G);
-    auto w_map = boost::get(boost::edge_weight, G);
+    auto w_map = boost::get(boost::edge_weight, G); // new!
     const edge_desc e = boost::add_edge(from, to, G).first;
     const edge_desc rev_e = boost::add_edge(to, from, G).first;
     c_map[e] = capacity;
-    c_map[rev_e] = 0;
+    c_map[rev_e] = 0; // reverse edge has no capacity!
     r_map[e] = rev_e;
     r_map[rev_e] = e;
-    w_map[e] = cost;
-    w_map[rev_e] = -cost;
+    w_map[e] = cost;   // new assign cost
+    w_map[rev_e] = -cost;   // new negative cost
   }
 };
 
 void solve() {
+  // ===== READ INPUT =====
   int n; std::cin >> n;
   int total_n_students = 0;
   
@@ -134,26 +130,31 @@ void solve() {
     std::cin >> freezer_capacity[i] >> freezer_cost[i];
   }
   
-  // Create a graph with N day-nodes, plus a source and a sink
-  graph G(n + 2);
+  // ===== BUILD GRAPH =====
+  graph G(n);
   edge_adder adder(G);
-  const int v_source = n;
-  const int v_sink = n + 1;
+  // auto c_map = boost::get(boost::edge_capacity, G);
+  // auto r_map = boost::get(boost::edge_reverse, G);
+  // auto rc_map = boost::get(boost::edge_residual_capacity, G);
   
-  // Add edges for production, consumption, and storage
+  const int v_source = boost::add_vertex(G);
+  const int v_sink = boost::add_vertex(G);
+  
+  // Connect every node to source and sink
   for(int i = 0; i < n; ++i) {
     adder.add_edge(v_source, i, production_capacity[i], production_cost[i]);
     adder.add_edge(i, v_sink, n_students[i], -menu_price[i]);
   }
   
+  // Connect the nodes to subsequent nodes (freezer)
   for(int i = 0; i < n-1; ++i) {
     adder.add_edge(i, i+1, freezer_capacity[i], freezer_cost[i]);
   }
   
-  // Calculate Min-Cost Max-Flow
-  long flow = boost::push_relabel_max_flow(G, v_source, v_sink);
+  // ===== CALCULATE MIN COST MAX FLOW =====
+  int flow = boost::push_relabel_max_flow(G, v_source, v_sink);
   boost::cycle_canceling(G);
-  long cost = boost::find_flow_cost(G);
+  int cost = boost::find_flow_cost(G);
   
   if (total_n_students > flow) {
     std::cout << "impossible ";
@@ -165,6 +166,7 @@ void solve() {
 
 int main() {
   std::ios_base::sync_with_stdio(false);
+  
   int n_tests; std::cin >> n_tests;
   while(n_tests--) {
     solve();
@@ -236,19 +238,20 @@ class edge_adder {
   void add_edge(int from, int to, long capacity, long cost) {
     auto c_map = boost::get(boost::edge_capacity, G);
     auto r_map = boost::get(boost::edge_reverse, G);
-    auto w_map = boost::get(boost::edge_weight, G);
+    auto w_map = boost::get(boost::edge_weight, G); // new!
     const edge_desc e = boost::add_edge(from, to, G).first;
     const edge_desc rev_e = boost::add_edge(to, from, G).first;
     c_map[e] = capacity;
-    c_map[rev_e] = 0;
+    c_map[rev_e] = 0; // reverse edge has no capacity!
     r_map[e] = rev_e;
     r_map[rev_e] = e;
-    w_map[e] = cost;
-    w_map[rev_e] = -cost;
+    w_map[e] = cost;   // new assign cost
+    w_map[rev_e] = -cost;   // new negative cost
   }
 };
 
 void solve() {
+  // ===== READ INPUT =====
   int n; std::cin >> n;
   int total_n_students = 0;
   
@@ -270,31 +273,33 @@ void solve() {
     std::cin >> freezer_capacity[i] >> freezer_cost[i];
   }
   
-  // Create a graph with N day-nodes, plus a source and a sink
-  graph G(n + 2);
+  // ===== BUILD GRAPH =====
+  graph G(n);
   edge_adder adder(G);
-  const int v_source = n;
-  const int v_sink = n + 1;
-  const int P_MAX = 20;
+  auto c_map = boost::get(boost::edge_capacity, G);
+  // auto r_map = boost::get(boost::edge_reverse, G);
+  auto rc_map = boost::get(boost::edge_residual_capacity, G);
   
-  // Add edges with non-negative costs
+  const int v_source = boost::add_vertex(G);
+  const int v_sink = boost::add_vertex(G);
+  
+  // Connect every node to source and sink
   for(int i = 0; i < n; ++i) {
     adder.add_edge(v_source, i, production_capacity[i], production_cost[i]);
-    adder.add_edge(i, v_sink, n_students[i], P_MAX - menu_price[i]); // Opportunity cost
+    adder.add_edge(i, v_sink, n_students[i], 20 - menu_price[i]);
   }
   
+  // Connect the nodes to subsequent nodes (freezer)
   for(int i = 0; i < n-1; ++i) {
     adder.add_edge(i, i+1, freezer_capacity[i], freezer_cost[i]);
   }
   
-  // Run the efficient algorithm for non-negative weights
+  // ===== CALCULATE MIN COST MAX FLOW =====
   boost::successive_shortest_path_nonnegative_weights(G, v_source, v_sink);
-  long cost = boost::find_flow_cost(G);
+  int cost = boost::find_flow_cost(G);
 
-  // Calculate total flow by summing flow out of the source
-  long flow = 0;
-  auto c_map = boost::get(boost::edge_capacity, G);
-  auto rc_map = boost::get(boost::edge_residual_capacity, G);
+  // Iterate over all edges leaving the source to sum up the flow values.
+  int flow = 0;
   out_edge_it e, eend;
   for(boost::tie(e, eend) = boost::out_edges(boost::vertex(v_source,G), G); e != eend; ++e) {
     flow += c_map[*e] - rc_map[*e];     
@@ -305,12 +310,12 @@ void solve() {
   } else {
     std::cout << "possible ";
   }
-  // Convert the minimized cost back to maximized profit
-  std::cout << flow << " " << P_MAX * flow - cost << std::endl;
+  std::cout << flow << " " << 20 * flow - cost << std::endl;
 }
 
 int main() {
   std::ios_base::sync_with_stdio(false);
+  
   int n_tests; std::cin >> n_tests;
   while(n_tests--) {
     solve();

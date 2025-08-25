@@ -86,10 +86,11 @@ typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::directedS, boost:
     boost::property<boost::edge_capacity_t, long,
         boost::property<boost::edge_residual_capacity_t, long,
             boost::property<boost::edge_reverse_t, traits::edge_descriptor,
-                boost::property <boost::edge_weight_t, long> > > > > graph;
+                boost::property <boost::edge_weight_t, long> > > > > graph; // new! weightmap corresponds to costs
 
 typedef traits::vertex_descriptor vertex_desc;
 typedef boost::graph_traits<graph>::edge_descriptor edge_desc;
+typedef boost::graph_traits<graph>::out_edge_iterator out_edge_it; // Iterator
 
 class edge_adder {
  graph &G;
@@ -99,26 +100,31 @@ class edge_adder {
   void add_edge(int from, int to, long capacity, long cost) {
     auto c_map = boost::get(boost::edge_capacity, G);
     auto r_map = boost::get(boost::edge_reverse, G);
-    auto w_map = boost::get(boost::edge_weight, G);
+    auto w_map = boost::get(boost::edge_weight, G); // new!
     const edge_desc e = boost::add_edge(from, to, G).first;
     const edge_desc rev_e = boost::add_edge(to, from, G).first;
     c_map[e] = capacity;
-    c_map[rev_e] = 0; // Reverse edge has no capacity
+    c_map[rev_e] = 0; // reverse edge has no capacity!
     r_map[e] = rev_e;
     r_map[rev_e] = e;
-    w_map[e] = cost;
-    w_map[rev_e] = -cost;
+    w_map[e] = cost;   // new assign cost
+    w_map[rev_e] = -cost;   // new negative cost
   }
 };
 
 void solve() {
+  // ===== READ INPUT =====
   int N, M, S; std::cin >> N >> M >> S;
   
   std::vector<int> limits(S);
-  for(int i = 0; i < S; ++i) std::cin >> limits[i];
+  for(int i = 0; i < S; ++i) {
+    std::cin >> limits[i];
+  }
   
   std::vector<int> property_to_state(M);
-  for(int i = 0; i < M; ++i) std::cin >> property_to_state[i];
+  for(int i = 0; i < M; ++i) {
+    std::cin >> property_to_state[i];
+  }
   
   std::vector<std::vector<int>> bids(N, std::vector<int>(M));
   for(int i = 0; i < N; ++i) {
@@ -127,52 +133,60 @@ void solve() {
     }
   }
   
-  graph G(N + M + S + 2);
+  // ===== BUILD GRAPH =====
+  graph G(N + M + S);
   edge_adder adder(G);
-
-  const vertex_desc v_source = N + M + S;
-  const vertex_desc v_sink = N + M + S + 1;
+  // auto c_map = boost::get(boost::edge_capacity, G);
+  // auto r_map = boost::get(boost::edge_reverse, G);
+  // auto rc_map = boost::get(boost::edge_residual_capacity, G);
   
-  // Edges from source to buyers
+  // Add Source and Sink
+  const vertex_desc v_source = boost::add_vertex(G);
+  const vertex_desc v_sink = boost::add_vertex(G);
+  
+  // Connect Source to Bidders and Bidders to Sites
   for(int i = 0; i < N; ++i) {
     adder.add_edge(v_source, i, 1, 0);
-  }
-  
-  // Edges from buyers to sites
-  for(int i = 0; i < N; ++i) {
+    
     for(int j = 0; j < M; j++) {
-      adder.add_edge(i, N + j, 1, -bids[i][j]);
+      adder.add_edge(i, N + j, 1, - bids[i][j]);
     }
   }
   
-  // Edges from sites to their states
+  // Connect Sites to States
   for(int i = 0; i < M; ++i) {
     adder.add_edge(N + i, N + M + property_to_state[i] - 1, 1, 0);
   }
   
-  // Edges from states to sink
+  // Connect States to Sink
   for(int i = 0; i < S; ++i) {
     adder.add_edge(N + M + i, v_sink, limits[i], 0);
   }
 
-  boost::push_relabel_max_flow(G, v_source, v_sink);
-  boost::cycle_canceling(G);
-  long cost = boost::find_flow_cost(G);
+  // boost::successive_shortest_path_nonnegative_weights(G, v_source, v_sink);
+  // int cost = boost::find_flow_cost(G);
+
+  // int sold = 0;
+  // out_edge_it e, eend;
+  // for(boost::tie(e, eend) = boost::out_edges(boost::vertex(v_sink, G), G); e != eend; ++e)
+  //   sold += rc_map[*e] - c_map[*e];  
+
+  // int revenue = 100 * sold - cost;
+  // std::cout << sold << " " << revenue << std::endl;
   
-  long flow = 0;
-  auto c_map = boost::get(boost::edge_capacity, G);
-  auto rc_map = boost::get(boost::edge_residual_capacity, G);
-  boost::graph_traits<graph>::out_edge_iterator e_it, e_end;
-  for(boost::tie(e_it, e_end) = boost::out_edges(v_source, G); e_it != e_end; ++e_it) {
-      flow += c_map[*e_it] - rc_map[*e_it];
-  }
+  // ====== CALCULATE FLOW AND COST =====
+  int flow = boost::push_relabel_max_flow(G, v_source, v_sink);
+  boost::cycle_canceling(G);
+  int cost = boost::find_flow_cost(G);
     
+  // ===== OUTPUT =====
   std::cout << flow << " " << -cost << std::endl;
 }
 
+
 int main() {
-  std::ios_base::sync_with_stdio(false);
   int T; std::cin >> T;
+  
   while(T--) {
     solve();
   }
@@ -220,11 +234,11 @@ typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::directedS, boost:
     boost::property<boost::edge_capacity_t, long,
         boost::property<boost::edge_residual_capacity_t, long,
             boost::property<boost::edge_reverse_t, traits::edge_descriptor,
-                boost::property <boost::edge_weight_t, long> > > > > graph;
+                boost::property <boost::edge_weight_t, long> > > > > graph; // new! weightmap corresponds to costs
 
 typedef traits::vertex_descriptor vertex_desc;
 typedef boost::graph_traits<graph>::edge_descriptor edge_desc;
-typedef boost::graph_traits<graph>::out_edge_iterator out_edge_it;
+typedef boost::graph_traits<graph>::out_edge_iterator out_edge_it; // Iterator
 
 class edge_adder {
  graph &G;
@@ -234,26 +248,31 @@ class edge_adder {
   void add_edge(int from, int to, long capacity, long cost) {
     auto c_map = boost::get(boost::edge_capacity, G);
     auto r_map = boost::get(boost::edge_reverse, G);
-    auto w_map = boost::get(boost::edge_weight, G);
+    auto w_map = boost::get(boost::edge_weight, G); // new!
     const edge_desc e = boost::add_edge(from, to, G).first;
     const edge_desc rev_e = boost::add_edge(to, from, G).first;
     c_map[e] = capacity;
-    c_map[rev_e] = 0; // Reverse edge has no capacity
+    c_map[rev_e] = 0; // reverse edge has no capacity!
     r_map[e] = rev_e;
     r_map[rev_e] = e;
-    w_map[e] = cost;
-    w_map[rev_e] = -cost;
+    w_map[e] = cost;   // new assign cost
+    w_map[rev_e] = -cost;   // new negative cost
   }
 };
 
 void solve() {
+  // ===== READ INPUT =====
   int N, M, S; std::cin >> N >> M >> S;
   
   std::vector<int> limits(S);
-  for(int i = 0; i < S; ++i) std::cin >> limits[i];
+  for(int i = 0; i < S; ++i) {
+    std::cin >> limits[i];
+  }
   
   std::vector<int> property_to_state(M);
-  for(int i = 0; i < M; ++i) std::cin >> property_to_state[i];
+  for(int i = 0; i < M; ++i) {
+    std::cin >> property_to_state[i];
+  }
   
   std::vector<std::vector<int>> bids(N, std::vector<int>(M));
   for(int i = 0; i < N; ++i) {
@@ -262,54 +281,53 @@ void solve() {
     }
   }
   
-  graph G(N + M + S + 2);
+  // ===== BUILD GRAPH =====
+  graph G(N + M + S);
   edge_adder adder(G);
-
-  const vertex_desc v_source = N + M + S;
-  const vertex_desc v_sink = N + M + S + 1;
-  const int MAX_BID = 100;
-
-  // Edges from source to buyers
+  auto c_map = boost::get(boost::edge_capacity, G);
+  auto r_map = boost::get(boost::edge_reverse, G);
+  auto rc_map = boost::get(boost::edge_residual_capacity, G);
+  
+  // Add Source and Sink
+  const vertex_desc v_source = boost::add_vertex(G);
+  const vertex_desc v_sink = boost::add_vertex(G);
+  
+  // Connect Source to Bidders and Bidders to Sites
   for(int i = 0; i < N; ++i) {
     adder.add_edge(v_source, i, 1, 0);
-  }
-  
-  // Edges from buyers to sites with transformed cost
-  for(int i = 0; i < N; ++i) {
+    
     for(int j = 0; j < M; j++) {
-      adder.add_edge(i, N + j, 1, MAX_BID - bids[i][j]);
+      adder.add_edge(i, N + j, 1, 100 - bids[i][j]);
     }
   }
   
-  // Edges from sites to their states
+  // Connect Sites to States
   for(int i = 0; i < M; ++i) {
     adder.add_edge(N + i, N + M + property_to_state[i] - 1, 1, 0);
   }
   
-  // Edges from states to sink
+  // Connect States to Sink
   for(int i = 0; i < S; ++i) {
     adder.add_edge(N + M + i, v_sink, limits[i], 0);
   }
 
+  // ====== CALCULATE FLOW AND COST =====
   boost::successive_shortest_path_nonnegative_weights(G, v_source, v_sink);
-  long cost = boost::find_flow_cost(G);
+  int cost = boost::find_flow_cost(G);
 
-  // Calculate total flow out of the source
-  long sold = 0;
-  auto c_map = boost::get(boost::edge_capacity, G);
-  auto rc_map = boost::get(boost::edge_residual_capacity, G);
-  out_edge_it e, e_end;
-  for(boost::tie(e, e_end) = boost::out_edges(v_source, G); e != e_end; ++e) {
-    sold += c_map[*e] - rc_map[*e];
-  }
-  
-  long revenue = sold * MAX_BID - cost;
+  int sold = 0;
+  out_edge_it e, eend;
+  for(boost::tie(e, eend) = boost::out_edges(boost::vertex(v_sink, G), G); e != eend; ++e)
+    sold += rc_map[*e] - c_map[*e];  
+
+  int revenue = 100 * sold - cost;
   std::cout << sold << " " << revenue << std::endl;
 }
 
+
 int main() {
-  std::ios_base::sync_with_stdio(false);
   int T; std::cin >> T;
+  
   while(T--) {
     solve();
   }
