@@ -93,7 +93,7 @@ void solve() {
         int edge_idx = to_edge_idx(v_1->info(), v_2->info(), n);
         
         Point circumcenter = t.dual(f);
-        K::FT radius = CGAL::squared_distance(circumcenter, t.triangle(f)[0]);
+        K::FT radius = CGAL::squared_distance(v_1->point(), circumcenter);
 
         // Update based on radius
         if(d_min.find(edge_idx) == d_min.end() || radius < d_min[edge_idx]) d_min[edge_idx] = radius;

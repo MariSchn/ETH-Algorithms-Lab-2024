@@ -52,7 +52,6 @@ The following C++ code implements this logic using the Boost Graph Library's `kr
 #include <iostream>
 #include <vector>
 #include <limits>
-#include <algorithm>
 
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/kruskal_min_spanning_tree.hpp>
@@ -61,71 +60,75 @@ typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::undirectedS,
   boost::no_property, boost::property<boost::edge_weight_t, int> >      weighted_graph;
 typedef boost::property_map<weighted_graph, boost::edge_weight_t>::type weight_map;
 typedef boost::graph_traits<weighted_graph>::edge_descriptor            edge_desc;
+typedef boost::graph_traits<weighted_graph>::vertex_descriptor          vertex_desc;
 
 void solve() {
-  int n, tatooine_start;
-  std::cin >> n >> tatooine_start;
-
-  weighted_graph g(n);
-  // We need to store costs separately to add edges back with the correct weight
-  std::vector<std::vector<int>> costs(n, std::vector<int>(n));
-
-  for (int i = 0; i < n - 1; ++i) {
-    for (int j = i + 1; j < n; ++j) {
-      int cost;
-      std::cin >> cost;
-      boost::add_edge(i, j, cost, g);
-      costs[i][j] = costs[j][i] = cost;
+  // ===== READ INPUT =====
+  int n, source; std::cin >> n >> source;
+  source--; // Adjust from 1-based to 0-based indexing
+  
+  std::vector<std::vector<int>> distances(n);
+  
+  weighted_graph G(n);
+  weighted_graph G_copy(n);
+  for(int i = 1; i < n; ++i) {
+    for(int j = 1; j < n - (i - 1); ++j) {
+      int k; std::cin >> k;
+      boost::add_edge(i - 1, i - 1 + j, k, G);
+      boost::add_edge(i - 1, i - 1 + j, k, G_copy);
+      distances[i-1].push_back(k);
     }
   }
+  
+  // ===== FIND MST =====
+  std::vector<edge_desc> mst;
+  boost::kruskal_minimum_spanning_tree(G, std::back_inserter(mst));
 
-  // Find the initial MST
-  std::vector<edge_desc> mst_edges;
-  boost::kruskal_minimum_spanning_tree(g, std::back_inserter(mst_edges));
+  // ===== FIND MINIMUM WEIGHT OF ALTERNATIVE MST =====
+  long min_mst_weight = std::numeric_limits<long>::max();
+for (const edge_desc &e : mst) {
+    int u = boost::source(e, G);
+    int v = boost::target(e, G);
 
-  long min_alternative_cost = std::numeric_limits<long>::max();
+    // Remove edge
+    boost::remove_edge(u, v, G_copy);
 
-  // Iterate over each edge in the MST
-  for (const auto& edge_to_remove : mst_edges) {
-    weighted_graph g_temp = g;
-    
-    vertex_desc u = boost::source(edge_to_remove, g);
-    vertex_desc v = boost::target(edge_to_remove, g);
-
-    // Temporarily remove one MST edge
-    boost::remove_edge(u, v, g_temp);
-
-    // Calculate the MST of the modified graph
+    // Calculate new MST
     std::vector<edge_desc> new_mst;
-    boost::kruskal_minimum_spanning_tree(g_temp, std::back_inserter(new_mst));
+    boost::kruskal_minimum_spanning_tree(G_copy, std::back_inserter(new_mst));
 
-    // If the graph was partitioned, new_mst will have fewer than n-1 edges
-    if (new_mst.size() != n - 1) {
-      continue;
+    if (new_mst.size() < n - 1) {
+        // Graph is disconnected
+        boost::add_edge(u, v, distances[u][v - u - 1], G_copy);
+        continue;
     }
 
-    // Calculate the cost of this new MST
-    long current_cost = 0;
-    weight_map weight_map_temp = boost::get(boost::edge_weight, g_temp);
-    for (const auto& e : new_mst) {
-      current_cost += weight_map_temp[e];
-    }
-    
-    min_alternative_cost = std::min(min_alternative_cost, current_cost);
-  }
+    // Calculate new MST weight
+    long mst_weight = 0;
+    for (const edge_desc &new_e : new_mst) {
+        int new_u = boost::source(new_e, G_copy);
+        int new_v = boost::target(new_e, G_copy);
 
-  std::cout << min_alternative_cost << std::endl;
+        int min_index = std::min(new_u, new_v);
+        int max_index = std::max(new_u, new_v);
+        mst_weight += distances[min_index][max_index - min_index - 1];
+    }
+
+    min_mst_weight = std::min(min_mst_weight, mst_weight);
+
+    // Add edge back
+    boost::add_edge(u, v, distances[u][v - u - 1], G_copy);
+}
+
+  // ===== OUTPUT =====
+  std::cout << min_mst_weight << std::endl;
 }
 
 int main() {
   std::ios_base::sync_with_stdio(false);
-  std::cin.tie(NULL);
-  int t;
-  std::cin >> t;
-  while (t--) {
-    solve();
-  }
-  return 0;
+  
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) { solve(); }
 }
 ```
 </details>
@@ -158,91 +161,81 @@ The overall complexity is dominated by the main loop, resulting in an $O(N^3 \al
 ```cpp
 #include <iostream>
 #include <vector>
-#include <algorithm>
-#include <tuple>
 #include <limits>
 
 #include <boost/pending/disjoint_sets.hpp>
 
-// An edge is represented as a tuple: {vertex1, vertex2, weight}
 typedef std::tuple<int, int, int> Edge;
 
+const int MAX_INT = std::numeric_limits<int>::max();
+
 void solve() {
-  int n, tatooine_start;
-  std::cin >> n >> tatooine_start;
+  // ===== READ INPUT =====
+  int n, source; std::cin >> n >> source;
 
   std::vector<Edge> edges;
-  edges.reserve(n * (n - 1) / 2);
-  for (int i = 0; i < n - 1; ++i) {
-    for (int j = i + 1; j < n; ++j) {
-      int cost;
-      std::cin >> cost;
-      edges.emplace_back(i, j, cost);
+  for(int j = 1; j <= n - 1; ++j) {
+    for(int k = 1; k <= n - j; ++k) {
+      int d; std::cin >> d;
+      // Adjust for 0-based indexing
+      edges.emplace_back(j - 1, j + k - 1, d);
     }
   }
-
-  // --- 1. Initial Sort ---
+  int n_edges = edges.size();
+  
+  // ===== FIND MST =====
+  // Sort list of edges based on their distance
   std::sort(edges.begin(), edges.end(), [](const Edge &a, const Edge &b) {
-    return std::get<2>(a) < std::get<2>(b);
+    return std::get<2>(a) < std::get<2>(b);  
   });
-
-  // --- 2. Find the First MST ---
-  std::vector<const Edge*> mst_edges;
-  mst_edges.reserve(n - 1);
-  boost::disjoint_sets_with_storage<> uf_mst(n);
-  int components = n;
-  for (const auto& edge : edges) {
-    int u = std::get<0>(edge);
-    int v = std::get<1>(edge);
-    if (uf_mst.find_set(u) != uf_mst.find_set(v)) {
-      uf_mst.link(u, v);
-      mst_edges.push_back(&edge);
-      if (--components == 1) break;
+  
+  // Find MST using Kruskals Algorithm
+  std::vector<Edge*> mst_edges; mst_edges.reserve(n-1);
+  boost::disjoint_sets_with_storage<> mst_uf(n);
+  int n_components = n;
+  for(int i = 0; i < n_edges; ++i) {
+    int c1 = mst_uf.find_set(std::get<0>(edges[i]));
+    int c2 = mst_uf.find_set(std::get<1>(edges[i]));
+    
+    if(c1 != c2 ) {
+      mst_uf.link(c1, c2);
+      mst_edges.push_back(&edges[i]);
+      if (--n_components == 1) break;
     }
   }
-
-  // --- 3. Find Second-Best MST ---
-  long min_alternative_cost = std::numeric_limits<long>::max();
   
-  // Iterate through each edge of the first MST, considering it "forbidden"
-  for (const Edge* forbidden_edge : mst_edges) {
-    long current_cost = 0;
-    int edges_in_tree = 0;
-    boost::disjoint_sets_with_storage<> uf_alt(n);
+  // Find 2nd best MST by skipping one edge of the MST (otherwise Kruskal)
+  int min_mst_weight = MAX_INT;
+  for(const Edge *skip_edge : mst_edges) {
+    int mst_weight = 0;
     
-    // Re-run Kruskal's, skipping the forbidden edge
-    for (const auto& edge : edges) {
-      if (&edge == forbidden_edge) {
-        continue;
-      }
+    boost::disjoint_sets_with_storage<> uf(n);
+    int n_components = n;
+    for(int i = 0; i < n_edges; ++i) {
+      if(&edges[i] == skip_edge) { continue; }
       
-      int u = std::get<0>(edge);
-      int v = std::get<1>(edge);
-      if (uf_alt.find_set(u) != uf_alt.find_set(v)) {
-        uf_alt.link(u, v);
-        current_cost += std::get<2>(edge);
-        edges_in_tree++;
+      int c1 = uf.find_set(std::get<0>(edges[i]));
+      int c2 = uf.find_set(std::get<1>(edges[i]));
+      
+      if(c1 != c2 ) {
+        uf.link(c1, c2);
+        mst_weight += std::get<2>(edges[i]);
+        if (--n_components == 1) break;
       }
     }
     
-    // Only consider valid spanning trees
-    if (edges_in_tree == n - 1) {
-        min_alternative_cost = std::min(min_alternative_cost, current_cost);
-    }
+    min_mst_weight = std::min(min_mst_weight, mst_weight);
   }
   
-  std::cout << min_alternative_cost << std::endl;
+  // ===== OUTPUT =====
+  std::cout << min_mst_weight << std::endl;
 }
 
 int main() {
   std::ios_base::sync_with_stdio(false);
-  std::cin.tie(NULL);
-  int t;
-  std::cin >> t;
-  while (t--) {
-    solve();
-  }
-  return 0;
+  
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) { solve(); }
 }
 ```
 </details>

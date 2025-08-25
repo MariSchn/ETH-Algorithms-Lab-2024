@@ -67,9 +67,7 @@ While this recalculation can be slow in the general case, it is sufficient for t
 #include <iostream>
 #include <vector>
 #include <deque>
-#include <algorithm>
 
-// Using a struct to represent the nodes for clarity
 struct Node {
   int idx;
   int brightness;
@@ -77,9 +75,9 @@ struct Node {
 };
 
 void solve() {
+  // std::cout << "================================" << std::endl;
   // ===== READ INPUT =====
-  int n, m, k;
-  std::cin >> n >> m >> k;
+  int n, m, k; std::cin >> n >> m >> k;
   
   std::vector<Node> nodes(n);
   for(int i = 0; i < n; ++i) { 
@@ -87,81 +85,81 @@ void solve() {
     nodes[i].idx = i;
   }
   for(int i = 0; i < n - 1; ++i) {
-    int u, v;
-    std::cin >> u >> v;
-    // Assuming u is always the parent of v based on the problem statement
+    int u, v; std::cin >> u >> v;
     nodes[u].children.push_back(&nodes[v]);
   }
   
   // ===== SOLVE =====
-  if (m > n) {
-      std::cout << "Abort mission" << std::endl;
-      return;
-  }
 
   std::vector<bool> result(n, false);
-  std::deque<Node*> window;
+  std::deque<Node*> curr_range; curr_range.push_back(&nodes[0]);
   
-  // Build the initial path (linked list)
-  Node* current_node = &nodes[0];
-  std::vector<Node*> path_list;
-  while (current_node != nullptr) {
-      path_list.push_back(current_node);
-      if (!current_node->children.empty()) {
-          current_node = current_node->children[0];
-      } else {
-          current_node = nullptr;
-      }
+  Node* curr_min   = &nodes[0];
+  Node* curr_max   = &nodes[0];
+  
+  // Initialize first window
+  for(int i = 0; i < m - 1; ++i) {
+    if(curr_range.back()->children.empty()) { std::cout << "Abort mission (no initial window)" << std::endl; return; }
+    curr_range.push_back(curr_range.back()->children[0]);
+    
+    if(curr_range.back()->brightness <= curr_min->brightness) { curr_min = curr_range.back(); }
+    if(curr_range.back()->brightness >= curr_max->brightness) { curr_max = curr_range.back(); }
   }
-
-  if (path_list.size() < m) {
-      std::cout << "Abort mission" << std::endl;
-      return;
-  }
-
-  // Sliding window over the path_list
-  for (int i = 0; i <= (int)path_list.size() - m; ++i) {
-      int min_h = path_list[i]->brightness;
-      int max_h = path_list[i]->brightness;
-      for (int j = 1; j < m; ++j) {
-          min_h = std::min(min_h, path_list[i+j]->brightness);
-          max_h = std::max(max_h, path_list[i+j]->brightness);
-      }
+  
+  // Check if initial window is valid
+  if(curr_max->brightness - curr_min->brightness <= k) { result[curr_range.front()->idx] = true; }
+  
+  while(!curr_range.back()->children.empty()) {
+    // std::cout << "Current Range: "; for(const Node *node : curr_range) { std::cout << node->idx << " "; } std::cout << std::endl;
+    // std::cout << "Current Max (" << curr_max->idx << "): " << curr_max->brightness << " Current Min (" << curr_min->idx << "): " << curr_min->brightness << std::endl;
+    
+    // Move curr_end forward
+    curr_range.push_back(curr_range.back()->children[0]);
+    
+    if(curr_range.back()->brightness <= curr_min->brightness) { curr_min = curr_range.back(); }
+    if(curr_range.back()->brightness >= curr_max->brightness) { curr_max = curr_range.back(); }
+    
+    // Move curr_start forward
+    bool replace_min = curr_min == curr_range.front();
+    bool replace_max = curr_max == curr_range.front();
+    
+    curr_range.pop_front();
+    
+    if(replace_min || replace_max) {
+      if (replace_min) { curr_min = curr_range.front(); }
+      if (replace_max) { curr_max = curr_range.front(); }
       
-      if (max_h - min_h <= k) {
-          result[path_list[i]->idx] = true;
+      for(Node *node : curr_range) {
+        if(replace_min && node->brightness <= curr_min->brightness) { curr_min = node; }
+        if(replace_max && node->brightness >= curr_max->brightness) { curr_max = node; }
       }
+    }
+  
+    // Check if current window is valid
+    if(curr_max->brightness - curr_min->brightness <= k) { result[curr_range.front()->idx] = true; }
   }
-
+  
   // ===== OUTPUT =====
-  bool found_solution = false;
+  int n_outputs = 0;
+  
   for(int i = 0; i < n; ++i) {
     if(result[i]) { 
-      if (found_solution) std::cout << " ";
-      std::cout << i;
-      found_solution = true;
+      std::cout << i << " "; 
+      n_outputs++;
     }
   }
   
-  if(!found_solution) { 
-    std::cout << "Abort mission"; 
-  }
+  if(n_outputs == 0) { std::cout << "Abort mission"; }
   std::cout << std::endl;
 }
 
 int main() {
   std::ios_base::sync_with_stdio(false);
-  std::cin.tie(NULL);
   
-  int n_tests;
-  std::cin >> n_tests;
-  while(n_tests--) {
-    solve();
-  }
-  return 0;
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) { solve(); }
 }
 ```
-*Note: The provided draft code was slightly refactored for clarity and correctness in handling the sliding window logic for the linked-list case.*
 </details>
 <details>
 <summary>Final Solution</summary>
@@ -203,59 +201,65 @@ By combining DFS with an efficient data structure like `multiset`, we can check 
 #include <vector>
 #include <set>
 #include <deque>
-#include <algorithm>
 
 struct Node {
   int idx;
   int brightness;
+  Node* parent = nullptr;
   std::vector<Node*> children;
 };
 
-// Helper to calculate contrast from the multiset
 int calculateContrast(const std::multiset<int> &brightnesses) {
-  if (brightnesses.empty()) return 0;
-  // multiset is sorted: max is *rbegin(), min is *begin()
+  // Note: multisets are sorted, so first *rbegin() is max and *begin() is min
   return *brightnesses.rbegin() - *brightnesses.begin();
 }
 
 void dfs(Node *curr, std::deque<Node*> &path, std::multiset<int> &brightnesses, std::vector<bool> &result, const size_t m, const int k) {
-  // 1. Add current node to the path window and its brightness to the set
+  // Add current node to path and to the brightnesses
   path.push_back(curr);
   brightnesses.insert(curr->brightness);
   
-  // 2. If path is too long, slide the window by removing the oldest element
+  // Check if the path is too long and remove the first element if it is too long
+  // As we pop as soon as the path reaches m+1, it is not necessary to pop multiple times
   if(path.size() > m) {
-    Node *first_node = path.front();
+    Node *first_node = path[0];
     path.pop_front();
-    // Erase one instance of the brightness value
     brightnesses.erase(brightnesses.find(first_node->brightness));
   }
 
-  // 3. Check if the current window is a valid rope
+  // Check if the current path is valid
   if(path.size() == m) {
-    if (calculateContrast(brightnesses) <= k) {
-      // Mark the starting node of this valid rope
-      result[path.front()->idx] = true;
+    int contrast = calculateContrast(brightnesses);
+    
+    // Check if contrast is low enough
+    if (contrast <= k) {
+      // Mark the current start node as valid
+      result[path[0]->idx] = true;
     }
   }
 
-  // 4. Recurse into children
+  // Recurse into children
   for(Node *child : curr->children) {
     dfs(child, path, brightnesses, result, m, k);
   }
 
-  // 5. Backtrack: remove the current node from the path and brightness set
-  // This restores the state for the parent node's DFS loop
+  // Finished with this node -> Remove it from path and its brightness
   path.pop_back();
   brightnesses.erase(brightnesses.find(curr->brightness));
+
+
+  // Restore the first element of the path, we removed because the path was too long
+  // If the first node in the path is the root node, there is no need to do this as the path has not gotten to long
+  if(path[0]->parent != nullptr) {
+    Node *first_node = path[0]->parent;
+    path.push_front(first_node);
+    brightnesses.insert(first_node->brightness);
+  }
 }
 
 void solve() {
   // ===== READ INPUT =====
-  int n;
-  size_t m;
-  int k; 
-  std::cin >> n >> m >> k;
+  int n, m, k; std::cin >> n >> m >> k;
   
   std::vector<Node> nodes(n);
   for(int i = 0; i < n; ++i) { 
@@ -263,9 +267,9 @@ void solve() {
     nodes[i].idx = i;
   }
   for(int i = 0; i < n - 1; ++i) {
-    int u, v; 
-    std::cin >> u >> v;
+    int u, v; std::cin >> u >> v;
     nodes[u].children.push_back(&nodes[v]);
+    nodes[v].parent = &nodes[u];
   }
   
   // ===== SOLVE =====
@@ -273,38 +277,29 @@ void solve() {
   std::multiset<int> brightnesses;
   std::vector<bool> result(n, false);
 
-  // Start the traversal from the root, node 0
   dfs(&nodes[0], path, brightnesses, result, m, k);
   
   // ===== OUTPUT =====
-  bool found_solution = false;
+  int n_outputs = 0;
+  
   for(int i = 0; i < n; ++i) {
-    if(result[i]) {
-      if (found_solution) std::cout << " ";
-      std::cout << i;
-      found_solution = true;
+    if(result[i]) { 
+      std::cout << i << " "; 
+      n_outputs++;
     }
   }
   
-  if(!found_solution) { 
-    std::cout << "Abort mission"; 
-  }
+  if(n_outputs == 0) { std::cout << "Abort mission"; }
   std::cout << std::endl;
 }
 
 int main() {
   std::ios_base::sync_with_stdio(false);
-  std::cin.tie(NULL);
   
-  int n_tests; 
-  std::cin >> n_tests;
-  while(n_tests--) {
-    solve();
-  }
-  return 0;
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) { solve(); }
 }
 ```
-*Note: The final solution code was slightly refactored to simplify the DFS logic, removing the unconventional "restore" step in favor of a more standard backtracking approach that correctly manages the sliding window state.*
 </details>
 
 ## ⚡ Result

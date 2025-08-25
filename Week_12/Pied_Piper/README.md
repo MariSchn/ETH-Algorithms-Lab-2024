@@ -40,6 +40,111 @@ Let's define a DP state `dp[i][j]` representing the maximum score for two disjoi
 ## ✨ Solutions
 
 <details>
+
+<summary>First Solution (Test Set 1)</summary>
+
+### Code
+```cpp
+#include <iostream>
+#include <vector>
+#include <limits>
+
+#include <boost/graph/adjacency_list.hpp>
+#include <boost/graph/cycle_canceling.hpp>
+#include <boost/graph/push_relabel_max_flow.hpp>
+#include <boost/graph/successive_shortest_path_nonnegative_weights.hpp>
+#include <boost/graph/find_flow_cost.hpp>
+#include <boost/graph/dijkstra_shortest_paths.hpp>
+
+typedef boost::adjacency_list_traits<boost::vecS, boost::vecS, boost::directedS> traits;
+typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::directedS, boost::no_property,
+    boost::property<boost::edge_capacity_t, long,
+        boost::property<boost::edge_residual_capacity_t, long,
+            boost::property<boost::edge_reverse_t, traits::edge_descriptor,
+                boost::property <boost::edge_weight_t, long> > > > > flow_graph; // new! weightmap corresponds to costs
+                
+typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::directedS,
+  boost::no_property, boost::property<boost::edge_weight_t, int> >      dijkstra_graph;
+
+
+typedef boost::graph_traits<flow_graph>::edge_descriptor             edge_desc;
+typedef boost::graph_traits<flow_graph>::vertex_descriptor           vertex_desc;
+typedef boost::graph_traits<flow_graph>::out_edge_iterator           out_edge_it;
+
+// Custom edge adder class, highly recommended
+class edge_adder {
+ flow_graph &G;
+
+ public:
+  explicit edge_adder(flow_graph &G) : G(G) {}
+  void add_edge(int from, int to, long capacity, long cost) {
+    auto c_map = boost::get(boost::edge_capacity, G);
+    auto r_map = boost::get(boost::edge_reverse, G);
+    auto w_map = boost::get(boost::edge_weight, G); // new!
+    const edge_desc e = boost::add_edge(from, to, G).first;
+    const edge_desc rev_e = boost::add_edge(to, from, G).first;
+    c_map[e] = capacity;
+    c_map[rev_e] = 0; // reverse edge has no capacity!
+    r_map[e] = rev_e;
+    r_map[rev_e] = e;
+    w_map[e] = cost;   // new assign cost
+    w_map[rev_e] = -cost;   // new negative cost
+  }
+};
+
+const int MAX_F = std::pow(10, 5);
+
+void solve() {
+  // ===== READ INPUT =====
+  int n, m; std::cin >> n >> m;
+  
+  flow_graph flow_G(2 * n);
+  dijkstra_graph dijkstra_G(2 * n);
+  edge_adder adder(flow_G);
+  
+  for(int i = 0; i < m; ++i) {
+    int u, v, f; std::cin >> u >> v >> f;
+    
+    if(u < v) { 
+      adder.add_edge(u, v, 1, MAX_F - f);
+      boost::add_edge(u, v, 1, dijkstra_G);
+    } else { 
+      adder.add_edge(n + u, n + v, 1, MAX_F - f); 
+      boost::add_edge(n + u, n + v, 1, dijkstra_G);
+    }
+  }
+  
+  // ===== SOLVE =====
+  const vertex_desc v_source = boost::add_vertex(flow_G);
+  const vertex_desc v_target = boost::add_vertex(flow_G);
+
+  boost::add_edge(n - 1, n - 1 + n, 0, dijkstra_G);
+  adder.add_edge(n - 1, n - 1 + n, 1, 0);
+  adder.add_edge(v_source, 0, 1, 0);
+  adder.add_edge(n, v_target, 1, 0);
+  
+  boost::successive_shortest_path_nonnegative_weights(flow_G, v_source, v_target);
+  int cost = boost::find_flow_cost(flow_G);
+  
+  std::vector<int> dist_map(2 * n);
+  boost::dijkstra_shortest_paths(dijkstra_G, 0, boost::distance_map(boost::make_iterator_property_map(dist_map.begin(), boost::get(boost::vertex_index, dijkstra_G))));
+  int num_nodes = dist_map[n];
+  
+  // ===== OUTPUT =====
+  std::cout << MAX_F * num_nodes - cost << std::endl;
+}
+
+int main() {
+  std::ios_base::sync_with_stdio(false);
+  
+  int n_tests; std::cin >> n_tests;;
+  while(n_tests--) { solve(); }
+}
+```
+
+</details>
+
+<details>
 <summary>Final Solution</summary>
 
 This problem can be elegantly solved using dynamic programming by modeling the required tour as two separate paths being built simultaneously.
@@ -76,96 +181,75 @@ The provided C++ code implements this "push-style" DP, where from a computed sta
 ```cpp
 #include <iostream>
 #include <vector>
-#include <algorithm>
 
 void solve() {
-  // Read problem input
-  int n, m;
-  std::cin >> n >> m;
+  // ===== READ INPUT =====
+  int n, m; std::cin >> n >> m;
 
-  // Adjacency lists for outgoing streets
+  std::vector<std::vector<std::pair<int, int>>> incoming(n);
   std::vector<std::vector<std::pair<int, int>>> outgoing(n);
-  
-  for (int k = 0; k < m; ++k) {
-    int u, v, f;
-    std::cin >> u >> v >> f;
-    // We only care about monotonically increasing paths for our DP model.
-    // A street u->v is part of a decreasing path if u>v.
-    // Our model handles this by finding two increasing paths.
-    // The problem statement defines two path types, which can be modeled
-    // as two agents moving along monotonically increasing paths.
-    outgoing[u].push_back({v, f});
-    outgoing[v].push_back({u, f}); // The DP logic will filter valid moves
+
+  for (int i = 0; i < m; ++i) {
+    int u, v, f; std::cin >> u >> v >> f;
+
+    outgoing[u].push_back(std::make_pair(v, f));
+    incoming[v].push_back(std::make_pair(u, f));
   }
 
-  // dp[i][j]: max rats for two disjoint paths 0~>i and 0~>j
+  // ===== SOLVE =====
   std::vector<std::vector<long>> dp(n, std::vector<long>(n, -1));
 
-  // Base case: Two paths at square 0.
-  dp[0][0] = 0;
+  // Fill the values for the initial out/in edges of 0.
+  for (std::pair<int, int> &el : outgoing[0]) {
+    dp[el.first][0] = el.second;
+  }
+  for (std::pair<int, int> &el : incoming[0]) {
+    dp[0][el.first] = el.second;
+  }
 
-  // Iterate through states (i, j) by increasing sum of indices
-  for (int s = 0; s < 2 * n - 2; ++s) {
-    for (int i = 0; i <= s; ++i) {
-      int j = s - i;
-      if (i >= n || j >= n || dp[i][j] == -1) {
-        continue;
-      }
+  // Iterate over the DP diagonally, i.e.
+  // k = 1 -> (0, 1), (1, 0)
+  // k = 2 -> (0, 2), (1, 1), (2, 0)
+  // etc.
+  for (int k = 1; k < n * 2; k++) {
+    for (int i = 0; i <= k; i++) {
+      int j = k - i;
+      // Make sure that we are actually still within the bounds of the DP
+      bool in_matrix = i < n && j < n;
+      // The value in the neighbor must not be -1, otherwise there is no way
+      // at all to go from 0 to i and from j back to 0 (impossible path), subsequently any
+      // path that continues from i, j would also be impossible.
+      bool valid_solution = dp[i][j] != -1;
       
-      // Attempt to extend the path ending at i
-      for (auto const& edge : outgoing[i]) {
-        int k = edge.first;
-        int rats = edge.second;
-        // The move i->k must be monotonically increasing.
-        if (k > i) {
-          // New endpoint k must be "ahead" of j to ensure disjointness,
-          // unless k is the final destination.
-          if (k > j || k == n - 1) {
-            // The new state is (k, j). We sort indices for consistency.
-            int next_i = std::min(k, j);
-            int next_j = std::max(k, j);
-            dp[next_i][next_j] = std::max(dp[next_i][next_j], dp[i][j] + rats);
+      if (in_matrix && valid_solution) {
+        for (auto &el : outgoing[i]) {
+          // Node n - 1 is an edge case, and it must not be strictly more positive.
+          if ((el.first > j && el.first > i) || el.first == n - 1) {
+            dp[el.first][j] = std::max(dp[el.first][j], dp[i][j] + el.second);
           }
         }
-      }
 
-      // Symmetrically, attempt to extend the path ending at j
-      for (auto const& edge : outgoing[j]) {
-        int k = edge.first;
-        int rats = edge.second;
-        // The move j->k must be monotonically increasing.
-        if (k > j) {
-          // New endpoint k must be "ahead" of i to ensure disjointness,
-          // unless k is the final destination.
-          if (k > i || k == n - 1) {
-            // The new state is (i, k). We sort indices for consistency.
-            int next_i = std::min(i, k);
-            int next_j = std::max(i, k);
-            dp[next_i][next_j] = std::max(dp[next_i][next_j], dp[i][j] + rats);
+        for (auto &el : incoming[j]) {
+          // Node n - 1 is an edge case, and it must not be strictly more positive.
+          if ((el.first > j && el.first > i) || el.first == n - 1) {
+            dp[i][el.first] = std::max(dp[i][el.first], dp[i][j] + el.second);
           }
         }
       }
     }
   }
 
-  // The final answer is when both paths meet at N-1.
+  // ===== OUTPUT =====
   std::cout << dp[n - 1][n - 1] << std::endl;
 }
 
 int main() {
   std::ios_base::sync_with_stdio(false);
-  std::cin.tie(NULL);
   
-  int t;
-  std::cin >> t;
-  while (t--) {
-    solve();
-  }
-  
-  return 0;
+  int n_tests; std::cin >> n_tests;;
+  while(n_tests--) { solve(); }
 }
 ```
-*Note: The logic in the provided solution code was slightly different and potentially confusing. The code above has been adjusted to use a more standard and understandable implementation of the two-disjoint-paths DP, which correctly solves the problem.*
 </details>
 
 ## ⚡ Result
