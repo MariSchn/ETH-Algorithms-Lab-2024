@@ -64,97 +64,81 @@ If we successfully process all bombs from our initial sorted list without any de
 ### 4. Code
 
 ```cpp
-#include <iostream>
-#include <vector>
-#include <algorithm>
-#include <stack>
-#include <tuple>
+#include<iostream>
+#include<vector>
+#include<algorithm>
+#include<stack>
+#include<tuple>
+#include<cmath>
 
-// Define a pair to store a bomb's time and original index
-using BombInfo = std::pair<int, int>;
 
-// Helper function to find the children of a bomb
-std::pair<int, int> get_children(int ball_idx, int n_balls) {
-  // Bombs in the latter half of the array are leaves (on the ground)
-  if (ball_idx >= (n_balls - 1) / 2) {
-    return {-1, -1}; // No children
+using IntPair = std::pair<int, int>;
+
+IntPair standsOn(int ball_idx, int n_balls) {
+  if(ball_idx >= (n_balls - 1) / 2) {
+    return std::make_pair(-1, -1);
   } else {
-    return {2 * ball_idx + 1, 2 * ball_idx + 2};
+    return std::make_pair(2 * ball_idx + 1, 
+                          2 * ball_idx + 2);
   }
 }
 
+
 void solve() {
   // ===== READ INPUT =====
-  int n_balls;
-  std::cin >> n_balls;
-  
-  std::vector<int> explosion_times(n_balls);
-  std::vector<BombInfo> sorted_bombs(n_balls);
-  
-  for (int i = 0; i < n_balls; i++) {
-    int t;
-    std::cin >> t;
+  int n_balls; std::cin >> n_balls;
+  std::vector<int> explosion_times(n_balls); 
+  std::vector<IntPair> t_idx_pairs(n_balls);
+  std::vector<bool> diffused(n_balls, false);
+  for(int i = 0; i < n_balls; i++) {
+    int t; std::cin >> t;
+    
     explosion_times[i] = t;
-    sorted_bombs[i] = {t, i}; // Pair the time with the index
+    t_idx_pairs[i] = std::make_pair(t, i);
   }
   
   // ===== SOLVE =====
-  
-  // Sort bombs by explosion time (ascending) and then by index (descending) as a tie-breaker.
-  std::sort(sorted_bombs.begin(), sorted_bombs.end(), [](const BombInfo &a, const BombInfo &b) {
-    if (a.first != b.first) {
+  // Sort with respect to explosion time (ascending) and index (descending)
+  std::sort(t_idx_pairs.begin(), t_idx_pairs.end(), [](const IntPair &a, const IntPair &b) {
+    if(a.first != b.first) {
       return a.first < b.first;
     } else {
       return a.second > b.second;
     }
   });
   
-  std::vector<bool> diffused(n_balls, false);
+  // Try to defuse the most urgent ball
   int elapsed_time = 0;
-  
-  // Iterate through the greedily sorted bombs
-  for (int i = 0; i < n_balls; ++i) {
-    int target_bomb_idx = sorted_bombs[i].second;
-    
-    // If this bomb was already defused as part of another subtree, skip it.
-    if (diffused[target_bomb_idx]) {
+  for(int i = 0; i < n_balls; ++i) {
+    // Check if bomb was already diffused
+    if(diffused[t_idx_pairs[i].second]) {
       continue;
     }
     
-    // Use a stack to perform post-order traversal for the target bomb's subtree.
     std::stack<int> to_diffuse_stack;
-    to_diffuse_stack.push(target_bomb_idx);
+    to_diffuse_stack.push(t_idx_pairs[i].second);
     
-    while (!to_diffuse_stack.empty()) {
-      int current_bomb_idx = to_diffuse_stack.top();
+    while(!to_diffuse_stack.empty()) {
+      int to_diffuse_idx = to_diffuse_stack.top();
       
-      int child1, child2;
-      std::tie(child1, child2) = get_children(current_bomb_idx, n_balls);
-      
-      bool children_done = true;
-      if (child1 != -1 && !diffused[child1]) {
-        to_diffuse_stack.push(child1);
-        children_done = false;
-      }
-      if (child2 != -1 && !diffused[child2]) {
-        to_diffuse_stack.push(child2);
-        children_done = false;
+      // Check if bomb already exploded
+      if(explosion_times[to_diffuse_idx] <= elapsed_time) {
+        std::cout << "no" << std::endl;
+        return;
       }
       
-      // If children are not done, the loop will continue to process them first.
-      // If children are done, we can defuse the current bomb.
-      if (children_done) {
-        // Now we can defuse the current bomb
+      int depends_on_1, depends_on_2;
+      std::tie(depends_on_1, depends_on_2) = standsOn(to_diffuse_idx, n_balls);
+      
+      // Check if bottom was reached or balls beneath were already diffused
+      if((depends_on_1 == -1 && depends_on_2 == -1) || 
+         (diffused[depends_on_1] && diffused[depends_on_2])) {
+        diffused[to_diffuse_idx] = true;
         elapsed_time++;
-        
-        // Check if we missed the deadline
-        if (explosion_times[current_bomb_idx] < elapsed_time) {
-          std::cout << "no" << std::endl;
-          return;
-        }
-        
-        diffused[current_bomb_idx] = true;
         to_diffuse_stack.pop();
+      } else {
+        if(!diffused[depends_on_1]) to_diffuse_stack.push(depends_on_1);
+        if(!diffused[depends_on_2]) to_diffuse_stack.push(depends_on_2);
       }
     }
   }
@@ -164,15 +148,11 @@ void solve() {
 
 int main() {
   std::ios_base::sync_with_stdio(false);
-  std::cin.tie(NULL);
   
-  int n_tests;
-  std::cin >> n_tests;
-  while (n_tests--) {
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) {
     solve();
   }
-  
-  return 0;
 }
 ```
 </details>
