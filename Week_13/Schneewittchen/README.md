@@ -85,30 +85,29 @@ Since we only create variables for a small subset of mines (at most 21: 1 entry 
 By setting up and solving this LP, we can find the optimal solution. If the LP solver reports that the problem is infeasible, it means there is no way to satisfy all constraints, and the output should be "Impossible!". Otherwise, the objective value gives the minimum cost.
 
 ```cpp
-#include <iostream>
-#include <vector>
-#include <stack>
-#include <unordered_map>
 #include <iomanip>
+#include <iostream>
+#include <unordered_map>
+#include <stack>
+#include <vector>
 
 #include <CGAL/QP_models.h>
 #include <CGAL/QP_functions.h>
 #include <CGAL/Gmpq.h>
 
-// CGAL types
 typedef double IT;
 typedef CGAL::Gmpq ET;
+
+// program and solution types
 typedef CGAL::Quadratic_program<IT> Program;
 typedef CGAL::Quadratic_program_solution<ET> Solution;
 
-// Struct to hold mineral properties
 struct Mineral {
-  long required;
-  long supply;
+  int required;
+  int supply;
   int price;
 };
 
-// Function to safely convert CGAL's exact rational type to a double and floor it
 double floor_to_double(const CGAL::Quotient<ET>& x) {
  double a = std::floor(CGAL::to_double(x));
  while (a > x) a -= 1;
@@ -118,154 +117,141 @@ double floor_to_double(const CGAL::Quotient<ET>& x) {
 
 void solve() {
   // ===== READ INPUT =====
-  int n, m;
-  std::cin >> n >> m;
+  int n, m; std::cin >> n >> m;
   
-  std::vector<long> danger_levels(n);
-  std::vector<bool> is_dangerous(n, false);
+  std::vector<int> danger_levels(n);
+  std::vector<bool> is_dangerous(n);
   std::vector<std::vector<int>> available_minerals(n, std::vector<int>(m));
   
-  std::vector<int> relevant_mines;
-  relevant_mines.push_back(0); // The entry is always relevant
-
-  for (int i = 0; i < n; ++i) {
+  // Read Mines
+  for(int i = 0; i < n; i++) {
     std::cin >> danger_levels[i];
-    if (danger_levels[i] >= 0) {
+    
+    if(danger_levels[i] >= 0) {
       is_dangerous[i] = true;
-      if (i != 0) relevant_mines.push_back(i);
     }
-    for (int j = 0; j < m; ++j) {
+    
+    for(int j = 0; j < m; j++) {
       std::cin >> available_minerals[i][j];
     }
   }
   
-  std::vector<std::vector<int>> children_adj(n);
-  for (int i = 0; i < n - 1; ++i) {
+  // Read Edges
+  std::vector<std::vector<int>> edges(n);
+  for(int i = 0; i < n-1; i++) {
     int u, v;
     std::cin >> u >> v;
-    children_adj[v].push_back(u);
+    edges[v].push_back(u);
   }
   
+  // Read Minerals
   std::vector<Mineral> minerals(m);
-  for (int i = 0; i < m; ++i) {
+  for(int i = 0; i < m; i++) {
     std::cin >> minerals[i].required >> minerals[i].supply >> minerals[i].price;
   }
 
-  // ===== SETUP LP =====
+  // ===== SOLVE =====
   
-  // Map relevant mine indices to compact LP variable indices to avoid a sparse matrix
-  // b_j variables are at indices 0 to m-1
-  // g_ij variables start from index m
-  int var_idx = m;
-  std::unordered_map<int, int> mine_to_var_map;
-  for (int mine_id : relevant_mines) {
-    mine_to_var_map[mine_id] = var_idx;
-    var_idx += m;
-  }
-
-  Program lp(CGAL::SMALLER, true, 0, false, 0);
-  int constraint_idx = 0;
-
-  // Build constraints for each relevant mine
-  for (int i : relevant_mines) {
-    // For mine i, find its domain: all descendant mines up to the next dangerous one
-    std::vector<int> domain_children;
-    std::vector<int> dangerous_descendants;
-    std::stack<int> s;
-    for (int child : children_adj[i]) {
-      s.push(child);
+  // Create a map from each relevant mine (root and dangerous mines) to the corresponding LP variable indices
+  int index = 1;
+  std::unordered_map<int, int> index_map;
+  for(int i = 0; i < n; i++) {
+    if(i == 0 || is_dangerous[i]) {
+      index_map[i] = m * index;
+      index++;
     }
+  }
+  
+  // Create the LP
+  int lp_row = 0;
+  Program lp (CGAL::SMALLER, true, 0, false, 0);
+  
+  for(int i = 0; i < n; i++) {
+    // Skip irrelevant nodes
+    if(i != 0 && !is_dangerous[i]) continue;
     
-    while (!s.empty()) {
-      int curr = s.top();
-      s.pop();
-      if (is_dangerous[curr]) {
-        dangerous_descendants.push_back(curr);
-      } else {
-        domain_children.push_back(curr);
-        for (int child : children_adj[curr]) {
-          s.push(child);
+    // Find all the children of the current node up using a DFS until either a leaf or a dangerous mine is hit
+    std::vector<int> children;
+    std::stack<int> stack;
+    stack.push(i);
+    while(!stack.empty()) {
+      int current = stack.top();
+      stack.pop();
+      for(int child : edges[current]) {
+        children.push_back(child);
+        if(!is_dangerous[child]) {
+          stack.push(child);
         }
       }
     }
     
-    // Calculate total minerals available in the domain of i
-    std::vector<long> total_minerals_in_domain(m, 0);
-    if (!is_dangerous[i]) { // Entry mine can have minerals
-        for(int j=0; j<m; ++j) total_minerals_in_domain[j] += available_minerals[i][j];
-    }
-    for (int child : domain_children) {
-      for (int j = 0; j < m; ++j) {
-        total_minerals_in_domain[j] += available_minerals[child][j];
+    // Calculate maximum amount of materials available from the current node
+    std::vector<int> total_minerals = available_minerals[i];
+    for(int child : children) {
+      for(int j = 0; j < m; j++) {
+        total_minerals[j] += available_minerals[child][j];
       }
     }
     
-    // Create flow conservation and resource constraints
-    for (int j = 0; j < m; ++j) {
-      int current_g_var = mine_to_var_map[i] + j;
+    // Define throughput of current mine
+    // Lower Bound (lp_row): Sum of the Childrens output (at least as much has to go through the current node as through its children)
+    // Upper Bound (lp_row+1): Cant transport more than there is available (total_materials)
+    for(int j = 0; j < m; j++) {
+      lp.set_a(index_map[i]+j, lp_row, -1);
+      lp.set_a(index_map[i]+j, lp_row+1, 1);
       
-      // Constraint: g_ij - 0.5 * sum(g_cj) <= R_ij
-      lp.set_a(current_g_var, constraint_idx, 1);
-      for (int child_mine : dangerous_descendants) {
-        lp.set_a(mine_to_var_map[child_mine] + j, constraint_idx, -0.5);
+      // From each dangerous child, only half of what comes in will arrive at the current node.
+      // Therefore multiple their throughput by 0.5
+      for(int child : children) {
+        if(!is_dangerous[child]) continue;
+        lp.set_a(index_map[child]+j, lp_row, 0.5);
+        lp.set_a(index_map[child]+j, lp_row+1, -0.5);
       }
-      lp.set_b(constraint_idx, total_minerals_in_domain[j]);
-      constraint_idx++;
+      lp.set_b(lp_row, 0);
+      lp.set_b(lp_row+1, total_minerals[j]);
       
-      // Constraint: g_ij - 0.5 * sum(g_cj) >= 0  (or -g_ij + 0.5 * sum(g_cj) <= 0)
-      lp.set_a(current_g_var, constraint_idx, -1);
-      for (int child_mine : dangerous_descendants) {
-        lp.set_a(mine_to_var_map[child_mine] + j, constraint_idx, 0.5);
-      }
-      lp.set_b(constraint_idx, 0);
-      constraint_idx++;
+      lp_row += 2;
     }
     
-    // Danger threshold constraint for dangerous mines
-    if (is_dangerous[i]) {
-      for (int j = 0; j < m; ++j) {
-        lp.set_a(mine_to_var_map[i] + j, constraint_idx, 1);
+    // Upper Bound the througput of the dangerous mines based on their danger level
+    if(i != 0) {
+      for(int j = 0; j < m; j++) {
+        lp.set_a(index_map[i]+j, lp_row, 1);
       }
-      lp.set_b(constraint_idx, danger_levels[i]);
-      constraint_idx++;
+      lp.set_b(lp_row, danger_levels[i]);
+      lp_row++;
     }
   }
   
-  // Requirement constraints: g_0j + b_j >= c_j (or -g_0j - b_j <= -c_j)
-  for (int j = 0; j < m; ++j) {
-    lp.set_a(j, constraint_idx, -1); // b_j variable
-    lp.set_a(mine_to_var_map[0] + j, constraint_idx, -1); // g_0j variable
-    lp.set_b(constraint_idx, -minerals[j].required);
-    constraint_idx++;
+  // Put Lower bound on gathered materials (from root and shop) to the required amout
+  for(int j = 0; j < m; j++) {
+    lp.set_a(j, lp_row, -1); // Minerals from shop
+    lp.set_a(index_map[0]+j, lp_row, -1);
+    lp.set_b(lp_row, -minerals[j].required);
+    lp_row++;
   }
   
-  // Shop supply constraints and objective function
-  for (int j = 0; j < m; ++j) {
-    lp.set_u(j, true, minerals[j].supply); // b_j <= supply
-    lp.set_c(j, minerals[j].price);        // objective coefficient for b_j
+  // Define shop constraints and objective function
+  for(int j = 0; j < m; j++) {
+    lp.set_u(j, true, minerals[j].supply);  // Cant buy more than supply
+    lp.set_c(j, minerals[j].price);
   }
   
-  // ===== SOLVE AND OUTPUT =====
   Solution s = CGAL::solve_linear_program(lp, ET());
   
-  if (s.is_infeasible()) {
+  // ===== OUTPUT =====
+  if(s.is_infeasible()) {
     std::cout << "Impossible!" << std::endl;
   } else {
-    std::cout << static_cast<long>(floor_to_double(s.objective_value())) << std::endl;
+    std::cout << (long) floor_to_double(s.objective_value()) << std::endl;
   }
 }
 
 int main() {
   std::ios_base::sync_with_stdio(false);
-  std::cin.tie(NULL);
   
-  int t;
-  std::cin >> t;
-  while (t--) {
-    solve();
-  }
-  
-  return 0;
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) { solve(); }
 }
 ```
 </details>

@@ -53,20 +53,26 @@ By setting up this LP with the CGAL library and solving it, we can find the opti
 ```cpp
 #include <iostream>
 #include <vector>
-#include <iomanip>
-#include <cmath>
 
 #include <CGAL/QP_models.h>
 #include <CGAL/QP_functions.h>
-#include <CGAL/Gmpq.h>
+#include <CGAL/Gmpz.h>
 
-// Define types for the LP solver
+#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
+#include <CGAL/Delaunay_triangulation_2.h>
+
 typedef double IT;
 typedef CGAL::Gmpq ET;
 typedef CGAL::Quadratic_program<IT> Program;
 typedef CGAL::Quadratic_program_solution<ET> Solution;
+typedef Solution::Variable_value_iterator SVI;
 
-// Helper function to round up to the nearest integer
+typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
+typedef CGAL::Delaunay_triangulation_2<K>  Triangulation;
+typedef Triangulation::Edge_iterator  Edge_iterator;
+
+typedef K::Point_2 Point;
+
 double ceil_to_double(const CGAL::Quotient<ET> &x) {
   double a = std::ceil(CGAL::to_double(x));
   while (a < x) a += 1;
@@ -75,55 +81,74 @@ double ceil_to_double(const CGAL::Quotient<ET> &x) {
 }
 
 void solve() {
-  int n, m, h, w;
-  std::cin >> n >> m >> h >> w;
-
-  std::vector<long> x_coords(n);
-  for (int i = 0; i < n; ++i) {
-    long x, y;
-    std::cin >> x >> y;
-    x_coords[i] = x;
-  }
-
-  // Linear program setup: variables a_i >= 1
-  Program lp(CGAL::SMALLER, true, 1, false, 0); 
+  // ===== READ INPUT =====
+  int n, m, h, w; std::cin >> n >> m >> h >> w;
   
-  // Add constraints for every pair of new posters
-  int constraint_idx = 0;
-  for (int i = 0; i < n; ++i) {
-    for (int j = i + 1; j < n; ++j) {
-      long dist_x = std::abs(x_coords[i] - x_coords[j]);
+  // Read new nails
+  std::vector<Point> new_nails; new_nails.reserve(n);
+  for(int i = 0; i < n; ++i) {
+    int x, y; std::cin >> x >> y;
+    new_nails.emplace_back(x, y);
+  }
+  
+  // Read old nails
+  std::vector<Point> old_nails; old_nails.reserve(m);
+  for(int i = 0; i < m; ++i) {
+    int x, y; std::cin >> x >> y;
+    old_nails.emplace_back(x, y);
+  }
+  
+  // ===== SOLVE =====
+  Program lp (CGAL::SMALLER, true, 1, false, 0); 
+  double h_halves = ((double) h) / 2.0;
+  double w_halves = ((double) w) / 2.0;
+  int n_constraints = 0;
+  
+  // Set constraints that the distance between all new posters needs to be at least 0
+  for(int i = 0; i < n; ++i) {
+    const Point p_1 = new_nails[i];
+    
+    for(int j = i + 1; j < n; ++j) {
+      const Point p_2 = new_nails[j];
       
-      // Constraint: a_i * w/2 + a_j * w/2 <= dist_x
-      lp.set_a(i, constraint_idx, (double)w / 2.0);
-      lp.set_a(j, constraint_idx, (double)w / 2.0);
-      lp.set_b(constraint_idx, dist_x);
-      constraint_idx++;
+      // Determine which of the two points is left and which is right
+      const Point *p_left, *p_right;
+      if(p_1.x() < p_2.x()) {
+        p_left = &p_1;
+        p_right = &p_2;
+      } else {
+        p_left = &p_2;
+        p_right = &p_1;
+      }
+      
+      // Add constraint
+      lp.set_a(i, n_constraints, w_halves);
+      lp.set_a(j, n_constraints, w_halves);
+      lp.set_b(n_constraints, p_right->x() - p_left->x());
+      
+      n_constraints++;
     }
   }
   
-  // Set the objective function to MINIMIZE: -sum(a_i * (2w + 2h))
-  for (int i = 0; i < n; ++i) {
-    lp.set_c(i, -(2.0 * w + 2.0 * h));
+  // Set objective
+  for(int i = 0; i < n; ++i) {
+    lp.set_c(i, -2*w - 2*h);
   }
   
-  // Solve the LP
+  // Solve LP and calculate sum of perimeters
   Solution s = CGAL::solve_linear_program(lp, ET());
+  if(!s.is_optimal()) { std::cout << "ERROR: SOLUTION NOT OPTIMAL" << std::endl; return; }
   
-  // Output the result, which is -objective_value, rounded up
+  // ===== OUTPUT =====
   std::cout << std::fixed << std::setprecision(0);
   std::cout << ceil_to_double(-s.objective_value()) << std::endl;
 }
 
 int main() {
   std::ios_base::sync_with_stdio(false);
-  std::cin.tie(NULL);
-  int t;
-  std::cin >> t;
-  while (t--) {
-    solve();
-  }
-  return 0;
+  
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) { solve(); }
 }
 ```
 </details>
@@ -150,19 +175,24 @@ This logic ensures that for every pair of new posters, we add the constraint tha
 ```cpp
 #include <iostream>
 #include <vector>
-#include <iomanip>
-#include <cmath>
 
 #include <CGAL/QP_models.h>
 #include <CGAL/QP_functions.h>
-#include <CGAL/Gmpq.h>
+#include <CGAL/Gmpz.h>
+
+#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
+// #include <CGAL/Delaunay_triangulation_2.h>
 
 typedef double IT;
 typedef CGAL::Gmpq ET;
 typedef CGAL::Quadratic_program<IT> Program;
 typedef CGAL::Quadratic_program_solution<ET> Solution;
+typedef Solution::Variable_value_iterator SVI;
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
+// typedef CGAL::Delaunay_triangulation_2<K>  Triangulation;
+// typedef Triangulation::Edge_iterator  Edge_iterator;
+
 typedef K::Point_2 Point;
 
 double ceil_to_double(const CGAL::Quotient<ET> &x) {
@@ -173,62 +203,105 @@ double ceil_to_double(const CGAL::Quotient<ET> &x) {
 }
 
 void solve() {
-  int n, m, h, w;
-  std::cin >> n >> m >> h >> w;
-
-  std::vector<Point> new_nails(n);
-  for (int i = 0; i < n; ++i) {
-    int x, y;
-    std::cin >> x >> y;
-    new_nails[i] = Point(x, y);
-  }
-
-  Program lp(CGAL::SMALLER, true, 1, false, 0); 
+  // std::cout << "==========================================================================" << std::endl;
+  // ===== READ INPUT =====
+  int n, m, h, w; std::cin >> n >> m >> h >> w;
   
-  int constraint_idx = 0;
-  for (int i = 0; i < n; ++i) {
-    for (int j = i + 1; j < n; ++j) {
-      Point p1 = new_nails[i];
-      Point p2 = new_nails[j];
+  // Read new nails
+  std::vector<Point> new_nails; new_nails.reserve(n);
+  for(int i = 0; i < n; ++i) {
+    int x, y; std::cin >> x >> y;
+    new_nails.emplace_back(x, y);
+  }
+  
+  // Read old nails
+  std::vector<Point> old_nails; old_nails.reserve(m);
+  for(int i = 0; i < m; ++i) {
+    int x, y; std::cin >> x >> y;
+    old_nails.emplace_back(x, y);
+  }
+  
+  // ===== SOLVE =====
+  Program lp (CGAL::SMALLER, true, 1, false, 0); 
+  double h_halves = ((double) h) / 2.0;
+  double w_halves = ((double) w) / 2.0;
+  int n_constraints = 0;
+  
+  // Set constraints that the distance between all new posters needs to be at least 0
+  for(int i = 0; i < n; ++i) {
+    const Point p_1 = new_nails[i];
+    
+    for(int j = i + 1; j < n; ++j) {
+      const Point p_2 = new_nails[j];
       
-      double norm_dist_x = std::abs(p1.x() - p2.x()) / (double)w;
-      double norm_dist_y = std::abs(p1.y() - p2.y()) / (double)h;
+      // Calculate distance in x and y direction
+      double x_dist = std::abs(p_1.x() - p_2.x()) / ((double) w);
+      double y_dist = std::abs(p_1.y() - p_2.y()) / ((double) h);
+      
+      // Determine in which dimensions to add constraints
+      bool add_x_constraint = false;
+      bool add_y_constraint = false;
+      if(x_dist < y_dist) { add_y_constraint = true; }
+      else if(x_dist > y_dist) { add_x_constraint = true; }
+      else { add_x_constraint = add_y_constraint = true; }
 
-      if (norm_dist_x < norm_dist_y) {
-        // Y constraint is tighter
-        lp.set_a(i, constraint_idx, (double)h / 2.0);
-        lp.set_a(j, constraint_idx, (double)h / 2.0);
-        lp.set_b(constraint_idx, std::abs(p1.y() - p2.y()));
-        constraint_idx++;
-      } else {
-        // X constraint is tighter or they are equal
-        lp.set_a(i, constraint_idx, (double)w / 2.0);
-        lp.set_a(j, constraint_idx, (double)w / 2.0);
-        lp.set_b(constraint_idx, std::abs(p1.x() - p2.x()));
-        constraint_idx++;
+      // Add constraints
+      if(add_x_constraint) {
+        const Point *p_left, *p_right;
+        if(p_1.x() < p_2.x()) {
+          p_left = &p_1;
+          p_right = &p_2;
+        } else {
+          p_left = &p_2;
+          p_right = &p_1;
+        }
+        
+        // Add constraint
+        lp.set_a(i, n_constraints, w_halves);
+        lp.set_a(j, n_constraints, w_halves);
+        lp.set_b(n_constraints, p_right->x() - p_left->x());
+        
+        n_constraints++;
+      }
+      if(add_y_constraint) {
+        const Point *p_bot, *p_top;
+        if(p_1.y() < p_2.y()) {
+          p_bot = &p_1;
+          p_top = &p_2;
+        } else {
+          p_bot = &p_2;
+          p_top = &p_1;
+        }
+        
+        // Add constraint
+        lp.set_a(i, n_constraints, h_halves);
+        lp.set_a(j, n_constraints, h_halves);
+        lp.set_b(n_constraints, p_top->y() - p_bot->y());
+        
+        n_constraints++;
       }
     }
   }
   
-  for (int i = 0; i < n; ++i) {
-    lp.set_c(i, -(2.0 * w + 2.0 * h));
+  // Set objective
+  for(int i = 0; i < n; ++i) {
+    lp.set_c(i, -2*w - 2*h);
   }
   
+  // Solve LP and calculate sum of perimeters
   Solution s = CGAL::solve_linear_program(lp, ET());
+  if(!s.is_optimal()) { std::cout << "ERROR: SOLUTION NOT OPTIMAL" << std::endl; return; }
   
+  // ===== OUTPUT =====
   std::cout << std::fixed << std::setprecision(0);
   std::cout << ceil_to_double(-s.objective_value()) << std::endl;
 }
 
 int main() {
   std::ios_base::sync_with_stdio(false);
-  std::cin.tie(NULL);
-  int t;
-  std::cin >> t;
-  while (t--) {
-    solve();
-  }
-  return 0;
+  
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) { solve(); }
 }
 ```
 </details>
@@ -257,21 +330,24 @@ To improve precision and potentially speed up the solver with integer arithmetic
 ```cpp
 #include <iostream>
 #include <vector>
-#include <iomanip>
-#include <cmath>
 #include <limits>
 
 #include <CGAL/QP_models.h>
-#include <CGAL/QP_functions.hh>
+#include <CGAL/QP_functions.h>
 #include <CGAL/Gmpz.h>
 
-// Use integer coefficients for precision
+#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
+#include <CGAL/Delaunay_triangulation_2.h>
+
 typedef int IT;
 typedef CGAL::Gmpz ET;
 typedef CGAL::Quadratic_program<IT> Program;
 typedef CGAL::Quadratic_program_solution<ET> Solution;
+typedef Solution::Variable_value_iterator SVI;
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
+typedef CGAL::Delaunay_triangulation_2<K>  Triangulation;
+
 typedef K::Point_2 Point;
 
 double ceil_to_double(const CGAL::Quotient<ET> &x) {
@@ -282,93 +358,174 @@ double ceil_to_double(const CGAL::Quotient<ET> &x) {
 }
 
 void solve() {
-  int n, m, h, w;
-  std::cin >> n >> m >> h >> w;
-
-  std::vector<Point> new_nails(n);
-  for (int i = 0; i < n; ++i) {
-    long x, y; std::cin >> x >> y;
-    new_nails[i] = Point(x, y);
+  // ===== READ INPUT =====
+  int n, m, h, w; std::cin >> n >> m >> h >> w;
+  
+  // Read new nails
+  std::vector<Point> new_nails; new_nails.reserve(n);
+  for(int i = 0; i < n; ++i) {
+    int x, y; std::cin >> x >> y;
+    new_nails.emplace_back(x, y);
   }
-
-  std::vector<Point> old_nails(m);
-  for (int i = 0; i < m; ++i) {
-    long x, y; std::cin >> x >> y;
-    old_nails[i] = Point(x, y);
+  
+  // Read old nails
+  std::vector<Point> old_nails; old_nails.reserve(m);
+  for(int i = 0; i < m; ++i) {
+    int x, y; std::cin >> x >> y;
+    old_nails.emplace_back(x, y);
   }
+  
+  // ===== SOLVE =====
+  // Triangulate old nails
+  Triangulation t;
+  t.insert(old_nails.begin(), old_nails.end());
+  
+  // Setup Linear Program
+  Program lp (CGAL::SMALLER, true, 1, false, 0); 
+  int n_constraints = 0;
+  
+  // Set constraints 
+  for(int i = 0; i < n; ++i) {
+    const Point p_1 = new_nails[i];
+    
+    // Set constraints for new nails
+    for(int j = i + 1; j < n; ++j) {
+      const Point p_2 = new_nails[j];
+      
+      // Calculate distance in x and y direction
+      double x_dist = std::abs(p_1.x() - p_2.x()) / ((double) w);
+      double y_dist = std::abs(p_1.y() - p_2.y()) / ((double) h);
+      
+      // Determine in which dimensions to add constraints
+      bool add_x_constraint = false;
+      bool add_y_constraint = false;
+      if(x_dist < y_dist) { add_y_constraint = true; }
+      else if(x_dist > y_dist) { add_x_constraint = true; }
+      else { add_x_constraint = add_y_constraint = true; }
 
-  Program lp(CGAL::SMALLER, true, 1, false, 0); 
-  int constraint_idx = 0;
-
-  // Constraints between pairs of new posters
-  for (int i = 0; i < n; ++i) {
-    for (int j = i + 1; j < n; ++j) {
-      double norm_dist_x = std::abs(new_nails[i].x() - new_nails[j].x()) / (double)w;
-      double norm_dist_y = std::abs(new_nails[i].y() - new_nails[j].y()) / (double)h;
-
-      if (norm_dist_x < norm_dist_y) {
-        lp.set_a(i, constraint_idx, h); lp.set_a(j, constraint_idx, h);
-        lp.set_b(constraint_idx, 2 * std::abs(new_nails[i].y() - new_nails[j].y()));
-        constraint_idx++;
-      } else {
-        lp.set_a(i, constraint_idx, w); lp.set_a(j, constraint_idx, w);
-        lp.set_b(constraint_idx, 2 * std::abs(new_nails[i].x() - new_nails[j].x()));
-        constraint_idx++;
+      // Add constraints
+      if(add_x_constraint) {
+        const Point *p_left, *p_right;
+        if(p_1.x() < p_2.x()) {
+          p_left = &p_1;
+          p_right = &p_2;
+        } else {
+          p_left = &p_2;
+          p_right = &p_1;
+        }
+        
+        // Add constraint
+        lp.set_a(i, n_constraints, w);
+        lp.set_a(j, n_constraints, w);
+        lp.set_b(n_constraints, 2 * p_right->x() - 2 * p_left->x());
+        
+        n_constraints++;
+      }
+      if(add_y_constraint) {
+        const Point *p_bot, *p_top;
+        if(p_1.y() < p_2.y()) {
+          p_bot = &p_1;
+          p_top = &p_2;
+        } else {
+          p_bot = &p_2;
+          p_top = &p_1;
+        }
+        
+        // Add constraint
+        lp.set_a(i, n_constraints, h);
+        lp.set_a(j, n_constraints, h);
+        lp.set_b(n_constraints, 2 * p_top->y() - 2 * p_bot->y());
+        
+        n_constraints++;
       }
     }
-  }
-
-  // Constraints between new posters and the CLOSEST old poster
-  if (m > 0) {
-    for (int i = 0; i < n; ++i) {
-      double min_max_norm_dist = std::numeric_limits<double>::max();
-      Point closest_old_nail = old_nails[0];
-
-      for (int k = 0; k < m; ++k) {
-        double norm_dist_x = std::abs(new_nails[i].x() - old_nails[k].x()) / (double)w;
-        double norm_dist_y = std::abs(new_nails[i].y() - old_nails[k].y()) / (double)h;
-        double max_norm_dist = std::max(norm_dist_x, norm_dist_y);
-        if (max_norm_dist < min_max_norm_dist) {
-          min_max_norm_dist = max_norm_dist;
-          closest_old_nail = old_nails[k];
+    
+    // Set constraint for old nails
+    if(m > 0) {
+      // Find closes old nail in terms of L1 Norm
+      int min_dist = std::numeric_limits<int>::max();
+      int min_idx = -1;
+      for(int j = 0; j < m; j++) {
+        const Point p_2 = old_nails[j];
+        
+        // Calculate distance in x and y direction
+        double x_dist = std::abs(p_1.x() - p_2.x()) / ((double) w);
+        double y_dist = std::abs(p_1.y() - p_2.y()) / ((double) h);
+        
+        if(std::max(x_dist, y_dist) < min_dist) {
+          min_dist = std::max(x_dist, y_dist);
+          min_idx = j;
         }
       }
       
-      double norm_dist_x = std::abs(new_nails[i].x() - closest_old_nail.x()) / (double)w;
-      double norm_dist_y = std::abs(new_nails[i].y() - closest_old_nail.y()) / (double)h;
-
-      if (norm_dist_x < norm_dist_y) {
-        lp.set_a(i, constraint_idx, h);
-        lp.set_b(constraint_idx, 2 * std::abs(new_nails[i].y() - closest_old_nail.y()) - h);
-        constraint_idx++;
-      } else {
-        lp.set_a(i, constraint_idx, w);
-        lp.set_b(constraint_idx, 2 * std::abs(new_nails[i].x() - closest_old_nail.x()) - w);
-        constraint_idx++;
+      // Calculate distance in x and y direction
+      const Point p_2 = old_nails[min_idx];
+      
+      double x_dist = std::abs(p_1.x() - p_2.x()) / ((double) w);
+      double y_dist = std::abs(p_1.y() - p_2.y()) / ((double) h);
+      
+      // Determine in which dimensions to add constraints
+      bool add_x_constraint = false;
+      bool add_y_constraint = false;
+      if(x_dist < y_dist) { add_y_constraint = true; }
+      else if(x_dist > y_dist) { add_x_constraint = true; }
+      else { add_x_constraint = add_y_constraint = true; }
+  
+      // Add constraints
+      if(add_x_constraint) {
+        const Point *p_left, *p_right;
+        if(p_1.x() < p_2.x()) {
+          p_left = &p_1;
+          p_right = &p_2;
+        } else {
+          p_left = &p_2;
+          p_right = &p_1;
+        }
+        
+        // Add constraint
+        lp.set_a(i, n_constraints, w);
+        lp.set_b(n_constraints, 2 * p_right->x() - 2 * p_left->x() - w);
+        
+        n_constraints++;
+      }
+      if(add_y_constraint) {
+        const Point *p_bot, *p_top;
+        if(p_1.y() < p_2.y()) {
+          p_bot = &p_1;
+          p_top = &p_2;
+        } else {
+          p_bot = &p_2;
+          p_top = &p_1;
+        }
+        
+        // Add constraint
+        lp.set_a(i, n_constraints, h);
+        lp.set_b(n_constraints, 2 * p_top->y() - 2 * p_bot->y() - h);
+        
+        n_constraints++;
       }
     }
   }
-
-  // Objective function
-  for (int i = 0; i < n; ++i) {
-    lp.set_c(i, -(2 * w + 2 * h));
-  }
-
-  Solution s = CGAL::solve_linear_program(lp, ET());
   
+  // Set objective
+  for(int i = 0; i < n; ++i) {
+    lp.set_c(i, -2*w - 2*h);
+  }
+  
+  // Solve LP and calculate sum of perimeters
+  Solution s = CGAL::solve_linear_program(lp, ET());
+  if(!s.is_optimal()) { std::cout << "ERROR: SOLUTION NOT OPTIMAL" << std::endl; return; }
+  
+  // ===== OUTPUT =====
   std::cout << std::fixed << std::setprecision(0);
   std::cout << ceil_to_double(-s.objective_value()) << std::endl;
 }
 
 int main() {
   std::ios_base::sync_with_stdio(false);
-  std::cin.tie(NULL);
-  int t;
-  std::cin >> t;
-  while (t--) {
-    solve();
-  }
-  return 0;
+  
+  int n_tests; std::cin >> n_tests;
+  while(n_tests--) { solve(); }
 }
 ```
 </details>
