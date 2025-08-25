@@ -69,85 +69,70 @@ In the code, we set up a `Program` object.
 After setting up the program, we call `CGAL::solve_linear_program`. If the solution is `infeasible`, no diet satisfies the constraints. Otherwise, we retrieve the optimal objective value, which is the minimum cost, and print it rounded down.
 
 ```cpp
-#include <iostream>
-#include <vector>
-#include <cmath>
+#include<iostream>
+#include<vector>
+#include<cmath>
 
 #include <CGAL/QP_models.h>
 #include <CGAL/QP_functions.h>
 #include <CGAL/Gmpz.h>
 
-// Type definitions for the linear program
-typedef int IT; // Input type
-typedef CGAL::Gmpz ET; // Exact type for solver
+typedef int IT;
+typedef CGAL::Gmpz ET;
 
-// Program and solution types
 typedef CGAL::Quadratic_program<IT> Program;
 typedef CGAL::Quadratic_program_solution<ET> Solution;
 
-void testcase() {
-    int n, m;
-    std::cin >> n >> m;
-    if (n == 0 && m == 0) exit(0);
-
-    // Read nutrient constraints
-    std::vector<IT> min_nutrient(n), max_nutrient(n);
-    for (int i = 0; i < n; ++i) {
-        std::cin >> min_nutrient[i] >> max_nutrient[i];
-    }
-
-    // Read food data
-    std::vector<IT> prices(m);
-    std::vector<std::vector<IT>> food_nutrients(m, std::vector<IT>(n));
-    for (int i = 0; i < m; ++i) {
-        std::cin >> prices[i];
-        for (int j = 0; j < n; ++j) {
-            std::cin >> food_nutrients[i][j];
-        }
-    }
-
-    // Create a linear program:
-    // Variables x_j >= 0 (true, 0)
-    // Constraints are of the form A*x <= b (CGAL::SMALLER)
-    Program lp(CGAL::SMALLER, true, 0, false, 0);
-
-    // Set constraints
-    for (int i = 0; i < n; ++i) { // For each nutrient i
-        // Constraint for min_nutrient: sum(x_j * C_ji) >= min_i
-        // -> -sum(x_j * C_ji) <= -min_i
-        for (int j = 0; j < m; ++j) { // For each food j
-            lp.set_a(j, i, -food_nutrients[j][i]);
-        }
-        lp.set_b(i, -min_nutrient[i]);
-
-        // Constraint for max_nutrient: sum(x_j * C_ji) <= max_i
-        for (int j = 0; j < m; ++j) {
-            lp.set_a(j, n + i, food_nutrients[j][i]);
-        }
-        lp.set_b(n + i, max_nutrient[i]);
-    }
-
-    // Set objective function: minimize sum(price_j * x_j)
-    for (int j = 0; j < m; ++j) {
-        lp.set_c(j, prices[j]);
-    }
-
-    // Solve the linear program
-    Solution s = CGAL::solve_linear_program(lp, ET());
-    
-    if (s.is_infeasible()) {
-        std::cout << "No such diet." << std::endl;
-    } else {
-        std::cout << (long)std::floor(CGAL::to_double(s.objective_value())) << std::endl;
-    }
-}
-
 int main() {
-    std::ios_base::sync_with_stdio(false);
-    while (true) {
-        testcase();
+  std::ios_base::sync_with_stdio(false);
+  
+  while(true) {
+    // ===== READ INPUT =====
+    int n, m; std::cin >> n >> m;
+    if (n == 0 && m == 0) break;
+    
+    std::vector<IT> min(n);
+    std::vector<IT> max(n);
+    for(int i = 0; i < n; ++i) {
+      std::cin >> min[i] >> max[i];
     }
-    return 0;
+    
+    std::vector<IT> prices(m);
+    std::vector<std::vector<IT>> nutrients(m, std::vector<IT>(n));
+    for(int i = 0; i < m; ++i) {
+      std::cin >> prices[i];
+      
+      for(int j = 0; j < n; ++j) {
+        std::cin >> nutrients[i][j];
+      }
+    }
+    
+    // ===== CONSTRUCT LINEAR PROGRAM =====
+    Program lp(CGAL::SMALLER, true, 0, false, 0);
+    
+    // Define min and max constraints
+    for(int nutrient_idx = 0; nutrient_idx < n; ++nutrient_idx) {
+      for(int foot_idx = 0; foot_idx < m; ++foot_idx) {
+        lp.set_a(foot_idx,     nutrient_idx, -nutrients[foot_idx][nutrient_idx]);
+        lp.set_a(foot_idx, n + nutrient_idx,  nutrients[foot_idx][nutrient_idx]);
+      }
+      lp.set_b(    nutrient_idx, -min[nutrient_idx]);
+      lp.set_b(n + nutrient_idx,  max[nutrient_idx]);
+    }
+    
+    // Define objective
+    for(int foot_idx = 0; foot_idx < m; ++foot_idx) {
+      lp.set_c(foot_idx, prices[foot_idx]);
+    }
+    
+    // ===== SOLVE AND OUTPUT =====
+    Solution s = CGAL::solve_linear_program(lp, ET());
+    if(s.is_infeasible()) {
+      std::cout << "No such diet." << std::endl;
+    } else {
+      std::cout <<(long) std::floor(CGAL::to_double(s.objective_value())) << std::endl;
+    }
+  }
 }
 ```
 </details>
