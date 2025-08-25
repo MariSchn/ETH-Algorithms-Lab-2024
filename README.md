@@ -19,22 +19,22 @@ In addition to the problems there are also some [general tips](#-general-tips) a
 
 ## 🗺️ Problem Index
 
-| Week  | Problem 1 | Problem 2 | Problem 3 | Problem 4 | Problem of the Week |
-|-------|-----------|-----------|-----------|-----------|---------------------|
-| 01    |           |           |           |           |                     |
-| 02    |           |           |           |           |                     |
-| 03    |           |           |           |           |                     |
-| 04    |           |           |           |           |                     |
-| 05    |           |           |           |           |                     |
-| 06    |           |           |           |           |                     |
-| 07    |           |           |           |           |                     |
-| 08    |           |           |           |           |                     |
-| 09    |           |           |           |           |                     |
-| 10    |           |           |           |           |                     |
-| 11    |           |           |           |           |                     |
-| 12    |           |           |           |           |                     |
-| 13    |           |           |           |           |                     |
-| 14    |           |           |           |           |                     |
+| Week | Problem 1                                                            | Problem 2                                                  | Problem 3                                                    | Problem 4                                           | Problem of the Week                                          |
+|------|----------------------------------------------------------------------|------------------------------------------------------------|------------------------------------------------------------- |-----------------------------------------------------|--------------------------------------------------------------|
+| 01   | [Dominoes](Week_01/Dominoes)                                         | [Even Pairs](Week_01/Even_Pairs)                           | [Even Matrices](Week_01/Even_Matrices)                       | [Build the Sum](Week_01/Build_the_Sum)              |                                                              |
+| 02   | [Beach Bars](Week_02/Beach_Bars)                                     | [Burning Coins](Week_02/Burning_Coins)                     | [Defensive Line](Week_02/Defensive_Line)                     | [The Great Game](Week_02/The_Great_Game)            | [Deck of Cards](Week_02/Deck_of_Cards)                       |
+| 03   | [First Steps with BGL](Week_03/First_Steps_with_BGL)                 | [Buddy Selection](Week_03/Buddy_Selection)                 | [Ant Challenge](Week_03/Ant_Challenge)                       | [Important Bridges](Week_03/Important_Bridges)      | [James Bond's Sovereign](Week_03/James_Bond’s_Sovereign)     |
+| 04   | [Hit](Week_04/Hit)                                                   | [First Hit](Week_04/First_Hit)                             | [Antenna](Week_04/Antenna)                                   | [Hiking Maps](Week_04/Hiking_Maps)                  | [The Iron Islands](Week_04/The_Iron_Islands)                 |
+| 05   | [Moving Books](Week_05/Moving_Books)                                 | [Asterix the Gaul](Week_05/Asterix_the_Gaul)               | [Severus Snape](Week_05/Severus_Snape)                       | [Boats](Week_05/Boats)                              | [Tracking](Week_05/Tracking)                                 |
+| 06   | [Tiles](Week_06/Tiles)                                               | [Coin Tossing Tournament](Week_06/Coin_Tossing_Tournament) | [Knights](Week_06/Knights)                                   | [Kingdom Defense](Week_06/Kingdom_Defense)          | [Motorcycles](Week_06/Motorcycles)                           |
+| 07   | [Bistro](Week_07/Bistro)                                             | [H1N1](Week_07/H1N1)                                       | [Germs](Week_07/Germs)                                       | [Clues](Week_07/Clues)                              | [Octopussy](Week_07/Octopussy)                               |
+| 08   | [Maxmize it!](Week_08/Maximize_it!)                                  | [Diet](Week_08/Diet)                                       | [Inball](Week_08/Inball)                                     | [Casterly Rock](Week_08/Casterly_Rock)              | [Attack on King's Landing](Week_08/Attack_on_King's_Landing) |
+| 09   | [Placing Knights](Week_09/Placing_Knights)                           | [Real Estate Market](Week_09/Real_Estate_Market)           | [Canteen](Week_09/Canteen)                                   | [Algocoon](Week_09/Algocoon)                        | [Idefix](Week_09/Idefix)                                     |
+| 10   | [Asterix and the Tour of Gaul](Week_10/Asterix_and_the_Tour_of_Gaul) | [Rubeus Hagrid](Week_10/Rubeus_Hagrid)                     | [San Francisco](Week_10/San_Francisco)                       | [Than Hand's Tourney](Week_10/The_Hand's_Tourney)   | [Hermione Granger](Week_10/Hermione_Granger)                 |
+| 11   | [Asterix in Switzerland](Week_11/Asterix_in_Switzerland)             | [Lernaean Hydra](Week_11/Lernaean_Hydra)                  | [Sith](Week_11/Revenge_of_the_Sith)                          | [Worldcup](Week_11/World_Cup)                       | [Ceryneian Hind](Week_11/Ceryneian_Hind)                     |
+| 12   | [Alastor Moody](Week_12/Alastor_Moody)                               | [Nemean Lion](Week_12/Nemean_Lion)                         | [Rapunzel](Week_12/Rapunzel)                                 | [Return of the Jedi](Week_12/Return_of_the_Jedi)    | [Pied Piper](Week_12/Pied_Piper)                             |
+| 13   | [Asterix and the Chariot Race](Week_13/Asterix_and_the_Chariot_Race) | [Car Sharing](Week_13/Car_Sharing)                         | [Fighting Pits of Meereen](Week_13/Fighting_Pits_of_Meereen) | [Suez](Week_13/Suez)                                | [Schneewittchen](Week_13/Schneewittchen)                     |
+| 14   |                                                                      |                                                            |                                                              |                                                     | [Ludo Bagman](Week_14/Ludo_Bagman)                           |
 
 ---
 
