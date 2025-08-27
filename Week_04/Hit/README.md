@@ -9,48 +9,49 @@ The ray originates from a starting point $(x, y)$ and is defined by another poin
 ## 💡 Hints
 
 <details>
+
 <summary>Hint #1</summary>
-The problem requires checking a single ray against a collection of line segments. The core of the problem is to determine for each segment whether it intersects the ray. If any such intersection is found, the answer is "yes". If the ray does not intersect any of the segments after checking all of them, the answer is "no".
+
+The problem involves determining whether a ray intersects with any line segments. Consider the precision requirements for intersection tests and whether exact results are necessary for all aspects of the computation. to determine which CGAL kernel to use.
+
 </details>
+
 <details>
+
 <summary>Hint #2</summary>
-The coordinate values can be very large, potentially exceeding the capacity of a standard 32-bit integer. When performing geometric calculations, such as line intersection tests, using standard floating-point types like `double` can introduce precision errors. These errors can lead to incorrect results for edge cases (e.g., when the ray passes very close to an endpoint). Consider how to perform these geometric tests in a way that is robust and exact.
+
+The **Exact Predicates Inexact Constructions Kernel (EPIC)** from CGAL is well-suited for this problem. It ensures exact results for predicate tests like intersection checks while maintaining efficiency for other operations, as we do not need to calculate actual intersection points.
+
 </details>
+
 <details>
+
 <summary>Hint #3</summary>
-A straightforward approach is to iterate through each obstacle and perform an intersection test. The main challenge is not the algorithmic complexity but the implementation's correctness. To handle the large coordinates and avoid precision issues, using a specialized computational geometry library is highly recommended. The **Computational Geometry Algorithms Library (CGAL)** is a powerful C++ library that provides data types and functions designed for robust geometric computations. It can handle arbitrary-precision numbers, ensuring that intersection tests are always correct.
+
+To solve the problem, use the `K::Ray_2` class to represent the ray and the `K::Segment_2` class for the line segments. The `CGAL::do_intersect` function can then be used to check for intersections between the ray and each segment.
+
 </details>
 
 ## ✨ Solutions
 
 <details>
+
 <summary>Final Solution</summary>
-The problem asks us to determine if a given ray intersects any of $N$ line segments. A direct approach is to check each segment one by one. If we find an intersection, we can immediately conclude the answer is "yes". If we check all segments and find no intersections, the answer is "no".
 
-### Core Challenge: Precision and Robustness
+As this is an introductary problem to CGAL the problem is not hard algorithmically, but is ment to familiarize you with CGAL.
 
-A significant challenge in computational geometry problems is floating-point precision. The input coordinates are large integers, which can cause overflow if not handled with appropriate data types (like a 64-bit `long` in C++). Furthermore, calculating intersections often involves division, which can lead to non-integer results. Using standard `double`s for these calculations can introduce small precision errors that lead to incorrect answers, especially in tricky cases where the ray might be collinear with a segment or pass through an endpoint.
+### Choice of Kernel
 
-### The CGAL-based Solution
+In this solution, we use the **Exact Predicates Inexact Constructions Kernel (EPICK)** from CGAL. This kernel is well-suited for our needs because it provides exact arithmetic for predicate tests (like intersection checks, which we are interested in) while allowing for inexact constructions (like computing intersection points, which we do not need here) using floating-point arithmetic. This balance helps avoid precision issues during intersection tests while maintaining performance by leveraging the efficiency of floating-point computations where exact results are not critical.
 
-To overcome these issues, we can leverage the **Computational Geometry Algorithms Library (CGAL)**. CGAL is designed for robust geometric computing. We will use the `Exact_predicates_inexact_constructions_kernel` (`K`).
+### Determining Intersection
 
--   **Exact Predicates:** This means that decision-making functions (predicates), like `do_intersect()`, are computed using exact arithmetic. This guarantees that the answer to a question like "Do this ray and this segment intersect?" is always correct, free from floating-point errors.
--   **Inexact Constructions:** This part means that functions that construct new geometric objects (like the intersection point itself) might use floating-point arithmetic for performance. Since we only need to know *if* an intersection exists, not *where*, this kernel is a perfect fit.
+To determine if the ray intersects with a segment, we can use use the `K::Ray_2` class for the ray itself and `K::Segment_2` to store the ray and the segments respectively. 
+Afterward, we can use the `CGAL::do_intersect` function, which is designed to handle various geometric objects and their interactions. This function will return `true` if the ray and segment intersect, and `false` otherwise.
 
-### Implementation Steps
+We can therefore simply iterate over all segments and perform the intersection test, to determine if any segment intersects the ray.
 
-1.  **Setup:** We include the necessary CGAL headers and define our kernel `K`.
-2.  **Input Loop:** The program reads test cases until it encounters an input of $N=0$.
-3.  **Ray Representation:** For each test case, we read the two points defining the ray and construct a `K::Ray_2` object. This object correctly represents an infinite ray starting at the first point and passing through the second.
-4.  **Segment Iteration:** We loop $N$ times, once for each obstacle segment.
-    -   Inside the loop, we read the endpoints of the current segment and create a `K::Segment_2` object.
-    -   We use the core CGAL function `CGAL::do_intersect(ray, segment)`. This function handles all the complex geometric logic and returns `true` if they intersect and `false` otherwise.
-5.  **Early Exit:** If an intersection is found, we set a `hit` flag to `true`. Critically, we must then read the remaining input lines for the current test case to avoid corrupting the input stream for the next test case. After that, we can `break` from the loop, as we have already found our answer.
-6.  **Output:** After the loop finishes (either by checking all segments or by breaking early), we print "yes" or "no" based on the `hit` flag.
-
-This approach effectively delegates the difficult and error-prone geometric calculations to a specialized, well-tested library, leading to a simple and correct solution.
-
+### Code
 ```cpp
 #include<iostream>
 #include<vector>
