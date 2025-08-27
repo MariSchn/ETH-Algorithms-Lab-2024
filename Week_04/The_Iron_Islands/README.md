@@ -2,31 +2,48 @@
 
 ## 📝 Problem Description
 
-You are tasked with finding an optimal plan to conquer a set of islands. You are given $N$ islands, each with a specific cost $c_i$ representing the number of soldiers needed to conquer it. You command a total of $k$ soldiers.
+The task is to find an optimal plan to conquer a set of islands. There are $N$ islands, each with a specific cost $c_i$ representing the number of soldiers needed to conquer it. A total of $k$ soldiers are available for deployment.
 
 The islands are organized into $w$ distinct waterways, each being a linear sequence of islands originating from a central island (island 0, called Pyke). Every island other than Pyke belongs to exactly one waterway.
 
 A "plan" is a selection of islands to conquer. A plan is considered **valid** if it meets two strict conditions:
-1.  **Exact Cost:** The sum of the costs of all conquered islands must be exactly equal to your total number of soldiers, $k$. Every soldier must be deployed.
-2.  **Traversability:** The set of conquered islands must form a single, contiguous path. This means you must be able to traverse all conquered islands sequentially along the waterways without visiting an island more than once and without passing through an unconquered island. Such a path can exist entirely within one waterway or be formed by joining segments from two different waterways at the central island.
+1.  **Exact Cost:** The sum of the costs of all conquered islands must be exactly equal to the total number of soldiers, $k$. Every soldier must be deployed.
+2.  **Traversability:** The set of conquered islands must form a single, contiguous path. This means all conquered islands must be traversable sequentially along the waterways without visiting an island more than once and without passing through an unconquered island.
 
-Your goal is to determine the maximum number of islands that can be conquered in any valid plan. If no valid plan exists, the answer is 0.
+The goal is to determine the maximum number of islands that can be conquered in any valid plan. If no valid plan exists, the answer is 0.
 
 ## 💡 Hints
 
 <details>
+
 <summary>Hint #1</summary>
+
 The condition that all attacked islands must be traversable without passing through an unattacked island is crucial. Think about what this implies about the arrangement of the islands you choose to conquer. They must be "next to" each other along the defined waterways.
+
 </details>
 
 <details>
+
 <summary>Hint #2</summary>
+
 A valid path can only visit each island once. To move from one waterway to another, you must pass through the central island, Pyke. What does this imply about the maximum number of different waterways that can be part of a single valid plan?
+
 </details>
 
 <details>
+
 <summary>Hint #3</summary>
+
 The problem can be simplified by considering two disjoint cases for a valid plan: either all conquered islands lie on a single waterway, or they lie on exactly two waterways, connected at Pyke. How can you find the best solution for each case? For the two-waterway case, if you spend $C_1$ soldiers on a segment of the first waterway, you are left with a fixed budget for the second. How can you efficiently find the best segment on another waterway for this remaining budget?
+
+</details>
+
+<details>
+
+<summary>Hint #4</summary>
+
+When the number of waterways, $w$, is large, a direct approach that checks all possible combinations becomes inefficient. Instead, consider precomputing the maximum segment lengths for each possible cost using a hash map. This allows efficient lookups for complementary segments, significantly reducing the overall complexity.
+
 </details>
 
 ## ✨ Solutions
@@ -34,17 +51,13 @@ The problem can be simplified by considering two disjoint cases for a valid plan
 <details>
 <summary>First Solution(Test Sets 1, 2)</summary>
 
-### Core Idea
-
 The problem requires us to find a set of islands that form a contiguous path and whose combined conquest cost is exactly $k$. The goal is to maximize the number of islands in such a set. The contiguous path constraint is reminiscent of problems involving contiguous subarrays, which often suggests a **sliding window** approach.
-
-### Key Observation: Path Structure
 
 A crucial observation comes from the traversal rules. To switch between waterways, one must pass through Pyke (island 0). Since each island can only be visited once in the final traversal, Pyke can be visited at most once. This means a valid path can involve islands from **at most two waterways**. If a path involved three or more waterways, it would need to pass through Pyke at least twice, which is forbidden.
 
 This simplifies the problem immensely: a valid plan consists of either:
 1.  A contiguous segment of islands on a single waterway.
-2.  A contiguous segment of islands from one waterway connected at Pyke to a contiguous segment from a second waterway.
+2.  A contiguous segment of islands from one waterway connected at Pyke to a contiguous segment from a second waterway also connected to Pyke.
 
 ### The Algorithm
 
@@ -54,12 +67,13 @@ This observation leads to an approach where we check all valid path structures. 
 
 2.  **Two Waterway Case:** We can iterate through every pair of distinct waterways, say waterway `A` and waterway `B`. To form a single contiguous path, we can conceptually "stitch" them together at Pyke. For example, we can form a path `(end of A) -> ... -> Pyke -> ... -> (end of B)`. This means we traverse one waterway in reverse towards Pyke, and the other away from Pyke. We can then apply the sliding window algorithm on this combined path.
 
-The main implementation challenge is managing the indices when creating a combined path from two separate waterways. In the provided code, this is handled by carefully tracking `left` and `right` pointers across the boundary between the two waterways.
+The main implementation challenge is managing the indices when creating a combined path from two separate waterways. 
 
-### Complexity Analysis
+### Issues with this Solution
 
 This approach involves iterating through all pairs of waterways. There are $O(w^2)$ such pairs. For each pair, we perform a sliding window algorithm. The length of the combined path can be up to $O(n)$. Therefore, the time complexity is $O(w^2 \cdot n)$. If $w$ is small (as in Test Sets 1 and 2, where $w \le 20$), this is feasible. However, for larger $w$, this approach becomes too slow.
 
+### Code
 ```cpp
 #include <iostream>
 #include <vector>
@@ -165,35 +179,39 @@ The two cases to consider for an optimal solution are:
 
 We can find the maximum number of islands for each case separately and take the overall maximum.
 
-### Case 1: Single Waterway Paths
+### Case 1: Single Waterway
 
 This case is straightforward. We can iterate through each of the $w$ waterways. For each one, we apply a standard **sliding window** algorithm to find the longest contiguous segment of islands whose costs sum up to exactly $k$. The total time complexity for this part is proportional to the sum of the lengths of all waterways, which is $O(n)$.
 
-### Case 2: Two Waterway Paths
+### Case 2: Two Waterways
 
 This is the more complex case. A path on two waterways must consist of:
 - A segment of islands on waterway `A`, starting from Pyke and extending outwards.
 - Pyke itself (island 0).
 - A segment of islands on waterway `B`, also starting from Pyke and extending outwards.
 
-Let's say we choose a segment on waterway `A` (excluding Pyke) with total cost $C_A$ and length $L_A$. For a valid plan, the total cost must be $k$. This means the remaining components—Pyke and the segment from waterway `B`—must have a combined cost of $k - C_A$. So, the segment from waterway `B` must have a cost of $C_B = k - C_A - \text{cost(Pyke)}$.
+Let's say we choose a segment on waterway `A` (excluding Pyke) with total cost $C_A$ and length $L_A$. For a valid plan, the total cost must be $k$. This means the remaining components (Pyke and the segment from waterway `B`) must have a combined cost of $k - C_A$. So, the segment from waterway `B` must have a cost of $C_B = k - C_A - \text{cost(Pyke)}$.
 
-Our goal is to find a pair of such segments $(A, B)$ that maximizes the total length $L_A + L_B + 1$.
+Our goal is to find a pair of such segments $(A, B)$ that maximizes the total length $L_A + L_B + 1$. We can not use the naiive sliding window approach from the first solution as it scales quadratically in the number of waterways $w$. We therefore need to opt for a more efficient solution, precomputing the maximum segment lengths $L$ for each possible cost using a hash map. This allows efficient lookups for complementary segments, reducing the overall complexity to $O(n)$ by processing each waterway independently and combining results intelligently.
 
-### An Efficient Approach using Hashing
 
-A naive search for the matching segment on waterway `B` would be too slow. We can optimize this using a hash map (like `std::unordered_map` in C++).
+### Hashing
+
+A naive search for the matching segment on waterway `B` would be too slow. We can optimize this using a hash map (like `std::unordered_map`).
 
 The algorithm proceeds as follows:
 1.  Initialize `max_size` by solving Case 1 for all single waterways.
-2.  Initialize an empty hash map, `men_to_max_num_islands`. This map will store `cost -> max_length` pairs. Specifically, `map[C]` will hold the maximum number of islands (length) we can conquer with a path starting from (but not including) Pyke that costs exactly $C$.
+2.  Initialize an empty hash map, `men_to_max_num_islands`. This map will store `cost -> max_length` pairs. Specifically, `men_to_max_num_islands[C]` will hold the maximum number of islands (length) we can conquer with a path starting from (but not including) Pyke that costs exactly $C$.
 3.  Iterate through each waterway, one by one. For the current waterway `i`:
-    a.  Calculate the prefix sums of costs for segments starting from Pyke. Let `prefix_sum[j]` be the cost to conquer the first `j` islands on this waterway after Pyke.
-    b.  For each prefix of length `j` and cost `prefix_sum[j]`:
-        i.  Calculate the required cost for a complementary path on another waterway: `complement_cost = k - prefix_sum[j] - cost(Pyke)`.
-        ii. Look up `complement_cost` in our hash map. If an entry exists, say `men_to_max_num_islands[complement_cost] = L_complement`, it means we have previously processed a waterway with a segment of length `L_complement` and cost `complement_cost`.
-        iii. We have found a valid two-waterway plan with total length `j + L_complement + 1` (for Pyke). We update our global `max_size` with this new length if it's larger.
-    c. After checking all prefixes of the current waterway `i`, we update the hash map with its own path information. For each prefix of length `j` and cost `prefix_sum[j]`, we update `men_to_max_num_islands[prefix_sum[j]] = max(men_to_max_num_islands[prefix_sum[j]], j)`.
+    
+    1.  Calculate the prefix sums of costs for segments starting from Pyke. Let `prefix_sum[j]` be the cost to conquer the first `j` islands on this waterway after Pyke.
+
+    2.  For each prefix of length `j` and cost `prefix_sum[j]`:
+        1.  Calculate the required cost for a complementary path on another waterway: `complement = k - prefix_sum[j] - cost(Pyke)`.
+        2. Look up `complement` in our hash map. If an entry exists, say `men_to_max_num_islands[complement] = L_complement`, it means we have previously processed a waterway with a segment of length `L_complement` and cost `complement`.
+        3. We have found a valid two-waterway plan with total length `j + L_complement + 1` (for Pyke). We update our global `max_size` with this new length if it's larger.
+
+    3. After checking all prefixes of the current waterway `i`, we update the hash map with its own path information. For each prefix of length `j` and cost `prefix_sum[j]`, we update `men_to_max_num_islands[prefix_sum[j]] = max(men_to_max_num_islands[prefix_sum[j]], j)`.
 
 By updating the map *after* checking for complements, we ensure that we only combine paths from two *different* waterways.
 
