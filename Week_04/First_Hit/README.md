@@ -14,7 +14,7 @@ If an intersection exists, the coordinates of this first intersection point shou
 
 <summary>Hint #1</summary>
 
-The fundamental operation in this problem is determining if and where a ray intersects a line segment. A straightforward approach would be to iterate through all the obstacle segments, calculate the intersection point for each, and then identify which of these intersection points is closest to the ray's origin.
+The **Exact Predicates Exact Constructions Kernel (EPECK)** from CGAL is necessary for this problem. It ensures exact results for both geometric predicates (like intersection checks) and constructions (like determining the exact intersection point). This precision is crucial given the large coordinate values and the need to avoid floating-point inaccuracies.
 
 </details>
 
@@ -22,7 +22,7 @@ The fundamental operation in this problem is determining if and where a ray inte
 
 <summary>Hint #2</summary>
 
-The coordinate values can be extremely large. Standard floating-point data types like `double` may not have enough precision to represent these values and the results of intermediate calculations accurately. This can lead to incorrect intersection results. Consider using a computational geometry library that supports exact arithmetic to avoid these precision issues.
+After detecting an intersection, the ray can be replaced with a shorter segment that ends at the closest intersection point found so far. This ensures that only closer intersections are considered in subsequent checks, improving efficiency.
 
 </details>
 
@@ -30,7 +30,7 @@ The coordinate values can be extremely large. Standard floating-point data types
 
 <summary>Hint #3</summary>
 
-The brute-force approach of checking every segment has a time complexity of $O(N)$. Given the constraints, this is likely efficient enough. To improve the practical running time, consider this: once you find an intersection, you are only interested in other intersections that are even closer. You can maintain the "closest hit found so far" and shorten your ray for subsequent checks. Shuffling the input segments randomly can increase the probability of finding a close intersection early, potentially speeding up the average-case performance.
+Randomly shuffling the input segments before processing can improve the average-case performance. By increasing the likelihood of finding a close intersection early, the search segment shrinks quickly, reducing the number of unnecessary checks.
 
 </details>
 
