@@ -1,4 +1,4 @@
-# James Bond's sovereigns
+# James Bond's Sovereigns
 
 ## 📝 Problem Description
 
@@ -11,22 +11,43 @@ Your task is to calculate the largest possible total value of coins that a speci
 ## 💡 Hints
 
 <details>
+
 <summary>Hint #1</summary>
+
 The problem asks you to find a guaranteed outcome in a game of sequential choices. This suggests that you need to consider the best move at each step, while also accounting for the worst possible moves your opponents can make. Think about how the state of the game can be represented at any point. What information is essential to decide on a move?
+
 </details>
+
 <details>
+
 <summary>Hint #2</summary>
+
 Since you must guarantee a win against any of your opponents' strategies, this suggests a **minimax** approach. The problem has optimal substructure (the solution to a larger problem depends on solutions to smaller subproblems) and overlapping subproblems (the same subproblems are solved multiple times). This structure makes it a good candidate for **dynamic programming** or recursion with memoization.
+
 </details>
+
 <details>
+
 <summary>Hint #3</summary>
-A key challenge is handling the two adversarial aspects. First, whenever it is your turn, you must assume that in the intervening `m-1` turns, the other players will collaborate to leave you with the worst possible options for your *next* turn. Second, for the very first `k` turns of the game (before you, passenger `p_k`, get to play), the players `p_0` through `p_{k-1}` will make moves to leave you in the worst possible starting position. Your solution must account for both of these worst-case scenarios, which involves minimizing over the opponents' choices.
+
+A key challenge is handling the two adversarial aspects. First, whenever it is your turn, you must assume that in the intervening $m-1$ turns, the other players will collaborate to leave you with the worst possible options for your *next* turn. Second, for the very first $k$ turns of the game (before you, passenger $p_k$, get to play), the players $p_0$ through $p_{k-1}$ will make moves to leave you in the worst possible starting position. Your solution must account for both of these worst-case scenarios, which involves minimizing over the opponents' choices.
+
+</details>
+
+<details>
+
+<summary>Hint #4</summary>
+
+You can simplify the problem by focusing solely on your own turns and the possible outcomes for those turns. Essentially, you can skip over the opponents' turns and only consider the resulting states that could occur due to their adversarial moves. This reduces the complexity of the problem and allows you to focus on maximizing your guaranteed outcome.
+
 </details>
 
 ## ✨ Solutions
 
 <details>
+
 <summary>Final Solution</summary>
+
 This problem describes a game where we want to find the best possible outcome in a worst-case scenario. We want to maximize our score, while all other players act as adversaries trying to minimize it. This is a classic **minimax** problem, which can be solved efficiently using **dynamic programming (DP)** with memoization.
 
 ### Overall Strategy
@@ -34,7 +55,7 @@ This problem describes a game where we want to find the best possible outcome in
 Our strategy is divided into two main parts:
 1.  **Handling the Initial Moves:** Before we (passenger $p_k$) get to make our first move, players $p_0, \dots, p_{k-1}$ will have taken a total of $k$ coins. Since they are adversaries, they will choose these $k$ coins in a way that leaves us in the worst possible starting position. They can take $i$ coins from the left and $k-i$ coins from the right, for any $i \in \{0, \dots, k\}$. We must find our guaranteed score for each of these possible starting boards and take the **minimum** among them.
 
-2.  **Solving the Subgame:** For a given board state (a subarray of coins), we need a function that calculates the maximum score we can guarantee if it's our turn to pick. Let's call this function `solve(start, end)`.
+2.  **Solving the Subgame:** For a given board state (a subarray of coins), we need a function that calculates the maximum score we can guarantee if it's our turn to pick. Let's call this function `solve(start, end)` (In the solution it is simply referred to as `recursion(...)`).
 
 ### DP Formulation
 
@@ -43,27 +64,28 @@ Let `solve(start, end)` be a function that computes the maximum winnings a playe
 **Recursive Step:**
 When it's our turn to choose from the subarray `[start, end]`, we have two options:
 
-1.  **Take the leftmost coin (`values[start]`):** Our immediate gain is `values[start]`. The remaining subarray is `[start+1, end]`. Before our next turn, the other $m-1$ players will each take a coin. They will remove a total of $m-1$ coins from the board `[start+1, end]`. To minimize our future winnings, they will leave us with the worst possible subproblem. They can take $i$ coins from the left and $(m-1)-i$ from the right. Our guaranteed score from the rest of the game will be the minimum over all their choices: `min_{0 \le i < m} { solve(start+1+i, end - (m-1-i)) }`.
-    Thus, our total guaranteed score if we take `values[start]` is:
-    `values[start] + min_{0 \le i < m} { solve(start+1+i, end - (m-1-i)) }`.
+1.  **Take the leftmost coin (`values[start]`):** Our immediate gain is `values[start]`. The remaining subarray is `[start+1, end]`. Before our next turn, the other $m-1$ players will each take a coin. They will remove a total of $m-1$ coins from the board `[start+1, end]`. To minimize our future winnings, they will leave us with the worst possible subproblem. They can take $i$ coins from the left and $(m-1)-i$ from the right. Our guaranteed score from the rest of the game will be the minimum over all their choices:  $$\min_{0 \le i \leq m - 1} { \text{solve}(\text{start}+1+i, \text{end} - (m-1-i)) }$$
+Thus, our total guaranteed score if we take `values[start]` is:
+$$\text{values}[\text{start}] + \min_{0 \leq i \leq m - 1} { \text{solve}(\text{start}+1+i, \text{end} - (m-1-i)) }$$
 
-2.  **Take the rightmost coin (`values[end]`):** Similarly, our gain is `values[end]`, and the remaining subarray is `[start, end-1]`. Our guaranteed score from the rest of the game is `min_{0 \le i < m} { solve(start+i, end-1 - (m-1-i)) }`.
-    Thus, our total guaranteed score if we take `values[end]` is:
-    `values[end] + min_{0 \le i < m} { solve(start+i, end-1 - (m-1-i)) }`.
+2.  **Take the rightmost coin (`values[end]`):** Similarly, our gain is `values[end]`, and the remaining subarray is `[start, end-1]`. Our guaranteed score from the rest of the game is $$\min_{0 \leq i \leq m - 1} { \text{solve}(\text{start}+i, \text{end}-1 - (m-1-i)) }$$
+Thus, our total guaranteed score if we take `values[end]` is:
+$$\text{values}[\text{end}] + \min_{0 \leq i \leq m - 1} { \text{solve}(\text{start}+i, \text{end}-1 - (m-1-i)) }$$
 
 Since we want to maximize our score, we will choose the better of these two options:
-`solve(start, end) = max(Option 1, Option 2)`.
+$$\text{solve}(\text{start}, \text{end}) = \max(\text{Option 1}, \text{Option 2})$$
 
 **Base Case:**
-The recursion terminates when there are not enough coins left for a full round of $m$ players. If `end - start + 1 < m`, it means that if we pick a coin now, we will not get another turn. Therefore, we should simply pick the more valuable of the two available coins.
-`solve(start, end) = max(values[start], values[end])`.
+The recursion terminates when there are not enough coins left for a full round of $m$ players. If `end - start + 1 < m`, it means that if we pick a coin now, we will not get another turn. Therefore, we should simply pick the more valuable of the two available coins:
+
+$$
+\text{solve}(\text{start}, \text{end}) = \max(\text{values}[\text{start}],\ \text{values}[\text{end}])
+$$
 
 **Memoization:**
-This recursive approach involves many overlapping subproblems. We can use a 2D array, `memo[start][end]`, to store the result of `solve(start, end)` and avoid recomputing it.
+This recursive approach involves many overlapping subproblems, especially, when iterating over all possible game states that can arise from the adversarial moves. We can use a 2D array, `memo[start][end]`, to store the result of `solve(start, end)` and avoid recomputing it.
 
 ### Implementation
-
-The main function first determines all possible board states after the initial $k$ adversarial moves. For each state `[i, n-1 - (k-i)]`, it calls our DP function `solve(i, n-1 - (k-i))`. The final answer is the minimum of these results.
 
 ```cpp
 #include<iostream>
