@@ -2,57 +2,66 @@
 
 ## 📝 Problem Description
 
-You are given a set of $N$ obstacle line segments in a 2D plane. You are also given a ray, defined by its starting point $S$ and another point $P$ that lies on the ray.
+A set of $N$ obstacle line segments is given in a 2D plane, along with a ray defined by its starting point $(x, y)$ and another point $(a, b)$ that lies on the ray.
 
-Your task is to find the first point where the ray intersects with any of the obstacle segments. An intersection point is considered "first" if it is the closest one to the ray's starting point $S$.
+The task is to determine the first point where the ray intersects with any of the obstacle segments. An intersection point is considered "first" if it is the closest one to the ray's starting point $(x, y)$.
 
-If an intersection exists, you should output the coordinates of this first intersection point, with each coordinate rounded down to the nearest integer. If the ray does not intersect any of the segments, you should report that there is no intersection.
+If an intersection exists, the coordinates of this first intersection point should be output, with each coordinate rounded down to the nearest integer.
 
 ## 💡 Hints
 
 <details>
+
 <summary>Hint #1</summary>
+
 The fundamental operation in this problem is determining if and where a ray intersects a line segment. A straightforward approach would be to iterate through all the obstacle segments, calculate the intersection point for each, and then identify which of these intersection points is closest to the ray's origin.
+
 </details>
+
 <details>
+
 <summary>Hint #2</summary>
+
 The coordinate values can be extremely large. Standard floating-point data types like `double` may not have enough precision to represent these values and the results of intermediate calculations accurately. This can lead to incorrect intersection results. Consider using a computational geometry library that supports exact arithmetic to avoid these precision issues.
+
 </details>
+
 <details>
+
 <summary>Hint #3</summary>
+
 The brute-force approach of checking every segment has a time complexity of $O(N)$. Given the constraints, this is likely efficient enough. To improve the practical running time, consider this: once you find an intersection, you are only interested in other intersections that are even closer. You can maintain the "closest hit found so far" and shorten your ray for subsequent checks. Shuffling the input segments randomly can increase the probability of finding a close intersection early, potentially speeding up the average-case performance.
+
 </details>
 
 ## ✨ Solutions
 
 <details>
+
 <summary>Final Solution</summary>
+
 This problem requires finding the closest intersection point between a ray and a set of line segments. The main challenges are the large coordinate values, which can cause precision errors with standard floating-point arithmetic, and handling the geometric calculations correctly.
+
+### Choice of Kernel
+
+For this problem, we need a kernel that can handle not only exact predicated but also exact constructions to determine where the intersection points lies. Therefore, the most suitable kernel for our needs is the **Exact Predicates Exact Constructions Kernel (EPECK)**. This kernel uses exact number types for all geometric predicates and constructions, ensuring that we can perform our calculations without worrying about floating-point inaccuracies.
 
 ### Approach
 
-The solution uses the **CGAL (Computational Geometry Algorithms Library)**, which is specifically designed for robust geometric computations. By using an exact kernel, we can avoid precision issues entirely.
+The strategy involves starting with the original ray and iterating through the obstacle segments. When an intersection is found, the ray is **replaced with a shorter segment** ending at the closest intersection point. This ensures that only closer intersections are considered in subsequent checks. 
 
-The overall strategy is as follows:
-1.  **Initialization:** Read the ray and all obstacle segments. The core of the algorithm is to iterate through each segment and keep track of the closest intersection point found so far.
-2.  **Iterative Search:**
-    *   We start with the original, infinite ray.
-    *   We iterate through the obstacle segments. The first time we find an intersection, we store that point. This point now becomes the endpoint of our "search segment", which starts at the ray's origin. We are no longer interested in any intersection that is further away.
-    *   For all subsequent obstacle segments, we check for an intersection with our current (and progressively shorter) search segment.
-    *   If a new, closer intersection is found, we update the endpoint of our search segment to this new point.
-3.  **Randomization for Performance:** Before iterating, we shuffle the list of obstacle segments randomly. While the worst-case complexity remains $O(N)$, this is a powerful heuristic. If a segment close to the ray's origin is processed early, our search segment shrinks quickly. Subsequent intersection tests against this shorter segment are often faster (e.g., their bounding boxes may not overlap), leading to better average-case performance.
+We can additionally first check if the ray (or segment) actually intersects the obstacle segment before computing the intersection point to avoid unnecessary calculations.
+
+To improve performance, the input segments are randomly shuffled before processing, increasing the likelihood of finding a close intersection early and preventing adversarial test cases/worst-case.
 
 ### Implementation Details
 
-*   **Kernel:** We use `CGAL::Exact_predicates_exact_constructions_kernel` (or `EPECK`). This kernel uses number types that can represent rational numbers with arbitrary precision, guaranteeing that all geometric predicates (like `do_intersect`) and constructions (like `intersection`) are exact.
 *   **Intersection Handling:** The `CGAL::intersection()` function can return different types. It might be a `Point` (for a simple intersection) or a `Segment` (if the ray and an obstacle are collinear and overlap). Our code must handle both cases correctly. If the intersection is an overlapping segment, we must identify which of its endpoints is closer to the ray's origin.
 *   **Distance Comparison:** To find the closest point, we compare distances. Comparing squared distances (`CGAL::squared_distance`) is more efficient as it avoids computing square roots, and it's sufficient for determining which point is closer.
 *   **Output:** The problem requires flooring the final coordinates. The provided `floor_to_double` function correctly converts CGAL's exact number type (`K::FT`) to a `double` and then applies the floor operation, carefully handling potential floating-point inaccuracies near integer boundaries.
 
-This approach is both robust due to the use of an exact geometry kernel and efficient enough to pass within the time limits.
-
+### Code
 ```cpp
-///1
 #include<iostream>
 #include<type_traits>
 #include<limits>
@@ -142,6 +151,18 @@ int main() {
   }
 }
 ```
+</details>
+
+## 🧠 Learnings
+
+<details> 
+
+<summary> Expand to View </summary>
+
+- Sometimes we need to shuffle the input to account for adversarial test cases
+- How long it takes to determine intersections can heavily depend on the geometric primitives we use. Always try to take the "simplest" possible.
+- How to work with the CGAL `intersection` function
+
 </details>
 
 ## ⚡ Result
