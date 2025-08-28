@@ -2,32 +2,42 @@
 
 ## 📝 Problem Description
 
-You are given a set of $N$ friends and $M$ boxes. Each friend $i$ has an associated strength $s_i$, and each box $j$ has an associated weight $w_j$. A friend can carry a box only if their strength is greater than or equal to the box's weight.
+Given a set of $N$ friends and $M$ boxes, each friend $i$ possesses a strength $s_i$, and each box $j$ has a weight $w_j$. A box can be carried by a friend only if the friend's strength is at least as great as the box's weight.
 
-The task is to move all $M$ boxes from an apartment to a moving van. Each friend can carry at most one box at a time. The time it takes for any friend to carry a box to the van is 2 minutes, and the time to return to the apartment is 1 minute. All friends start at the same time, and the process is complete once the last box reaches the van.
+The objective is to transfer all $M$ boxes from an apartment to a moving van. Each friend can carry at most one box at a time. The time required for a friend to deliver a box to the van is 2 minutes, and the return trip to the apartment takes 1 minute. All friends begin simultaneously, and the process finishes when the last box has been delivered to the van.
 
-Your goal is to determine the minimum amount of time required to move all $M$ boxes. If it's not possible for the given friends to move all the boxes (i.e., some box is heavier than the strongest friend), you should indicate that the task is impossible.
+The task is to determine the minimum total time necessary to move all $M$ boxes. If there exists a box that cannot be carried by any friend (i.e., its weight exceeds the strength of the strongest friend), the situation is impossible.
 
 ## 💡 Hints
 
 <details>
+
 <summary>Hint #1</summary>
+
 The total time for the entire operation is determined by the friend who makes the most trips. If a friend needs to make $k$ trips, what is the total time they will spend? Remember that they don't need to return to the apartment after their last delivery.
+
 </details>
 
 <details>
+
 <summary>Hint #2</summary>
-Consider the relationship between the number of trips and feasibility. If all boxes can be moved when each friend makes at most $k$ trips, can they also be moved if each friend is allowed to make $k+1$ trips? This monotonic property often suggests a powerful search algorithm. Instead of searching for the optimal time directly, perhaps you can search for the optimal number of trips.
+
+Consider the relationship between the number of trips and feasibility. If all boxes can be moved when each friend makes at most $k$ trips, can they also be moved if each friend is allowed to make $k+1$ trips? This monotonic property often suggests a search algorithm. Instead of searching for the optimal time directly, perhaps you can search for the optimal number of trips.
+
 </details>
 
 <details>
+
 <summary>Hint #3</summary>
+
 To check if a plan is feasible for a given maximum number of trips, say $k$, you need to assign boxes to friends effectively. To maximize your chances, who should carry the heaviest boxes? Sorting the friends by strength and the boxes by weight is a very good first step. Once sorted, how can you quickly verify if an assignment is possible for the $k$ trips limit?
+
 </details>
 
 ## ✨ Solutions
 
 <details>
+
 <summary>Final Solution</summary>
 
 This problem asks for the minimum time to move $M$ boxes using $N$ friends. The core of the problem is to find an optimal assignment of boxes to friends that minimizes the total duration.
@@ -63,8 +73,10 @@ The crucial part is to implement the `is_possible(k)` check efficiently. To give
     
     Therefore, our check is: for each required friend `i` from `0` to $f-1$, we must ensure that `strengths[i] >= weights[i * k]`. If this condition fails for any `i`, then `is_possible(k)` is `false`. If it holds for all required friends, it's `true`.
 
-By combining the binary search with this greedy check, we can efficiently find the minimum required number of trips, $k^*$, and the final answer will be $3k^* - 1$.
+**Note**: The code does not extract this logic into a separate function, as the actual check is not very complicated, but structuring it this way it is easier to understand.
 
+By combining the binary search with this greedy check, we can efficiently find the minimum required number of trips, $k^*$, and the final answer will be $3k^* - 1$.
+### Code
 ```cpp
 #include<iostream>
 #include<vector>
