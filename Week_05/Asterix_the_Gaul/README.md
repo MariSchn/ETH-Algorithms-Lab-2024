@@ -2,59 +2,75 @@
 
 ## 📝 Problem Description
 
-Given a set of $N$ available movements, where each movement is defined by a distance $d$ it covers and a time $t$ it takes, the goal is to select a subset of these movements to travel a total distance of at least $D$ in strictly less than $T$ seconds.
+Consider a set of $N$ available movements, each characterized by a distance $d$ and a time $t$. The task is to select a subset of these movements such that the total distance covered is at least $D$ and the total time required is strictly less than $T$ seconds.
 
-Additionally, we can drink $i$ gulps of a potion before starting. Taking $i$ gulps increases the distance of *every* chosen movement by an amount $s_i$. We are given the values of $s_i$ for $i$ from 1 to $M$. The objective is to find the minimum number of gulps required to meet the distance and time criteria. If it's impossible to succeed even with the maximum of $M$ gulps, we should report that.
+Before starting, it is possible to consume $i$ gulps of a potion, where taking $i$ gulps increases the distance of every chosen movement by $s_i$. The values $s_i$ are provided for $i$ from 1 to $M$. The objective is to determine the minimum number of gulps necessary to satisfy the distance and time requirements.
 
 ## 💡 Hints
 
 <details>
+
 <summary>Hint #1</summary>
+
 The number of available movements, $N$, is relatively small (up to 30). This often suggests that solutions with exponential complexity in $N$, such as those that explore all subsets of movements, might be feasible, at least for smaller values of $N$.
+
 </details>
+
 <details>
+
 <summary>Hint #2</summary>
+
 Let's first simplify the problem by ignoring the potion. How can you determine the maximum distance achievable for a *fixed number of moves*, say $k$, while keeping the total time under the limit $T$? This subproblem seems related to the classic subset sum problem. If you can solve this for all possible $k$, how can you use that information to find the answer?
+
 </details>
+
 <details>
+
 <summary>Hint #3</summary>
-A solution that checks all $2^N$ subsets is too slow when $N=30$, as $2^{30}$ is over a billion operations. When faced with an exponential complexity problem on a set, a common strategy is to split the set into two halves. Can you generate all possible outcomes for each half independently and then combine the results from the two halves efficiently? This technique is known as **meet-in-the-middle**.
+
+A solution that checks all $2^N$ subsets is too slow when $N=30$, as $2^{30}$ is over a billion operations. When faced with an exponential complexity problem on a set, a common strategy is to split the set into two halves. Can you generate all possible outcomes for each half independently and then combine the results from the two halves efficiently? This technique is known as split and list.
+
 </details>
 
 ## ✨ Solutions
 
 <details>
+
 <summary>First Solution (Test Sets 1, 2, 3)</summary>
+
 This problem asks us to select a subset of movements to satisfy certain conditions, which is a variation of the classic **Subset Sum Problem**. Since these problems are generally NP-complete, we expect a solution with exponential time complexity. For the smaller constraints where $N \le 20$, a brute-force approach that checks every possible subset of movements is feasible.
 
 The overall strategy can be broken down into two main phases:
 
 ### Phase 1: Precomputation of Maximum Distances
-First, we solve a simplified version of the problem: without any potions, what is the maximum distance we can cover for a given number of moves, say $k$, while staying under the time limit $T$?
 
-To do this, we can iterate through all $2^N$ subsets of the available movements. For each subset, we calculate:
+First, a simplified version of the problem is solved: without any potions, what is the maximum distance that can be covered for a given number of moves, say $k$, while staying under the time limit $T$?
+
+This is accomplished by iterating through all $2^N$ subsets of the available movements. For each subset, the following are computed:
 1.  The total distance covered (`sum_distance`).
 2.  The total time taken (`sum_time`).
 3.  The number of movements used (`n_moves`).
 
-If `sum_time` is strictly less than $T$, then this subset is a valid combination of moves. We use an array, let's call it `max_dist_for_k_moves`, to store the best distance found so far for each possible number of moves. We update `max_dist_for_k_moves[n_moves]` with `sum_distance` if it's greater than the currently stored value.
+If `sum_time` is strictly less than $T$, then this subset is a valid combination of moves. An array, `n_moves_to_best_raw_distance`, is used to store the best distance found so far for each possible number of moves. The value `n_moves_to_best_raw_distance[n_moves]` is updated with `sum_distance` if it is greater than the currently stored value.
 
-After checking all $2^N$ subsets, this array will contain the maximum raw distance (without potions) achievable for using $k = 0, 1, \dots, N$ movements.
+After checking all $2^N$ subsets, this array contains the maximum raw distance (without potions) achievable for using $k = 0, 1, \dots, N$ movements.
 
 ### Phase 2: Finding the Minimum Potion Gulps
-Now, we can determine the minimum number of gulps needed. We iterate through all possible numbers of moves, from $k=1$ to $N$. For each $k$:
 
-1.  We retrieve the maximum raw distance achievable with $k$ moves, `dist_raw = max_dist_for_k_moves[k]`. If no valid combination for $k$ moves exists, we skip it.
-2.  We check if we can already reach the destination: if `dist_raw >= D`, it means we can succeed with **0 gulps**. We can stop and report 0.
-3.  Otherwise, we need to cover a remaining distance of `D - dist_raw`. With $k$ moves, each gulp of potion adds a certain boost to *each* move. If we take a potion that gives a boost of `b`, the total extra distance is `k * b`.
-4.  Therefore, we need a per-move boost of at least `ceil((D - dist_raw) / k)`. Let's call this `necessary_boost`.
-5.  We are given a sorted list of potion effects $s_1, s_2, \dots, s_M$. We can use binary search (specifically, `std::lower_bound` in C++) to find the smallest index $i$ such that the potion effect $s_i$ is greater than or equal to `necessary_boost`. The number of gulps would then be $i$.
-6.  We keep track of the minimum number of gulps found across all values of $k$.
+The next step is to determine the minimum number of gulps needed. All possible numbers of moves, from $k=1$ to $N$, are considered. For each $k$:
 
-After checking all possible numbers of moves, the minimum value we found is our answer. If we never find a way to reach the destination, it's impossible.
+1.  The maximum raw distance achievable with $k$ moves is retrieved as `n_moves_to_best_raw_distance[k]`. If no valid combination for $k$ moves exists, this value is skipped.
+2.  If `n_moves_to_best_raw_distance[k] >= D`, then the destination can be reached with **0 gulps**. In this case, 0 is reported as the answer.
+3.  Otherwise, the remaining distance to cover is `D - n_moves_to_best_raw_distance[k]`. With $k$ moves, each gulp of potion adds a certain boost to each move. If a potion provides a boost of `b`, the total extra distance is `k * b`.
+4.  Therefore, a per-move boost of at least `ceil((D - n_moves_to_best_raw_distance[k]) / k)` is required. Denote this as `necessary_boost`.
+5.  Given a sorted list of potion effects $s_1, s_2, \dots, s_M$, binary search (specifically, `std::lower_bound`) is used to find the smallest index $i$ such that the potion effect $s_i$ is greater than or equal to `necessary_boost`. The number of gulps is then $i+1$ (since the list is 0-indexed).
+6.  The minimum number of gulps found across all values of $k$ is tracked.
+
+After checking all possible numbers of moves, the minimum value found is the answer. If no way is found to reach the destination, the task is impossible.
 
 **Complexity:** The first phase dominates the runtime. Iterating through all subsets takes $O(2^N \cdot N)$ time. The second phase takes $O(N \cdot \log M)$ for the binary searches. The total complexity is approximately $O(2^N \cdot N)$, which is acceptable for $N \le 20$.
 
+### Code
 ```cpp
 #include <iostream>
 #include <vector>
@@ -142,10 +158,12 @@ int main() {
 </details>
 
 <details>
-<summary>Final Solution</summary>
-The previous solution's $O(2^N \cdot N)$ complexity is too slow for the full constraints where $N$ can be up to 30. To optimize this, we can use the **meet-in-the-middle** (or **split and list**) technique. This approach reduces the complexity by splitting the problem into two smaller, more manageable subproblems and then combining their results.
 
-### The Meet-in-the-Middle Strategy
+<summary>Final Solution</summary>
+
+The previous solution's $O(2^N \cdot N)$ complexity is too slow for the full constraints where $N$ can be up to 30. To optimize this, we can use the **split and list** (or **meet-in-the-middle**) technique. This approach reduces the complexity by splitting the problem into two smaller, more manageable subproblems and then combining their results.
+
+### The Split-and-List Strategy
 
 1.  **Split:** Divide the $N$ movements into two halves: the first half with $\lfloor N/2 \rfloor$ moves and the second half with the rest.
 
@@ -155,14 +173,16 @@ The previous solution's $O(2^N \cdot N)$ complexity is too slow for the full con
 
 4.  **Combine Results:** Now, we combine the filtered results from the two halves. We iterate through every state $(k_1, t_1, d_1)$ from the first half. For each, we need to find the best possible partner state $(k_2, t_2, d_2)$ from the second half. A valid partner must satisfy the time constraint: $t_1 + t_2 < T$. Our goal is to find the partner that maximizes the total distance $d_1 + d_2$.
     For a given $t_1$, we need to find a state from the second half where $t_2 < T - t_1$ and $d_2$ is as large as possible. Since our filtered lists from step 3 are sorted by time (and thus also by distance), we can use binary search (`std::upper_bound`) to efficiently find the best valid partner.
-    For each valid combination `(k1+k2, t1+t2, d1+d2)`, we update our `max_dist_for_k_moves` array.
+    For each valid combination `(k1+k2, t1+t2, d1+d2)`, we update our `n_moves_to_best_raw_distance` array.
 
-5.  **Calculate Final Answer:** This final step is identical to the one in the first solution. We use the populated `max_dist_for_k_moves` array to calculate the required boost for each number of moves and find the minimum number of potion gulps.
+5.  **Calculate Final Answer:** This final step is identical to the one in the first solution. We use the populated `n_moves_to_best_raw_distance` array to calculate the required boost for each number of moves and find the minimum number of potion gulps.
 
 **Implementation Note:** The provided code implements this logic by working with "remaining distance" and "remaining time" instead of total distance and time. It initializes with `(D, T)` and subtracts the move's `(d, t)` at each step. So, minimizing the final "remaining distance" is equivalent to maximizing the total distance covered.
 
 **Complexity:** The generation and filtering steps for each half take roughly $O(N \cdot 2^{N/2})$. The combination step involves iterating through the first half's results and performing a binary search on the second half's results, leading to a complexity around $O(N \cdot 2^{N/2} \log(2^{N/2}))$, which simplifies to $O(N^2 \cdot 2^{N/2})$. This is significantly faster than $O(2^N)$ and is efficient enough for $N \le 30$.
 
+### Code
+**Note**: The original solution code comes from [this repo](https://github.com/simon-hrabec/Algolab-2020/tree/main).
 ```cpp
 #include <iostream>
 #include <vector>
@@ -270,7 +290,14 @@ int main() {
 ```
 </details>
 
-## ⚡ Result
+## 🧠 Learnings
+
+<details> 
+
+<summary> Expand to View </summary>
+
+- `std::lower_bound` is a very nice and useful function if you need a quick and simple binary search.
+- For problems which require exponential complexity (as they are NP-hard) split-and-list is probably necessary.
 
 ```plaintext
 Compiling: successful
