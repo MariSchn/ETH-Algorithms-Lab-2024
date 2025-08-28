@@ -9,22 +9,36 @@ A special condition applies to this journey: certain roads are classified as "ri
 ## 💡 Hints
 
 <details>
+
 <summary>Hint #1</summary>
+
 This problem is a variation of the classic shortest path problem. What is the standard algorithm for finding the shortest path between two points in a network where all travel times (weights) are non-negative?
+
 </details>
+
 <details>
+
 <summary>Hint #2</summary>
-Simply running a standard shortest path algorithm on the cities and roads will not work, as it doesn't account for the constraint of using at least $k$ river roads. The state of our search needs to include more than just the current city. How can we augment the search state to keep track of the number of river roads traversed so far?
+
+Simply running a standard shortest path algorithm on the cities and roads will not work, as it doesn't account for the constraint of using at least $k$ river roads. The state of our search needs to include more than just the current city. How can we augment the search state/graph to keep track of the number of river roads traversed so far?
+I.e. it is not enough for each node to store which city we are in. Ideally at each node in our graph we also store/encode the information of how many rivers we have crossed.
+
 </details>
+
 <details>
+
 <summary>Hint #3</summary>
-Consider creating a "layered" version of the city network. Imagine having $k+1$ copies, or layers, of the network. Layer $i$ could represent all paths that have used exactly $i$ river roads. How would you define the connections (roads) within a single layer and, more importantly, *between* different layers? Traversing a regular road would keep you in the same layer, while traversing a river road would move you to the next layer.
+
+Consider creating a "layered" version of the city network. Each layer $i$ represents all paths that have used exactly $i$ river roads. This means layer $0$ corresponds to paths that have used no river roads, layer $1$ to paths that have used one river road, and so on, up to layer $k$. Traversing a regular road keeps you within the same layer, while traversing a river road moves you from layer $i$ to layer $i+1$. Think about how to define the connections within a single layer and between adjacent layers to model this structure effectively.
+
 </details>
 
 ## ✨ Solutions
 
 <details>
+
 <summary>First Solution (Test Set 1, 2)</summary>
+
 This problem asks for the shortest path from a starting city $x$ to a destination city $y$ with an additional constraint. The presence of non-negative travel times suggests that Dijkstra's algorithm is a suitable foundation for a solution.
 
 A simple application of Dijkstra's algorithm would find the shortest path but would ignore the constraint about using a minimum number of river roads. For the first two test sets, we have the simplifying assumption that $k=1$, meaning exactly one river road must be part of the path.
@@ -33,13 +47,14 @@ This suggests that any valid path will look like this: a shortest path from the 
 
 We can solve this by decomposing the problem:
 1.  **Calculate all-pairs shortest paths from $x$:** Run Dijkstra's algorithm starting from city $x$. This gives us the shortest travel time from $x$ to every other city in the network. Let's call this `dist_from_x`.
-2.  **Calculate all-pairs shortest paths from $y$:** Run Dijkstra's algorithm starting from city $y$. For an undirected network, this gives the shortest travel time from any city to $y$. Let's call this `dist_to_y`.
+2.  **Calculate all-pairs shortest paths from $y$:** Run Dijkstra's algorithm starting from city $y`. For an undirected network, this gives the shortest travel time from any city to $y$. Let's call this `dist_to_y`.
 3.  **Combine the paths:** Iterate through every river road in the network. For each river road connecting cities $u$ and $v$ with travel time $w$, we can form a complete, valid path in two ways:
     *   $x \rightarrow \dots \rightarrow u \xrightarrow{\text{river}} v \rightarrow \dots \rightarrow y$. The total time is `dist_from_x[u] + w + dist_to_y[v]`.
     *   $x \rightarrow \dots \rightarrow v \xrightarrow{\text{river}} u \rightarrow \dots \rightarrow y$. The total time is `dist_from_x[v] + w + dist_to_y[u]`.
 
 By calculating these potential path times for every river road and finding the minimum among them, we can determine the shortest path that uses at least one river road.
 
+### Code
 ```cpp
 #include<iostream>
 #include<vector>
@@ -99,8 +114,11 @@ int main() {
 }
 ```
 </details>
+
 <details>
+
 <summary>Final Solution</summary>
+
 The previous approach of running Dijkstra twice and iterating over river roads works well for $k=1$. However, it does not generalize to cases where $k>1$, as we would need to consider all combinations of $k$ river roads, which is computationally infeasible.
 
 The constraint that $k$ is small (up to 10) is a strong hint. This suggests a solution where the complexity might depend on $k$. The key idea is to augment the state in our shortest path search. Instead of just tracking the current city, we also need to track the number of river roads traversed. A state can be defined by the pair `(current_city, num_rivers_used)`.
@@ -112,14 +130,13 @@ We can imagine creating $k+1$ copies of the original city network, stacked as la
 1.  **Nodes:** We create a new, larger graph with $n \times (k+1)$ nodes. A node with index `i * n + u` corresponds to the state `(city u, layer i)`.
 2.  **Regular Roads:** A regular road between cities $u$ and $v$ with travel time $w$ does not change the river road count. Therefore, for each layer $i \in [0, k]$, we add an edge between node `(u, i)` and node `(v, i)` with weight $w$.
 3.  **River Roads:** A river road between $u$ and $v$ with travel time $w$ is used to transition between layers.
-    *   To increment the river road count, for each layer $i \in [0, k-1]$, we add an edge connecting node `(u, i)` to node `(v, i+1)` with weight $w$. Since roads are bidirectional, this connection allows travel from $u$ to $v$ (or $v$ to $u$) while moving from layer $i$ to $i+1$.
-    *   To satisfy the "at least $k$" requirement, once we have used $k$ river roads (i.e., we are in layer $k$), any further traversal of a river road should keep us in a valid state. We model this by adding an edge for the river road between `(u, k)` and `(v, k)`. This allows paths to use more than $k$ river roads.
+    *   To increment the river road count, for each layer $i \in [0, k-1]$, we add an edge connecting node `(u, i)` to node `(v, i+1)` with weight $w$. Since roads are bidirectional, this connection allows travel from $u$ to $v$ (or $v$ to $u$) while moving from layer $i$ to layer $i+1$.
+    *   To satisfy the "at least $k$" requirement, once we have used $k$ river roads (i.e., we are in layer $k$), any further traversal of a river road should keep us in a valid state. We model this by adding an edge for the river road between `(u, k)` and `(v, k)`. This allows paths to use more than $k$ river roads if needed.
 
 ### Finding the Solution
-After constructing this layered graph, we can find the answer with a single run of Dijkstra's algorithm. We start the search from the node `(x, 0)`—representing the start city $x$ in layer 0 (having used 0 river roads). The final answer is the shortest distance to the node `(y, k)`. Any path reaching `(y, k)` will have used *exactly* $k$ river roads to transition through the layers, or *more than* $k$ by using additional river roads within layer $k$.
+After constructing this layered graph, we can find the answer with a single run of Dijkstra's algorithm. We start the search from the node `(x, 0)` representing the start city $x$ in layer 0 (having used 0 river roads). The final answer is the shortest distance to the node `(y, k)`. Any path reaching `(y, k)` will have used *exactly* $k$ river roads to transition through the layers, or *more than* $k$ by using additional river roads within layer $k$.
 
-The code below implements this layered graph strategy. It builds the graph with $n \times (k+1)$ vertices and adds edges according to the logic described above. A single Dijkstra run then efficiently finds the required minimum travel time.
-
+### Code
 ```cpp
 #include<iostream>
 #include<vector>
@@ -195,6 +212,17 @@ int main() {
   }
 }
 ```
+</details>
+
+## 🧠 Learnings
+
+<details> 
+
+<summary> Expand to View </summary>
+
+- Sometimes you need to call Dijkstra multiple times
+- Copying a graph multiple times and adding certain edges in between instances can be a common pattern (also occured in exam problem)
+
 </details>
 
 ## ⚡ Result
