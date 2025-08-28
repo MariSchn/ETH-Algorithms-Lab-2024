@@ -13,71 +13,87 @@ The goal is to find the smallest possible cost, i.e., the length of the shortest
 ## 💡 Hints
 
 <details>
+
 <summary>Hint #1</summary>
+
 The problem asks for the shortest <strong>contiguous</strong> sub-sequence of map parts that satisfies a certain property (covering the entire path). What is a common algorithmic technique for finding optimal contiguous sub-arrays or sub-sequences?
+
 </details>
+
 <details>
+
 <summary>Hint #2</summary>
+
 Consider a "sliding window" approach, where a window `[left, right]` represents the map parts $t_{left}, \dots, t_{right}$. A window is "valid" if all path legs are covered. As you expand the window by incrementing `right` or shrink it by incrementing `left`, you need a way to efficiently check if the window remains valid. How can you track which legs are covered without re-scanning all maps in the window each time?
+
 </details>
+
 <details>
+
 <summary>Hint #3</summary>
+
 The main geometric challenge is to determine if a leg $(p_i, p_{i+1})$ is contained within a triangle $t_j$. A key property of triangles is that they are <em>convex</em> shapes. What does this imply about containing a line segment? If a convex shape contains the two endpoints of a line segment, it must also contain the entire segment. This simplifies the problem from segment-in-triangle to point-in-triangle.
+
 </details>
+
 <details>
+
 <summary>Hint #4</summary>
-How can we efficiently check if a point is inside a triangle when we are only given six points on its edges, not its vertices? Calculating the vertices by intersecting lines is possible but can be slow and complex. A better approach is to use orientation tests. A point is inside a triangle if it lies on the "same side" of all three of the triangle's edges. To make this work, you first need to orient the edges consistently (e.g., all clockwise). You can achieve this by using a point on a third edge to determine the orientation of the other two.
+
+How can we efficiently check if a point is inside a triangle when we are only given six points on its edges, not its vertices? Calculating the vertices by intersecting lines is possible but can be slow and complex, especially since it would require exact constructions. 
+
+A better approach is to use orientation tests. A point is inside a triangle if it lies on the "same side" of all three of the triangle's edges. To make this work, you first need to orient the edges consistently (e.g., all clockwise). You can achieve this by using a point on a third edge to determine the orientation of the other two.
+
 </details>
 
 ## ✨ Solutions
 
 <details>
 <summary>Final Solution</summary>
-This problem combines a geometric component with a search algorithm. The overall task is to find the shortest contiguous sub-sequence of map parts, $t_{b}, \dots, t_{e-1}$, that covers an entire hiking path.
 
-### High-Level Strategy
+We can easily see, that this problem involves some **Geometry/CGAL**, as the Map Parts are represented by **Triangles** and the Path is a combination of **Segments**.
 
-We can break the problem into two main parts:
-1.  **Geometric Check:** An efficient method to determine if a given triangular map part covers a specific leg of the hike.
-2.  **Search Algorithm:** A way to find the shortest contiguous block of maps that satisfies the covering condition for all legs.
+Breaking it down, the problem requires us to find the **smallest contiguous subsequence of triangles** $t_{\text{left}}, \dots, t_{\text{right}}$ such that all the legs of the path $l_0, \dots, l_{m-1}$, $l_i = (p_i, p_{i + 1})$ are covered. 
+To find the smallest contiguous subsequence we usually use a **Sliding Window**. However, the Sliding Window approach is **not quite straight forward**, as it is not clear how our window updates when we increase or decrease its size.
 
-The requirement of a *contiguous* block strongly suggests a **sliding window** algorithm.
+### Sliding Window
 
-### Geometric Containment Check
+A window is **valid**, if the triangles $t_{\text{left}}, \dots, t_{\text{right}}$ in it cover all the legs $l_0, \dots, l_{m - 1}$.
+To check this we will introduce a vector **counting how often each leg $l_i$ is covered** in the window. This also provides an intuitive update rule when the `left` or `right` pointer of the window is updated:
 
-The first challenge is to check if a leg, which is a line segment, is contained within a triangle.
-A crucial observation is that triangles are **convex**. For any convex shape, if it contains the two endpoints of a line segment, it must also contain the entire segment. Therefore, the problem of checking if leg $(p_i, p_{i+1})$ is contained in triangle $t_j$ reduces to two simpler checks:
-1. Is point $p_i$ contained in triangle $t_j$?
-2. Is point $p_{i+1}$ contained in triangle $t_j$?
+- If the `right` pointer is updated, we add a new triangle to the window, so for every leg $l_i$  that is covered by the new triangle $t_{\text{right}}$ we increase the counter for $l_i$ by $1$
+- If the `left` pointer is updated, we remove the triangle $t_{\text{left}}$ from the window, so for every leg $l_i$ that was covered by the triangle $t_{\text{left}}$ we decrese the counter for $l_i$ by $1$
 
-The next challenge is performing this point-in-triangle test. The input format is unusual: each triangle is defined by six points lying on its edges, not its vertices. Calculating the triangle's vertices by intersecting the lines defined by these points is computationally expensive and can introduce precision issues.
+We can easily check if a window is valid, by checking if all legs $l_i$ are currently covered at least once.
+To **speed this up**, we can also introduce a `n_uncovered` counter, which counts the number of legs $l_i$ that are not currently covered. 
 
-A more robust method is to use **orientation tests**. A point $P$ is inside a triangle if and only if it lies on the same side of all three of the triangle's edges. For example, if we traverse the triangle's boundary in a clockwise direction, point $P$ must always be to our right.
+- If a new triangle is added (update of `right`) and increments the counter from $0$ to $1$ for some leg $l_i$, `n_uncovered` is decremented, as we have just covered a leg that was previously uncovered
+- If an old triangle is removed (update of `left`) and decrements the counter from $1$ to $0$ for some leg $l_i$, `n_uncovered` is incremented, as we have just removed the only triangle that covered $l_i$
 
-To implement this, we first need to establish a consistent orientation for the edges of each triangle. The input gives us pairs of points for each edge, like $(q_0, q_1)$, but the direction from $q_0$ to $q_1$ might not be consistent with a clockwise traversal. We can enforce a consistent orientation (e.g., clockwise) as a preprocessing step. For a triangle with edges $A, B, C$, we can orient edge $A$ (defined by points $a_1, a_2$) by checking its orientation relative to a point on edge $B$ (say, $b_1$). If `CGAL::left_turn(a_1, a_2, b_1)` is true, it means traversing from $a_1$ to $a_2$ results in a left turn towards the rest of the triangle, implying a counter-clockwise orientation. To enforce a clockwise orientation, we would swap the points to $(a_2, a_1)$. We repeat this process for all three edges to ensure they are all oriented consistently.
+Using this we only need to check if `n_uncovered == 0` to determine whether a window is valid or not, instead of having to loop over the entire vector.
 
-Once all edges are oriented clockwise, a point $P$ is inside or on the boundary of the triangle if it is *not* to the left of any edge. This can be checked with `!CGAL::left_turn(edge_p1, edge_p2, P)`. Using "not left" instead of "right" correctly handles cases where $P$ is collinear with an edge.
+### Containment
 
-### Sliding Window Algorithm
+The **main challenge** of the problem, however, still remains. We need to find a way to efficiently determine wheter a leg $l_j$ is contained in a triangle $t_i$.
 
-With the geometric check in place, we can find the shortest valid sequence of maps.
+Given that each triangle is represented by 6 points $a_1, a_2, b_1, b_2, c_1, c_2$ on its edges instead of its vertices it is not trivial to use the regular CGAL contains/intersects function to check whether the segment $l_i$ is contained in the triangle $t_i$. This is because to use that we would have to explicitly create the triangle from the 6 points. This would require intersecting the lines defined by $(a_1, a_2), (b_1, b_2), (c_1, c_2)$ to determine its vertices which required Constructions and consequently will be too slow.
 
-1.  **Preprocessing:** For each map part $t_i$ and each path leg $l_j$, we precompute whether $t_i$ covers $l_j$. We can store this information in a structure like `std::vector<std::vector<int>> covers`, where `covers[i]` contains the indices of all legs covered by map $t_i$. This step takes $O(n \cdot m)$ time.
+First, we can observe, that as triangles are convex, a leg $l_i$ is contained in $t_i$ if both its starting point $p_i$ and its ending point $p_{i + 1}$ are contained in the triangle $t_i$. Therefore, it is sufficient to check if $p_i, p_{i+1}$ are contained in $t_i$.
 
-2.  **Sliding Window:** We use a window `[left, right]` over the array of map parts. We also need two auxiliary data structures:
-    *   `times_covered[m-1]`: An array where `times_covered[j]` stores how many maps currently in our window cover leg $l_j$.
-    *   `n_uncovered`: A counter for the number of legs that are covered zero times by the maps in the window.
+To efficiently check if a point $p$ is contained in the triangle $t_i$ we will use **Orientation Tests**, which do not require constructions.
 
-The algorithm proceeds as follows:
-*   Initialize `left = 0`, `right = 0`, and `n_uncovered = m - 1`.
-*   Expand the window by incrementing `right`. For the new map $t_{right}$, iterate through all legs it covers (using our precomputed table). For each such leg $j$, increment `times_covered[j]`. If `times_covered[j]` becomes 1, it means this leg just went from uncovered to covered, so we decrement `n_uncovered`.
-*   Once `n_uncovered` reaches 0, the window `[left, right]` is valid and covers the entire path. We record its length, `right - left + 1`, and update our minimum answer.
-*   Now, we shrink the window from the left by incrementing `left`. For the old map $t_{left}$, we iterate through the legs it covered. For each such leg $j$, we decrement `times_covered[j]`. If `times_covered[j]` becomes 0, it means the leg is now uncovered, so we increment `n_uncovered`.
-*   We continue shrinking the window until it is no longer valid (`n_uncovered > 0`). Then, we go back to expanding with `right`.
+Given a new point $p$, we can check if it is on the **same side** (left or right) of each edge $e_a, e_b, e_c$ using `CGAL::left_turn`/`CGAL::right_turn`. 
+**If the point $p$ is inside the triangle, it has to be on the same side for all edges**.
+(If this is not clear try drawing some examples, or rather counter examples for this)
 
-This process continues until `right` reaches the end of the map list. The overall time complexity of the sliding window part is $O(n)$, as both `left` and `right` pointers only move forward. The total complexity is dominated by the preprocessing step, resulting in $O(n \cdot m)$.
+However, for this we need to ensure that all the edges $e_a,e_b,e_c$ are oriented in the same way. To avoid that for some edge, the inside is left while for the others inside is right. This depends on the **order** of $(a_1, a_2)$. We can ensure that this is consistent across all edgegs $e_a, e_b, e_c$ by **pre-processing** them such that for every edge, **right is inside** and **left is outside**. For this we use the fact that the triangle is convex. That means that at every vertex is either a left or a right turn, but they need to be all the same. Therefore we can just check if witht the current configuration $(a_1, a_2)$ of an edge every vertex is a right turn or left turn, and if it is a left turn, we can simply swap the points of the edge $(a_2, a_1)$ to make it a right turn. <br />
+With this consistent orientation for each triangle, we can then check if a point $p$ is contained in the triangle by checking if it is **NOT on the left side** for any edge $e_a, e_b, e_c$
 
-**Code**
+**Note**: It would be more intuitive to check wheter it is on the right side for all edges, but this causes some problems if $p$ is colinear with any edge. Therefore we instead check if it is not left of any edge.
+
+We can then simply precompute for every triangle $t_i$, which legs $l_j$  it covers and then apply the above described sliding window apprach
+
+### Code
 ```cpp
 #include <iostream>
 #include <vector>
@@ -129,7 +145,7 @@ void solve() {
     if(!CGAL::right_turn(triangles[triangle_idx][2], triangles[triangle_idx][3], triangles[triangle_idx][4])) {
       std::swap(triangles[triangle_idx][2], triangles[triangle_idx][3]);
     } 
-    // Check for line b and swap if orientation is wrong
+    // Check for line c and swap if orientation is wrong
     if(!CGAL::right_turn(triangles[triangle_idx][4], triangles[triangle_idx][5], triangles[triangle_idx][0])) {
       std::swap(triangles[triangle_idx][4], triangles[triangle_idx][5]);
     } 
@@ -189,6 +205,17 @@ int main() {
   while(n_tests--) { solve(); }
 }
 ```
+</details>
+
+## 🧠 Learnings
+
+<details> 
+
+<summary> Expand to View </summary>
+
+- For CGAL problems really think about whether you really need (exact) constructions or if you can find any way around them
+- 
+
 </details>
 
 ## ⚡ Result

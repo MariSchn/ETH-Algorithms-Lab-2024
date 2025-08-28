@@ -48,7 +48,7 @@ void solve() {
     if(!CGAL::right_turn(triangles[triangle_idx][2], triangles[triangle_idx][3], triangles[triangle_idx][4])) {
       std::swap(triangles[triangle_idx][2], triangles[triangle_idx][3]);
     } 
-    // Check for line b and swap if orientation is wrong
+    // Check for line c and swap if orientation is wrong
     if(!CGAL::right_turn(triangles[triangle_idx][4], triangles[triangle_idx][5], triangles[triangle_idx][0])) {
       std::swap(triangles[triangle_idx][4], triangles[triangle_idx][5]);
     } 
