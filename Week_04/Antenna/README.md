@@ -7,47 +7,41 @@ Given a set of $N$ locations in a 2D plane, represented by their coordinates $(x
 ## 💡 Hints
 
 <details>
+
 <summary>Hint #1</summary>
-The problem asks you to find an optimal location for a transmitter, which will become the center of a circular coverage area. The size of this area, its radius, is determined by the point or points that are farthest from this optimal center. Think about which of the given locations are most likely to constrain the size of this minimal coverage area.
+
+For this problem, you need a kernel that supports exact arithmetic for geometric predicates and constructions. The **Exact_predicates_exact_constructions_kernel_with_sqrt** is the ideal choice, as it ensures precision even when calculating square roots, which is necessary for determining the exact radius of the circle.
+
 </details>
+
 <details>
+
 <summary>Hint #2</summary>
-This problem can be modeled geometrically. The task is to find the smallest circle that encloses all given points. A key property of this minimal circle is that it is uniquely determined by either two of the points forming a diameter, or three of the points lying on its circumference. This is a classic problem in the field of computational geometry.
-</details>
-<details>
-<summary>Hint #3</summary>
-This is a well-known problem called the **Smallest Enclosing Circle** (or Minimum Enclosing Circle). Implementing an algorithm for it from scratch (like Welzl's algorithm) can be quite complex, especially when dealing with geometric edge cases and numerical precision. The large coordinate values given in the problem statement can easily lead to floating-point errors with standard `double` or `long double` types. For a robust solution, consider using a specialized library designed for computational geometry, such as the **Computational Geometry Algorithms Library (CGAL)**.
+
+CGAL provides built-in functionality for solving this problem. Use the `Min_circle_2` class along with its associated traits, `Min_circle_2_traits_2`. These tools allow you to compute the smallest enclosing circle for a set of points efficiently and robustly.
+
 </details>
 
 ## ✨ Solutions
 
 <details>
+
 <summary>Final Solution</summary>
+
 This problem is a classic computational geometry task: finding the **Smallest Enclosing Circle** for a given set of points. The center of the radio transmitter corresponds to the center of this circle, and the transmission radius is the circle's radius.
 
-### Approach: Using a Computational Geometry Library (CGAL)
+### Choice of Kernel
 
-Implementing an algorithm for the smallest enclosing circle from scratch is challenging. It requires handling various geometric configurations and, more importantly, dealing with numerical precision. The input coordinates can be large, making standard floating-point arithmetic prone to errors.
+For this problem, we need a kernel that can handle exact arithmetic, especially for geometric predicates and constructions (such as the exact radius of the circle). The most suitable choice is the **Exact_predicates_exact_constructions_kernel_with_sqrt**. The important aspect here is that we also need exact square roots, as we are asked to give the actual radius and not the squared radius, which involves a root.
 
-A more practical and robust approach, especially in an academic or competitive setting, is to use a specialized library like the **Computational Geometry Algorithms Library (CGAL)**. CGAL provides highly optimized and numerically stable implementations for a vast range of geometric problems.
+### Approach
 
-### C++ Implementation with CGAL
+CGAL already offers everything we need for this problem. We can simply read in all points as `K::Point_2` objects and store them in a vector. 
+The `mc` function already provides us with the minimum enclosing circle for all the points. We simply need to get its radius by taking the square root of `c.squared_radius()`.
 
-The solution uses CGAL's `Min_circle_2` component to solve the problem directly.
+Note that for the output in this problem to be counted correctly, you need to set the output precision to 0 decimal places.
 
-1.  **Kernel Selection**: We use `Exact_predicates_exact_constructions_kernel_with_sqrt`. This is a crucial choice. This "kernel" tells CGAL to use number types that can represent calculations (including square roots) *exactly*, without any loss of precision. This avoids the floating-point errors that would likely arise from using standard `double` types with large coordinates.
-
-2.  **Algorithm Usage**:
-    *   We read all input coordinates and store them as `Point` objects in a `std::vector`.
-    *   The core of the solution is the line: `MinCircle mc(points.begin(), points.end(), true);`. This creates an instance of the `Min_circle_2` algorithm, passing the collection of points. The algorithm automatically computes the smallest enclosing circle. The `true` parameter enables a randomized processing of points, which leads to an excellent expected runtime.
-    *   The resulting circle object is retrieved via `mc.circle()`.
-
-3.  **Outputting the Radius**:
-    *   The problem requires the smallest *integral* transmission radius.
-    *   We get the squared radius from the circle object using `c.squared_radius()`.
-    *   We then compute the actual radius by taking the square root using `CGAL::sqrt()`. This operation is also performed with exact precision by the kernel.
-    *   Finally, we need to find the ceiling of this exact radius value. The helper function `ceil_to_double` handles the conversion from CGAL's exact number type to a `double` and computes the ceiling carefully to avoid floating-point inaccuracies, ensuring the correct integer output.
-
+### Code
 ```cpp
 #include<iostream>
 #include<cmath>
