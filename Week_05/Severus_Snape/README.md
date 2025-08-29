@@ -2,71 +2,103 @@
 
 ## 📝 Problem Description
 
-The goal is to find the minimum total number of potions required to boost three attributes—magical power, happiness, and wit—to at least some specified threshold values $P$, $H$, and $W$, respectively. All attributes start at zero.
+The task is to determine the minimum total number of potions required to increase three attributes—magical power, happiness, and wit—to at least specified threshold values $P$, $H$, and $W$, respectively. All attributes initially have a value of zero.
 
-There are two types of potions available:
-1.  **Type A Potions:** There are $n$ distinct potions of this type. The $i$-th potion provides $p_i$ magical power and $h_i$ happiness, but decreases wit by a fixed amount $a$.
-2.  **Type B Potions:** There are $m$ distinct potions of this type. The $j$-th potion provides $w_j$ wit, but decreases magical power by a fixed amount $b$. It has no effect on happiness.
+Two types of potions are available:
+1.  **Type A Potions:** There are $n$ distinct potions of this type. The $i$-th potion increases magical power by $p_i$ and happiness by $h_i$, but decreases wit by a fixed amount $a$.
+2.  **Type B Potions:** There are $m$ distinct potions of this type. The $j$-th potion increases wit by $w_j$, but decreases magical power by a fixed amount $b$. This type has no effect on happiness.
 
-You must select a subset of the available $n$ type A and $m$ type B potions. The task is to determine the smallest possible size of this subset that meets or exceeds the required thresholds for all three attributes. If no combination of potions can achieve this, the answer should indicate that it's impossible.
+A subset of the available $n$ type A and $m$ type B potions must be selected. The task is to determine the smallest possible size of such a subset that meets or exceeds the required thresholds for all three attributes.
 
 ## 💡 Hints
 
 <details>
+
 <summary>Hint #1</summary>
-The problem asks for the minimum *total* number of potions. Notice that the two types of potions have distinct primary effects: type A for happiness, and type B for wit. Both affect power. How can you use this separation to simplify the problem?
+
+Notice that happiness is only ever increased by type A potions and never decreased by any potion. This means that once you reach the required happiness threshold, you do not need to worry about losing it. Therefore, your main challenge is to optimize the selection of potions to maximize magical power and wit while ensuring happiness is at least the required value.
+
 </details>
+
 <details>
+
 <summary>Hint #2</summary>
-Consider the type B potions. If you decide to take a fixed number, say $k_B$, of them, which $k_B$ potions are the best to choose? Since they all have the same power penalty ($b$) but offer different amounts of wit, it is always optimal to pick the ones that provide the most wit. This suggests a greedy choice is possible for type B potions.
+
+When working with type A potions, focus on how to reach the happiness threshold as efficiently as possible, but also pay attention to the resulting magical power. Since happiness cannot decrease, you can use a dynamic programming approach to precompute, for each possible number of type A potions and happiness value, the maximum magical power achievable. How might you structure your DP state and transitions to efficiently answer queries about possible happiness and power combinations?
+
 </details>
+
 <details>
+
 <summary>Hint #3</summary>
-Now consider the type A potions. Choosing them is more complex because they involve a trade-off between power and happiness. A simple greedy choice is not obvious. This subproblem—selecting a specific number of items to satisfy a constraint on one value (happiness) while maximizing another (power)—is a classic pattern. This structure suggests that dynamic programming might be a suitable technique.
+
+Once you have precomputed the best possible outcomes for type A potions, think about how to select type B potions. For a fixed number of type B potions, how would you choose which ones to take? Is there a way to select the most effective subset for a given number? What impact does this choice have on the other attributes?
+
 </details>
+
 <details>
+
 <summary>Hint #4</summary>
-To combine these ideas, you can pre-process one set of potions. For example, you can build a dynamic programming table for type A potions. A state like $dp[j][h]$ could store the maximum power achievable using exactly $j$ type A potions to get at least $h$ happiness. After this pre-computation, you can iterate through the number of type B potions you take ($k_B$), and for each choice, use the DP table to efficiently find the minimum number of type A potions ($k_A$) needed to satisfy the remaining requirements.
+
+Try to combine your strategies for both potion types. Can you iterate over possible numbers of type B potions, and for each, use your precomputed results for type A potions to check if all thresholds can be met? How can you efficiently check if a combination of type A and type B potions meets all three requirements?
+
 </details>
 
 ## ✨ Solutions
 
 <details>
+
 <summary>Final Solution</summary>
-This problem asks for the minimum total number of potions to satisfy three different attribute thresholds. The effects of the two potion types are intertwined, primarily through the magical power attribute. A good strategy is to separate the decision-making process for each type of potion. We can use dynamic programming to analyze the trade-offs for type A potions and a greedy approach for type B potions.
 
-### Overall Strategy
+A good strategy is to separate the decision-making process for each type of potion. We can use **dynamic programming** to analyze the trade-offs for type A potions and a **greedy** approach for type B potions.
 
-1.  **Pre-computation for Type A Potions:** The choice of type A potions is complex due to the two attributes they provide (power and happiness). We will use dynamic programming to pre-compute the maximum possible magical power for any given number of type A potions and any minimum happiness requirement.
-2.  **Greedy Choice for Type B Potions:** For a fixed number of type B potions, it's always best to take those that provide the most wit, as they all have the same power penalty. We can sort them by their wit value.
+### Approach
+
+1.  **Pre-computation for Type A Potions:** The choice of type A potions is complex due to the two attributes they provide (power and happiness). We will use dynamic programming to pre-compute the maximum possible **magical power** for any given number of type A potions and any minimum happiness requirement.
+2.  **Greedy Choice for Type B Potions:** For a fixed number of type B potions, it's always best to take those that provide the most wit, as they all have the same power penalty. Therefore, we can sort them by their wit value.
 3.  **Combining Results:** We then iterate through the number of type B potions we could take. For each number, we calculate the resulting wit gain and power penalty. Then, using our pre-computed DP table, we find the minimum number of type A potions required to satisfy the remaining thresholds.
+4.  **Finalizing the Solution:** The first valid combination of type A and type B potions that meets all requirements gives us the answer. 
 
 ### Dynamic Programming for Type A Potions
 
-Let's define a DP state to capture the necessary information.
-$dp[i][j][h]$ = The maximum magical power achievable by choosing exactly $j$ potions from the first $i$ available type A potions, while ensuring their combined happiness is *at least* $h$.
+To efficiently select type A potions, we use a three-dimensional dynamic programming table that tracks the best possible outcome for different choices:
 
-The transitions are as follows: when considering the $i$-th potion (with power $p_{i-1}$ and happiness $h_{i-1}$):
-*   **Option 1: Don't take potion $i-1$.** We must still choose $j$ potions from the first $i-1$ available. The maximum power is $dp[i-1][j][h]$.
-*   **Option 2: Take potion $i-1$.** We now need to choose $j-1$ potions from the first $i-1$. To meet the total happiness goal of at least $h$, the other $j-1$ potions must provide a combined happiness of at least $h - h_{i-1}$. The total power would be $p_{i-1}$ plus the power from the other potions, which is $dp[i-1][j-1][\max(0, h - h_{i-1})] + p_{i-1}$.
+**DP State Definition:**
+$\text{DP}[i][j][h]$ represents the maximum total magical power achievable by choosing exactly $j$ potions from the first $i$ type A potions, such that their combined happiness is at least $h$.
 
-The final value is the maximum of these two options:
-$dp[i][j][h] = \max(dp[i-1][j][h], \quad dp[i-1][j-1][\max(0, h - h_{i-1})] + p_{i-1})$
 
-The table is initialized with a very small number (negative infinity) to denote impossible states. Base cases for $j=1$ are handled by finding the best single potion.
+**Base Case:** For $j=1$ (only take one potion), the base case is handled by selecting the single potion among the first $i$ that provides at least $h$ happiness and the highest possible power.
 
-### Finding the Minimal Combination
+**Recursion:**
+When considering the $i$-th potion (with power $p_{i-1}$ and happiness $h_{i-1}$), we have two choices:
 
-After populating the DP table, we combine the results:
-1.  Sort type B potions in descending order of the wit they provide.
-2.  Iterate through the number of type B potions to take, $k_B$, from $1$ to $m$. For each $k_B$, we take the top $k_B$ potions.
-3.  Calculate the `current_wit` and `power_penalty` for these $k_B$ potions.
+1. **Don't take the $i$-th potion:**
+  We still need to select $j$ potions from the first $i-1$ potions, maintaining the same happiness requirement $h$. We have previously computed the optimal value for this and can read it from the DP table. The value is $\text{DP}[i-1][j][h]$.
+
+2. **Take the $i$-th potion:** We must select $j-1$ potions from the first $i-1$ potions. To ensure the total happiness is at least $h$, the remaining $j-1$ potions must provide at least $h - h_{i-1}$ happiness (if this is negative, we use $0$ instead). This is because since we are taking potion $i$ we get $h_{i-1}$ from the potion itself, so we only need $\max(0, h - h_{i-1})$ from the other potions. <br />
+We can read how much magical power we will get from this from our DP table as $\text{DP}[i-1][j-1][\max(0, h - h_{i-1})]$. Since we also take the $i$-th potion, we add its power to the total. The value is $\text{DP}[i-1][j-1][\max(0, h - h_{i-1})] + p_{i-1}$.
+
+We take the maximum of these two options:
+
+$$
+	\text{DP}[i][j][h] = \max\left(\text{DP}[i-1][j][h],\; \text{DP}[i-1][j-1][\max(0, h - h_{i-1})] + p_{i-1}\right)
+$$
+
+Using this recursion, we can simply fill the entire DP table $\text{DP}[i][j][h]$
+
+### Greedy Approach for Type B Potions
+
+After populating the DP table, we use a greedy approach to optimize the type B potions. 
+1.  Sort type B potions in descending order of the wit they provide. <br /> This was not possible for the type A potions, as they provide both magical power and happiness.
+2.  Iterate through the number of type B potions to take, $k_B$, from $1$ to $m$. For each $k_B$, we take the top $k_B$ type B potions.
+3.  Calculate the `current_wit` and `power_penalty` the best $k_B$ type B potions provide.
 4.  If `current_wit` is at least $W$, we proceed. Otherwise, adding A-potions (which reduce wit) won't help, so we need more B-potions.
-5.  We then search for the smallest number of type A potions, $k_A$ (from $1$ to $n$), that satisfies the remaining conditions:
-    *   **Wit:** `current_wit` - $k_A \times a \ge W$
-    *   **Power:** $dp[n][k_A][H] \ge P + \text{power\_penalty}$
-6.  The first pair $(k_A, k_B)$ that fulfills all conditions provides a valid solution. The algorithm returns the total count $k_A + k_B$ and terminates. If the loops complete without finding any solution, it is impossible.
+5.  We then search for the smallest number of type A potions, $k_A$ (from $1$ to $n$) in our precomputed DP table, that satisfies the remaining conditions:
+    *   **Wit:** `current_wit` - $k_A \cdot a \ge W$, the wit needs to be enough even after applying the penalty $k_A \cdot a$ we get from the type A potions
+    *   **Power:** $\text{DP}[n][k_A][H] \ge P + \text{power\_penalty}$, the magiacal power when taking $k_A$ type A potions among all $n$ potions and having at least $H$ happiness needs to fulfill the magical power constraint, even when applying the power penalty from the type B potions.
+6.  Since the type B potions are sorted descendingly, the first pair $(k_A, k_B)$ that fulfills all conditions provides a valid solution. The algorithm returns the total count $k_A + k_B$ and terminates.
 
+### Code
 ```cpp
 #include <iostream>
 #include <vector>
