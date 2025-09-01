@@ -2,61 +2,68 @@
 
 ## 📝 Problem Description
 
-You are given an $m \times n$ grid of intersections connected by hallways. There are $k$ knights, each starting at a specific intersection coordinate $(x, y)$. The objective is to find the maximum number of knights that can escape the grid.
+Given an $m \times n$ grid of intersections connected by hallways, there are $k$ knights, each initially positioned at a specific intersection $(x, y)$. The goal is to determine the maximum number of knights that can escape the grid under the following constraints:
 
-The movement of knights is constrained by two primary rules:
-1.  A hallway segment connecting two adjacent intersections (horizontally or vertically) can be used by at most one knight in total.
-2.  Any given intersection can be passed through by at most $C$ knights in total. A knight's starting position counts as one use of that intersection.
+1. Each hallway segment connecting two adjacent intersections (either horizontally or vertically) may be traversed by at most one knight in total.
+2. Each intersection may be used by at most $C$ knights in total, with a knight's starting position counting as one use of that intersection.
 
-A knight escapes by moving from an intersection at the boundary of the grid (i.e., in row 0 or $n-1$, or column 0 or $m-1$) to the "outside". Your task is to calculate the maximum number of knights that can simultaneously find a valid path from their starting position to an escape route.
+A knight is considered to have escaped if it moves from an intersection located on the boundary of the grid (that is, any intersection in row $0$ or $n-1$, or column $0$ or $m-1$) to the outside. The task is to compute the largest possible number of knights that can simultaneously find valid escape routes from their starting positions.
 
 ## 💡 Hints
 
 <details>
+
 <summary>Hint #1</summary>
+
 This problem involves moving entities (knights) through a system with capacity limitations (on hallways and at intersections). This structure is characteristic of problems that can be modeled as a network. Think about how you can represent the movement of knights and the given constraints as flows through such a system.
+
 </details>
+
 <details>
+
 <summary>Hint #2</summary>
-Consider modeling the cave as a graph. What would the vertices and edges represent? If intersections are vertices and hallways are edges, the constraint on hallways is straightforward to model. What property of an edge can represent that it can only be used once? This naturally leads to the concept of edge capacities. How would you integrate the knights' starting positions and their escape routes into this graph model? Think about adding special vertices, like a source and a sink.
+
+Consider modeling the cave as a graph. What would the vertices and edges represent? If intersections are vertices and hallways are edges, the constraint on hallways is straightforward to model. What property of an edge can represent that it can only be used once? How would you integrate the knights' starting positions and their escape routes into this graph model?
+
 </details>
+
 <details>
+
 <summary>Hint #3</summary>
-A standard graph flow model handles capacities on edges, but this problem also imposes a capacity $C$ on each *vertex* (intersection). This is a common and important variation. A powerful technique to handle vertex capacities is **vertex splitting**. Can you replace each original vertex with a pair of new vertices connected by an edge, such that the capacity of this new edge enforces the original vertex capacity?
+
+A standard graph flow model handles capacities on edges, but this problem also imposes a capacity $C$ on each *node* (intersection). This is a common and important variation. Can you replace each original node with a pair of new nodes connected by an edge, such that the capacity of this new edge enforces the original node capacity?
+
 </details>
 
 ## ✨ Solutions
 
 <details>
+
 <summary>Final Solution</summary>
-This problem can be elegantly solved by modeling it as a **maximum flow** problem on a carefully constructed graph. The "flow" in our network will represent the paths of the knights. The maximum flow will then correspond to the maximum number of knights that can find valid escape routes.
 
-### Graph Construction
+We can model the problem as a **graph**, where each intersection is a node and the hallways are the edges connecting the intersections. This gives us an $n \times m$ grid of nodes.
 
-The core of the solution is to build a flow network that accurately represents all the problem's constraints.
+The problem can be formulated as a **max flow** problem. The path of each individual knight corresponds to a unit of flow. This allows us to ensure that **no two knights walk through the same hallway** by setting the edge capacity for all hallways to 1.
 
-1.  **Source and Sink:** We introduce a single **super-source** vertex, $s$, and a single **super-sink** vertex, $t$. The source $s$ will be the origin of all flow (knights), and the sink $t$ will be the final destination (the outside world).
+However, we cannot introduce a source or sink within the grid without disrupting its structure. Therefore, we add **additional source and sink nodes**:
 
-2.  **Vertex Splitting for Intersection Capacities:** A standard flow network has capacities on edges, not on vertices. To model the constraint that each intersection can be used by at most $C$ knights, we use a technique called **vertex splitting**. For each intersection at grid coordinates $(r, c)$, we create two nodes in our graph:
-    *   An **in-node**, $v_{in}(r, c)$.
-    *   An **out-node**, $v_{out}(r, c)$.
+- The **source** is connected to each starting position of a knight with an edge of capacity 1, ensuring that each knight can contribute at most one unit of flow.
+- The **sink** is connected to all nodes at the border of the grid, representing the possible escape points for the knights. Each connection from a border node to the sink has capacity 1. <br />
+**Note**: The capacity of the sink edges does not actually matter as by construction of the entire graph, only one flow/knight can reach each border node.
 
-    We then add a directed edge from the in-node to the out-node, $v_{in}(r, c) \to v_{out}(r, c)$, with a capacity of $C$. Any flow representing a knight passing through this intersection *must* traverse this edge. This construction elegantly ensures that the total flow through the intersection $(r, c)$ cannot exceed $C$.
+The flow through the graph represents the path of each knight. Since only one knight can go along each hallway, all hallway capacities are set to one. By connecting the source node to all the knight positions, we ensure that the flow starts at the correct locations. When we calculate the max flow, the knights will automatically “block” each other by saturating the capacity of each path. If no knight can find a path to the border, the max flow algorithm will stop, as there is no way to increase the flow. In this case, no further knight can escape, and our final answer is the value of the flow.
 
-3.  **Hallway Edges:** Hallways connect adjacent intersections. Since a hallway can be used by only one knight, we model them as edges with capacity 1. For any two adjacent intersections $(r_1, c_1)$ and $(r_2, c_2)$, we add two directed edges to our network:
-    *   $v_{out}(r_1, c_1) \to v_{in}(r_2, c_2)$ with capacity 1.
-    *   $v_{out}(r_2, c_2) \to v_{in}(r_1, c_1)$ with capacity 1.
+The only remaining constraint is that each intersection also has a maximum capacity $C$ before it collapses. This requires modeling **node capacities**. To achieve this we apply the following trick:
 
-    Notice that a knight "leaves" an intersection via its out-node and "arrives" at the next intersection via its in-node.
+- Each intersection is split into two nodes: one that receives all incoming edges (**in-node**) and one that sends all outgoing edges (**out-node**).
+- We add an edge between the in-node and out-node with capacity $C$ to ensure that at most $C$ knights/flow can pass through the node/intersection.
 
-4.  **Knight Starting Positions:** To place the knights into the network, we connect the super-source $s$ to the in-node of each knight's starting intersection. For each knight starting at $(r, c)$, we add an edge $s \to v_{in}(r, c)$ with a capacity of 1. This injects one unit of flow into the network for each knight, representing their potential to escape.
+If a knight (flow) wants to go through an intersection, it must enter at the in-node (where all incoming edges point), traverse the edge with capacity $C$ (the only edge available from the in-node), and then proceed to any connected out-node. By forcing each knight/flow through the edge connecting the in-node and out-node, we ensure that at most $C$ knights/flow can pass through this intersection.
 
-5.  **Escape Routes:** Knights escape when they move from a boundary intersection to the outside. In our model, this corresponds to flow reaching the super-sink $t$. For any move from an intersection $(r, c)$ that would go off the grid, we instead direct that path to the sink. For example, from an intersection $(0, c)$ in the top row, a move "up" leads to an escape. We model this by adding an edge from its out-node to the sink: $v_{out}(0, c) \to t$ with capacity 1. We do this for all four boundaries.
+The final step is to compute the maximum flow from the source to the sink in this constructed network. The value of this maximum flow is the maximum number of knights that can escape the cave.
 
-### Finding the Solution
 
-After constructing this network, the problem is reduced to finding the maximum possible flow from the source $s$ to the sink $t$. The value of this maximum flow is precisely the maximum number of knights that can escape the cave. Any standard max-flow algorithm, such as Edmonds-Karp or Push-Relabel, can be used to find this value. This single, general model correctly handles all subtasks, including the specific cases for $C=1$ and $C=2$.
-
+### Code
 ```cpp
 #include<iostream>
 #include<vector>
@@ -159,6 +166,17 @@ int main() {
   }
 }
 ```
+
+</details>
+
+
+## 🧠 Learnings
+
+<details> 
+
+<summary> Expand to View </summary>
+
+- You can enforce node capacities by simply splitting the node into two and connecting them with an edge of capacity equal to the original node's capacity. See solution for details.
 
 </details>
 
