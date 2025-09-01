@@ -2,23 +2,34 @@
 
 ## 📝 Problem Description
 
-The central task is to determine whether a given rectangular layout can be completely tiled using 2x1 tiles. You are given the dimensions of the layout, $W$ and $H$. The layout itself is represented as a grid where each space is either designated to be tiled or to be left empty.
+The task is to determine whether a given rectangular layout can be completely tiled using 2x1 tiles, given the dimensions of the layout, $W$ and $H$. The layout itself is represented as a grid where each space is either designated to be tiled or to be left empty.
 
-Each 2x1 tile must cover exactly two adjacent spaces that are marked for tiling. These adjacent spaces can be either horizontal or vertical neighbors. Every space that needs to be tiled must be covered by exactly one tile, and no tiles can be placed on spaces designated to be left empty. Your program should output "yes" if a valid tiling exists and "no" otherwise.
+Each 2x1 tile must cover exactly two adjacent spaces that are marked for tiling. These adjacent spaces can be either horizontal or vertical neighbors. Every space that needs to be tiled must be covered by exactly one tile, and no tiles can be placed on spaces designated to be left empty.
 
 ## 💡 Hints
 
 <details>
+
 <summary>Hint #1</summary>
+
 Before diving into complex algorithms, consider a simple, fundamental property of the tiles. Each tile covers exactly two spaces. What does this imply about the total number of spaces that need to be tiled for a valid solution to even be possible?
+
 </details>
+
 <details>
+
 <summary>Hint #2</summary>
+
 This problem is about pairing up adjacent, tileable spaces. How can you model this? Think about representing each tileable space as an object and the potential placement of a tile between two adjacent spaces as a connection between them. This reframes the problem from laying tiles to finding a perfect set of pairings.
+
 </details>
+
 <details>
+
 <summary>Hint #3</summary>
-The problem can be solved by finding a **maximum matching**. To construct the required model, it's incredibly helpful to color the grid like a checkerboard. Notice that any 2x1 tile will always cover one "white" space and one "black" space. This structure allows you to create a **bipartite graph**. Maximum matching in a bipartite graph is a classic problem that can be solved efficiently using a max-flow algorithm.
+
+The problem can be solved by finding a **maximum matching**. To construct the required model, it's incredibly helpful to color the grid like a checkerboard. Notice that any 2x1 tile will always cover one "white" space and one "black" space. This structure allows you to create a **bipartite graph**. Maximum matching in a bipartite graph is a classic problem that can be solved efficiently using a max-flow algorithm or other matching algorithms.
+
 </details>
 
 ## ✨ Solutions
@@ -27,17 +38,14 @@ The problem can be solved by finding a **maximum matching**. To construct the re
 
 <summary>First Solution (Test Set 3, 4)</summary>
 
-This solution correctly identifies the problem as a **bipartite matching** problem and uses **maximum flow** to solve it. The approach models the tileable spaces as vertices in a bipartite graph, where vertices are colored in a checkerboard pattern (based on whether `(r + c)` is even or odd).
+This solution approaches the problem by modeling the tileable spaces as vertices in a graph and using **maximum flow** to try to pair up adjacent spaces. The implementation colors the grid in a checkerboard pattern (based on whether `(row + col)` is even or odd), alternating which spaces are connected to the source and sink.
 
-The key insight is that any 2×1 tile must cover exactly one "white" space and one "black" space. This creates a bipartite graph where we need to find a perfect matching.
+The key insight is that any 2×1 tile must cover two adjacent spaces, and the checkerboard coloring is used to ensure that every tile covers one space of each color. The solution constructs bidirectional edges between adjacent tileable spaces and runs the flow algorithm twice (once with `odd=false` and once with `odd=true`) to cover both possible colorings, checking if either produces a perfect matching.
 
-However, this implementation has some issues in its graph construction. It creates **bidirectional edges** between adjacent tileable spaces and attempts to handle both possible checkerboard colorings by running the flow algorithm twice (once with `odd=false` and once with `odd=true`) and checking if either produces a perfect matching.
-
-While this approach demonstrates understanding of the core concepts, the graph construction is not optimal, which limits its effectiveness on certain test cases. Despite these implementation issues, the solution manages to pass some test sets.
+While this approach demonstrates a solid attempt to model the pairing constraints, the use of bidirectional edges and the need to try both coloring options make the graph construction less efficient and can limit its effectiveness on certain test cases. Nevertheless, the solution manages to pass some test sets by "brute-forcing" both coloring options.
 
 ### Code
 ```cpp
-///3
 #include<iostream>
 #include<vector>
 #include<string>
@@ -163,12 +171,19 @@ int main() {
 
 
 <details>
+
 <summary>Final Solution</summary>
-This problem can be elegantly solved by modeling it as a maximum flow problem. The core idea is to determine if all tileable spaces in the garden can be perfectly paired up with an adjacent tileable space. This is equivalent to finding a **perfect matching** in a graph.
+
+**Note**: While this solution does not do it, you can solve this problem much more easily using a matching algorithm.
+
+
+This problem can be elegantly solved by modeling it as a maximum flow problem, but the final solution improves on the first by making the graph construction more efficient and by leveraging the structure of the grid more directly.
+
+The first solution attempts to pair up adjacent spaces using a checkerboard coloring, but it constructs bidirectional edges and must try both possible colorings, which is inefficient and can be error-prone. The final solution, uses a single coloring and only adds edges in one direction (from one color to the other), which avoids redundancy and simplifies the graph. This makes it only necessary to calculate one flow and solves test set 1 and 2.
 
 ### From Tiling to Graphs
 
-First, we can represent the garden layout as a graph. Each space `(r, c)` that can be tiled (marked with a '.') becomes a vertex in our graph. An edge exists between two vertices if their corresponding spaces are adjacent (horizontally or vertically) in the grid. A tiling of the garden corresponds to a **matching** in this graph—a set of edges where no two edges share a vertex. A **perfect matching** is a matching that covers every single vertex in the graph. Our goal is to find out if such a perfect matching exists.
+We represent the garden layout as a graph. Each space `(r, c)` that can be tiled (marked with a '.') becomes a vertex. An edge exists between two vertices if their corresponding spaces are adjacent (horizontally or vertically) in the grid. A tiling of the garden corresponds to a **matching** in this graph (a set of edges where no two edges share a vertex). A **perfect matching** is a matching that covers every single vertex in the graph. Our goal is to find out if such a perfect matching exists.
 
 ### Bipartite Matching and Max-Flow
 
@@ -185,15 +200,12 @@ The problem of finding a maximum matching in a bipartite graph can be transforme
 
 The maximum flow from `S` to `T` in this network corresponds to the maximum number of tiles that can be placed, which is the size of the maximum matching. Let `N` be the total number of tileable spaces.
 
--   A simple initial check: If `N` is odd, a perfect tiling is impossible, as each tile covers two spaces.
+-   If `N` is odd, a perfect tiling is impossible, as each tile covers two spaces.
 -   If `N` is even, a perfect tiling exists if and only if we can place `N / 2` tiles. This means the maximum flow must be equal to `N / 2`.
 -   Therefore, the condition for a successful tiling is: **`max_flow * 2 == N`**.
 
-If this condition holds, the layout can be tiled; otherwise, it cannot. The provided C++ code implements this exact logic using the Boost Graph Library to calculate the maximum flow.
-
 **Code**
 ```cpp
-///3
 #include<iostream>
 #include<vector>
 #include<string>
