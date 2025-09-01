@@ -2,34 +2,52 @@
 
 ## 📝 Problem Description
 
-You are given the results of a tournament involving $N$ players and $M$ rounds. In each round, two players compete, and one player wins, receiving one point, while the loser receives zero. For some rounds, the winner is known. For others, the outcome is unknown.
+Given the results of a tournament with $N$ players and $M$ rounds, each round involves two players competing, with one player winning and receiving one point, while the other receives zero. Some rounds have a known winner, while others have an unknown outcome.
 
-Your task is to determine if it's possible to assign winners to the unknown rounds such that the total points for each player match a given final scoreboard. The input consists of the number of players $N$, the number of rounds $M$, a list of all $M$ rounds with players $a$ and $b$, and an outcome code $c$. If $c=1$, player $a$ won; if $c=2$, player $b$ won; if $c=0$, the winner is unknown. Finally, you are given a target scoreboard with scores $s_0, s_1, \dots, s_{n-1}$ for each player. Your program should output "yes" if the scoreboard is achievable and "no" otherwise.
+The task is to determine whether it is possible to assign winners to the rounds with unknown outcomes so that the total points for each player match a specified final scoreboard.
 
 ## 💡 Hints
 
 <details>
+
 <summary>Hint #1</summary>
-A fundamental property of the tournament is that in every single round, exactly one point is awarded. This means that the total number of points distributed across all players must equal the total number of rounds played. Does the given scoreboard satisfy this condition? This is a necessary, but not sufficient, condition for a "yes" answer.
+
+Try to model the problem as a graph. Each game connects exactly two players, and each player can participate in multiple games. If you draw a node for each player and a node for each game, what kind of graph structure do you get?
+
 </details>
 
 <details>
+
 <summary>Hint #2</summary>
-This problem can be viewed as an allocation problem. You have a set of resources (the points from each game) that need to be distributed to a set of recipients (the players). For games with a known outcome, the allocation is fixed. For games with an unknown outcome, you have a choice. How can you model this system of choices and constraints?
+
+This problem is well-suited for a flow-based approach. Imagine a source node that "generates" points, which must flow through the games and then to the players, finally reaching a sink. How could you use flow to model the assignment of points from games to players, and ensure that each player receives their required score?
+
 </details>
 
 <details>
+
 <summary>Hint #3</summary>
-Consider modeling this problem as a flow network. A flow network is excellent for representing problems where a commodity flows from a source to a sink through a network with capacity constraints. What could represent the source of points, the players, the games, and the final destination of the points (the sink)? How would you set the capacities on the connections to model the rules of the tournament and the target scores?
+
+To construct the flow network:
+ - Add a source node and a sink node.
+ - For each game, add a node and connect the source to each game node with capacity 1 (each game gives one point).
+ - For each game with a known outcome, connect the game node to the winner's player node with capacity 1. For unknown outcomes, connect the game node to both involved players with capacity 1 each.
+ - For each player, connect their node to the sink with capacity equal to their required final score.
+This setup ensures that the flow models the assignment of points and respects all constraints.
+
 </details>
 
 ## ✨ Solutions
 
 <details>
-<summary>Final Solution</summary>
-This problem can be elegantly solved by modeling it as a maximum flow problem. We can construct a flow network where the "flow" represents the points awarded in the tournament. The goal is to see if we can push a total flow equal to the number of games, $M$, from a source to a sink while respecting all constraints.
 
-### Network Construction
+<summary>Final Solution</summary>
+
+This problem can be solved by modeling it as a **maximum flow problem** in a **bipartite graph**. We can construct a flow network where the "flow" represents the points awarded in the tournament. The goal is to see if we can push a total flow equal to the number of games, $M$, from a source to a sink while respecting all constraints.
+
+Pushing a flow of $M$ through the constructed network will mean that every point from each game has been successfully assigned to a player in such a way that all the constraints are satisfied. Specifically, it ensures that each game awards exactly one point, and each player receives exactly their target score. Therefore, if the maximum flow equals $M$, it is possible to realize the given scoreboard.
+
+### Graph Construction
 
 We build a directed graph with a source vertex `source`, a sink vertex `sink`, a set of nodes representing the games, and a set of nodes representing the players.
 
@@ -53,15 +71,12 @@ After constructing the network, we can determine if the scoreboard is achievable
 1.  **Conservation of Points:** A basic sanity check is that the sum of all scores on the scoreboard, $\sum s_i$, must equal the total number of games, $M$. If `score_sum != M`, it's impossible to achieve the scoreboard because the total number of points awarded does not match the total points required.
 
 2.  **Maximum Flow:** We calculate the maximum flow from the `source` to the `sink` in our constructed network.
-    *   If the max flow is equal to $M$ (and also equal to `score_sum`), it means that a valid assignment of points exists. We were able to successfully route all $M$ points from the games to the players in a way that respects every player's target score. The answer is "yes".
-    *   If the max flow is less than $M$, it means it's impossible to satisfy all constraints simultaneously. Even though the total points might sum up correctly, there is no way to distribute them from the specific games to the specific players to match the target scores. This indicates a bottleneck somewhere in the network, meaning the scoreboard is unachievable. The answer is "no".
+    *   If the max flow is equal to $M$ (and also equal to `score_sum`), it means that a valid assignment of points exists. We were able to successfully route all $M$ points from the games to the players in a way that respects every player's target score.
+    *   If the max flow is less than $M$, it means it's impossible to satisfy all constraints simultaneously. Even though the total points might sum up correctly, there is no way to distribute them from the specific games to the specific players to match the target scores. This indicates a bottleneck somewhere in the network, meaning the scoreboard is unachievable.
 
 In summary, the problem is solvable if and only if `score_sum == M` and `max_flow == M`.
 
-### C++ Implementation
-
-The following C++ code uses the Boost Graph Library to implement this max-flow solution.
-
+### Code
 ```cpp
 #include<iostream>
 
