@@ -2,58 +2,70 @@
 
 ## 📝 Problem Description
 
-You are given $N$ bombs, indexed from $0$ to $N-1$. Each bomb $i$ has an associated timer $t_i$, indicating that it must be deactivated at or before the end of minute $t_i$. It takes exactly one minute to deactivate a single bomb.
+Given $N$ bombs, indexed from $0$ to $N-1$, each bomb $i$ is equipped with a timer $t_i$, specifying that it must be deactivated at or before minute $t_i$. Deactivating a bomb requires exactly one minute.
 
-The bombs have a dependency structure. For any bomb $j$, it can only be deactivated if the bombs at indices $2j+1$ and $2j+2$ (if they exist within the index range) have already been deactivated. Bombs with indices $j$ such that $2j+1 \ge N$ have no dependencies and are considered to be on the ground.
+A dependency structure is imposed: for any bomb $j$, deactivation is only possible after the bombs at indices $2j+1$ and $2j+2$ (if these indices are within the valid range) have already been deactivated. Bombs with indices $j$ such that $2j+1 \ge N$ have no dependencies and are considered to be on the ground.
 
-The task is to determine if a valid deactivation sequence for all $N$ bombs exists. A sequence is valid if every bomb is deactivated before its timer runs out and all dependency constraints are respected. If such a sequence is possible, the output is 'yes'; otherwise, the output is 'no'.
+The objective is to determine whether there exists a sequence to deactivate all $N$ bombs such that every bomb is deactivated before its timer expires and all dependency constraints are satisfied.
 
 ## 💡 Hints
 
 <details>
+
 <summary>Hint #1</summary>
+
 The dependency rule, where item $j$ depends on items $2j+1$ and $2j+2$, defines a specific, structured relationship between the bombs. What kind of hierarchical data structure does this arrangement resemble? Consider how this structure constrains the order in which you can deactivate the bombs.
+
 </details>
+
 <details>
+
 <summary>Hint #2</summary>
+
 The dependencies form a binary tree, where bomb $j$ is the parent of bombs $2j+1$ and $2j+2$. The rule that a parent can only be defused after its children implies that any valid deactivation sequence must process subtrees in a post-order traversal fashion. The main question is, in what order should we select bombs or subtrees to process? A greedy approach might be effective. Which bomb is the most "urgent" to deal with at any given time?
+
 </details>
+
 <details>
+
 <summary>Hint #3</summary>
+
 A common and powerful greedy strategy for scheduling problems is to prioritize the task with the earliest deadline. In this problem, this translates to focusing on the bomb with the smallest explosion timer $t_i$. However, we can't simply deactivate this bomb; we must first handle all of its dependencies. This suggests an algorithm: identify the bomb `b` with the earliest deadline among all those not yet handled. Then, perform the necessary deactivations for `b`'s entire dependency chain (i.e., its subtree) before finally deactivating `b`. If this can be done without any bomb exploding, repeat the process for the bomb with the next-earliest deadline.
+
 </details>
 
 ## ✨ Solutions
 
 <details>
+
 <summary>Final Solution</summary>
 
-### 1. Problem Modeling
+### Model as Binary Tree
 
-First, let's analyze the dependency structure. A bomb at index $j$ depends on bombs at indices $2j+1$ and $2j+2$. This is the standard indexing scheme for a **binary tree** stored in an array, where bomb $j$ is the parent node of its children, $2j+1$ and $2j+2$. The condition that a bomb can only be defused after the ones it "stands on" means that a parent node can only be processed after all nodes in its subtree have been processed. This is a classic **post-order traversal** constraint.
+First, let's analyze the dependency structure. A bomb at index $j$ depends on bombs at indices $2j+1$ and $2j+2$. This is the standard indexing scheme for a **binary tree** stored in an array, where bomb $j$ is the parent node of its children, $2j+1$ and $2j+2$. The condition that a bomb can only be defused after the ones it "stands on" means that a parent node can only be processed after all nodes in its subtree have been processed. This is a classic **post-order traversal**.
 
 The core challenge is to find a single, valid permutation of deactivations (a specific post-order traversal of the entire tree) that satisfies every bomb's individual deadline.
 
-### 2. A Greedy Strategy
+### Greedy Strategy
 
 When faced with multiple tasks and deadlines, a strong heuristic is to prioritize the most constrained task. In our case, the most constrained bomb is the one with the **earliest explosion time**. This forms the basis of our greedy strategy: we should always try to defuse the bomb that is closest to exploding.
 
 This leads to the following algorithm:
-1.  Create a list of all bombs.
-2.  Sort this list primarily by explosion time $t_i$ in ascending order. This gives us a priority list of which bombs to *target*.
-3.  To handle cases where multiple bombs have the same deadline, we use a secondary sorting criterion as a tie-breaker. The provided solution sorts by the bomb's index $i$ in descending order. This ensures a deterministic processing order.
-4.  Iterate through this sorted list of bombs. For each bomb $b$ in the list:
+1.  Sort this list primarily by explosion time $t_i$ in ascending order. This gives us a priority list of which bombs to *target*.
+2.  To handle cases where multiple bombs have the same deadline, we use a secondary sorting criterion as a tie-breaker. We sort by the index $i$ of the balls to prioritize balls that are higher up in the tree and therefore have more children/dependencies.
+3.  Iterate through this sorted list of bombs. For each bomb $b$ in the list:
+    *   If $b$ has already exploded, we can immediately terminate and report `no`.
     *   If $b$ has already been defused (as a dependency of a previously targeted bomb), we can skip it.
-    *   Otherwise, we must initiate the process to defuse $b$. This requires us to first defuse its entire subtree in a post-order manner.
+    *   Otherwise, we must initiate the process to defuse $b$. This requires us to first defuse its entire subtree in a post-order traversal.
 
-### 3. Implementation with a Stack
+### Diffuse using Post-order Traversal
 
-A stack is a natural fit for performing an iterative post-order traversal. The process for defusing a target bomb `b` and its dependencies is as follows:
+To perform the post-order traversal we can use a stack to keep track of the balls that need to be checked. The process for defusing a target bomb `b` and its dependencies is as follows:
 
 1.  Initialize a stack and push the target bomb `b` onto it.
 2.  Maintain a global `elapsed_time` counter, initialized to 0.
 3.  While the stack is not empty, inspect the bomb `c` at the top of the stack:
-    *   Check if `c` has children that have not yet been defused. If so, push these undisposed children onto the stack. This ensures they are processed before `c`.
+    *   Check if `c` has children that have not yet been defused. If so, push these undiffused children onto the stack. This ensures they are processed before `c`.
     *   If all of `c`'s children have been defused (or if `c` is a leaf), it's now safe to defuse `c`.
         *   Increment `elapsed_time`.
         *   Check if the deadline is met: `elapsed_time <= t_c`. If this condition fails, it means bomb `c` would have exploded. No solution is possible, so we can immediately terminate and report 'no'.
@@ -61,8 +73,7 @@ A stack is a natural fit for performing an iterative post-order traversal. The p
 
 If we successfully process all bombs from our initial sorted list without any deadline violations, it means a valid deactivation sequence exists, and the answer is 'yes'.
 
-### 4. Code
-
+### Code
 ```cpp
 #include<iostream>
 #include<vector>
