@@ -2,38 +2,47 @@
 
 ## 📝 Problem Description
 
-You are asked to simulate the life of bacteria in a rectangular dish. Initially, you are given the coordinates for the centers of $N$ bacteria. All bacteria start as disks with a radius of 0.5 at time $t=0$.
+The task is to simulate the life cycle of bacteria in a rectangular dish. The centers of $N$ bacteria are provided, each starting as a disk with radius $0.5$ at time $t=0$. The radius of each bacterium evolves over time according to $\varrho(t) = t^2 + \frac{1}{2}$. A bacterium is considered dead at the moment it touches another bacterium or one of the four boundaries of the dish. In this model, bacteria continue to grow after death, potentially overlapping with other bacteria or the boundaries.
 
-The radius of each bacterium grows over time according to the function $\varrho(t) = t^2 + \frac{1}{2}$. A bacterium dies the moment it touches another bacterium or one of the four boundaries of the rectangular dish. For this simulation, we use a simplified model where germs are assumed to continue growing even after they die, potentially overlapping with other germs or the boundaries.
+The objective is to determine three specific moments during the simulation:
+1. The time at which the **first** bacterium dies.
+2. The time when the number of living bacteria falls **below 50%** of the initial count for the first time.
+3. The time at which the **last** bacterium dies.
 
-Your task is to determine three key moments in this simulation:
-1.  The time when the **first** bacterium dies.
-2.  The time when the number of living bacteria drops **below 50%** of the initial count for the first time.
-3.  The time when the **last** bacterium dies.
-
-The input provides the number of bacteria $N$, the coordinates $(l, b, r, t)$ defining the rectangular dish (from $x=l$ to $x=r$ and $y=b$ to $y=t$), and the initial center coordinates $(x, y)$ for each of the $N$ bacteria. All times reported in the output must be rounded up to the nearest integer.
+The input specifies the number of bacteria $N$, the coordinates $(l, b, r, t)$ that define the rectangular dish (with $x$ ranging from $l$ to $r$ and $y$ from $b$ to $t$), and the initial center coordinates $(x, y)$ for each bacterium. All reported times must be rounded up to the nearest integer.
 
 ## 💡 Hints
 
 <details>
+
 <summary>Hint #1</summary>
+
 The problem asks for specific times, but the events (deaths) are triggered by distances. A bacterium dies when its radius reaches a certain critical value. This value is determined by either the distance to a boundary or the distance to another bacterium. Can you establish a mathematical relationship between the death radius and the time of death?
+
 </details>
 
 <details>
+
 <summary>Hint #2</summary>
-Instead of trying to find the three required times directly, consider a different approach. What if you could calculate the exact time of death for *every single bacterium*? If you had a list of all $N$ death times, you could simply sort them. The first, median, and last death events would then correspond to the minimum, median, and maximum values in this sorted list.
+
+Instead of trying to find the three required times directly, consider a different approach. What if you could calculate the exact time of death for *every single bacterium* given its radius when it dies? If you had a list of all $N$ death times, you could simply sort them. The first, median, and last death events would then correspond to the minimum, median, and maximum values in this sorted list.
+
 </details>
 
 <details>
+
 <summary>Hint #3</summary>
+
 To find the death time for each bacterium, you need to find its closest obstacle. This obstacle is either a wall or another bacterium. Finding the closest bacterium for every single bacterium by checking all pairs would take $O(N^2)$ time, which is too slow for the given constraints. This is a classic nearest-neighbor search problem. Consider using a spatial data structure to speed up this search. A Delaunay triangulation has a crucial property: the nearest neighbor of any point is guaranteed to be one of its adjacent vertices in the triangulation. This dramatically reduces the number of distance calculations needed.
+
 </details>
 
 ## ✨ Solutions
 
 <details>
+
 <summary>Final Solution</summary>
+
 This problem asks us to find the times of three specific events: the first death, the point where half the bacteria are dead, and the last death. The core of the problem lies in determining when each individual bacterium dies.
 
 ### From Time to Distance (and back)
@@ -55,31 +64,32 @@ A bacterium dies for one of two reasons:
 2.  **It hits another bacterium:** When two bacteria touch, their centers are separated by a distance equal to the sum of their radii. Since all bacteria grow at the same rate, they will have the same radius $R$ at any given time $t$. If two bacteria with centers $p_i$ and $p_j$ touch, the distance between them is $\|p_i - p_j\| = R + R = 2R$. Thus, the radius at which they touch is $R = \frac{\|p_i - p_j\|}{2}$. A bacterium `i` will die from the first bacterium it touches, which is its nearest neighbor.
 
 The actual death radius for a bacterium $i$, let's call it $R_{\text{death}, i}$, is the minimum of the radii required to hit any obstacle:
-$$ R_{\text{death}, i} = \min(R_{\text{boundary}}, \min_{j \neq i} \frac{\|p_i - p_j\|}{2}) $$
+$$ R_{\text{death}, i} = \min\left(R_{\text{boundary}}, \min_{j \neq i} \frac{\|p_i - p_j\|}{2}\right) $$
 
 ### Efficiently Finding Nearest Neighbors with Delaunay Triangulation
 
 Calculating the nearest neighbor for each bacterium by checking all other $N-1$ bacteria results in an $O(N^2)$ algorithm, which is too slow. This is where **Delaunay triangulation** becomes essential. A fundamental property of Delaunay triangulations is that for any vertex $v$, its nearest neighbor in the point set is one of the vertices connected to $v$ by an edge in the triangulation. This reduces the search for the nearest neighbor of a point from $N-1$ candidates to just its handful of adjacent vertices in the triangulation, leading to a much faster overall solution.
 
-### Algorithm and Implementation Details
+### Final Algorithm
 
 The final algorithm is as follows:
 
 1.  **Construct Delaunay Triangulation:** Read all $N$ bacterium center coordinates and insert them into a Delaunay triangulation.
 2.  **Calculate Death Radii:** For each vertex (bacterium) `v` in the triangulation:
-    a. Calculate the distance to the nearest boundary, $R_{\text{boundary}}$.
-    b. Find the minimum distance to an adjacent vertex in the triangulation. Let this be $\|p_v - p_{neighbor}\|$. The corresponding collision radius is $R_{\text{cell}} = \frac{\|p_v - p_{neighbor}\|}{2}$.
-    c. The death radius for `v` is $R_{\text{death}} = \min(R_{\text{boundary}}, R_{\text{cell}})$.
+    - Calculate the distance to the nearest boundary, $R_{\text{boundary}}$.
+    - Find the minimum distance to an adjacent vertex in the triangulation. Let this be $\|p_v - p_{neighbor}\|$. The corresponding collision radius is $R_{\text{cell}} = \frac{\|p_v - p_{neighbor}\|}{2}$.
+    - The death radius for `v` is $R_{\text{death}} = \min(R_{\text{boundary}}, R_{\text{cell}})$.
 3.  **Use Squared Distances:** To avoid costly `sqrt` operations, we work with squared radii and squared distances.
     *   $R_{\text{death}}^2 = \min(R_{\text{boundary}}^2, (R_{\text{cell}})^2) = \min(( \min(\dots))^2, \frac{\|p_v - p_{neighbor}\|^2}{4})$.
     *   We compute this squared death radius for each of the $N$ bacteria and store them in a vector.
 4.  **Find Event Times:**
-    a. Sort the vector of squared death radii.
-    b. The first death corresponds to the smallest squared radius: `radii[0]`.
-    c. The "median" death (when the count of living bacteria drops below 50%) corresponds to the element at index `floor(N/2)`.
-    d. The last death corresponds to the largest squared radius: `radii[N-1]`.
+    - Sort the vector of squared death radii.
+    - The first death corresponds to the smallest squared radius: `death_distances[0]`.
+    - The "median" death (when the count of living bacteria drops below 50%) corresponds to the element at index `floor(N/2)`.
+    - The last death corresponds to the largest squared radius: `death_distances[N-1]`.
 5.  **Convert to Time:** For each of the three selected squared death radii, $R_{\text{death}}^2$, convert it back to time using the formula $t = \sqrt{\sqrt{R_{\text{death}}^2} - 0.5}$ and round the result up to the nearest integer.
 
+### Code
 ```cpp
 #include <iostream>
 #include <vector>
