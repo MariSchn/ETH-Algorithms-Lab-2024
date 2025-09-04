@@ -2,85 +2,81 @@
 
 ## 📝 Problem Description
 
-Given a set of $N$ points in a 2D plane, you are tasked with answering $M$ independent queries. Each query provides a starting location $(x,y)$ and a required minimum separation distance, which we will denote by a value $d$. For each query, you must determine if it is possible to find a continuous path starting from $(x,y)$ that can extend infinitely far away, such that at every point along this path, the distance to any of the $N$ initial points is at least $\sqrt{d}$.
-
-The output for each test case must be a single string containing $M$ characters. The $i$-th character should be 'y' if an escape path exists for the $i$-th query, and 'n' otherwise.
+Given a set of $N$ points in the plane, the task is to answer $M$ independent queries. Each query specifies a starting location $(x, y)$ and a minimum required separation distance $d$. For each query, determine whether there exists a continuous path beginning at $(x, y)$ that can extend to infinity, such that every point along the path maintains a distance of at least $\sqrt{d}$ from all of the $N$ given points.
 
 ## 💡 Hints
 
 <details>
+
 <summary>Hint #1</summary>
+
 The problem requires finding a "safe" path. A path is safe if it maintains a certain minimum distance from a set of fixed points. Where would such a path lie? Intuitively, to maximize safety, one should travel as far as possible from all points. This suggests considering the regions of the plane that are equidistant from the nearest two or three fixed points.
+
 </details>
+
 <details>
+
 <summary>Hint #2</summary>
+
 Let's rephrase the problem. A person at location $P$ needing to maintain a distance of at least $\sqrt{d}$ is equivalent to a disk of radius $\sqrt{d}$ centered at $P$ not being allowed to contain any of the fixed points. The question is then: can this disk move from its initial position to infinity without ever "colliding" with any of the fixed points? This is a classic motion planning problem. The "highways" for such movement are defined by the Voronoi diagram of the fixed points, as its edges are maximally distant from the nearest sites.
+
 </details>
+
 <details>
+
 <summary>Hint #3</summary>
+
 Solving each query from scratch would be too slow given the constraints. This points towards a precomputation strategy. We can partition the plane into regions and, for each region, precompute the maximum size of a disk that can escape from it. The Delaunay triangulation, which is the dual of the Voronoi diagram, provides a convenient partitioning of the plane into triangles. The "bottlenecks" for movement between adjacent triangles are the shared Delaunay edges. This suggests an algorithm that propagates "escape clearance" values from the outside inwards through the faces of the triangulation.
+
 </details>
+
 <details>
+
 <summary>Hint #4</summary>
+
 The process of propagating escape clearances can be modeled as a shortest path algorithm on the dual graph of the triangulation, where faces are nodes. Since we want to find the path that allows the *largest* disk to pass, we need to maximize the minimum clearance along the path. This is a "widest path" or "bottleneck shortest path" problem. A Dijkstra-like algorithm using a max-priority queue is perfectly suited for this. Start the search from the infinite faces, which have infinite clearance, and explore inwards.
+
 </details>
 
 ## ✨ Solutions
 
 <details>
+
+
 <summary>Final Solution</summary>
-This problem is a classic example of motion planning. We need to determine if a person, who can be modeled as a point, can find a path from a starting location to "infinity" while always maintaining a minimum distance from a set of fixed "infected" points.
 
-### Core Idea: Disk Escape and Precomputation
 
-The condition of maintaining a distance of at least $\sqrt{d}$ from all infected points is equivalent to saying that a disk of radius $\sqrt{d}$ centered at the person's location must never contain any of the infected points. The problem then becomes: can this disk move from its initial position to an unbounded region of the plane?
+This problem is a classic instance of motion planning: we must determine whether a disk of radius $\sqrt{d}$, centered at a query point, can escape to infinity while always maintaining at least distance $d$ from a given set of points.
 
-Since we have many queries for the same set of infected points, a precomputation approach is ideal. We can analyze the structure of the plane defined by the infected points and, for every region, determine the maximum size of a disk that can escape from it.
+To solve this, we use the **Delaunay Triangulation** of the point set. Conceptually, the dual structure, the **Voronoi Diagram**, is relevant, as the optimal escape paths for the disk follow the Voronoi edges, which maximize the distance to the nearest points. However, for efficiency, we only construct and use the Delaunay triangulation, since explicit Voronoi construction is computationally more expensive.
 
-### Geometric Framework: Delaunay Triangulation
+The key idea is to **precompute the largest disk** that can escape from each face (triangle) of the Delaunay triangulation. Once this is done, each query can be answered in constant time.
 
-The paths that stay maximally far from a set of points are the edges of the **Voronoi diagram**. The center of our escaping disk would ideally travel along these edges. However, working with the Voronoi diagram's dual, the **Delaunay triangulation**, is often computationally more convenient. The vertices of the Delaunay triangulation are the infected points themselves.
+The precomputation proceeds as follows:
 
-The key insight is to consider the faces (triangles) of the Delaunay triangulation. Movement between adjacent triangles is only possible by crossing their shared edge. This shared edge acts as a bottleneck. A disk can only pass through this "gap" if its diameter is less than or equal to the length of the edge.
+1. **Initialization:**
+  - All infinite (boundary) faces are considered to be outside the point set. Any disk in such a face has already escaped, so the largest disk that can escape from these faces is set to `std::numeric_limits<double>::max()`.
 
-To avoid floating-point inaccuracies and expensive `sqrt` operations, we will work with **squared distances**. Let the input value `d` be the required *squared* distance. Our disk has a squared radius of $d$.
+2. **Propagation:**
+  - Perform a breadth-first search (BFS) over all faces, starting from the infinite faces.
+  - For each face, propagate the maximum disk size to its neighbors. The maximum disk size that can escape from a neighboring face is the minimum of:
+    - The maximum disk size that can escape from the current face.
+    - The length of the edge connecting the current face and the neighbor.
+  - This ensures that the escape path is always feasible: the disk must fit through every edge along its path to the outside.
 
-### Algorithm: Widest Path on the Dual Graph
+By repeating this process for all faces, we obtain for each triangle the largest disk size that can escape from it.
 
-We can determine the escape capability of each face using an algorithm similar to Dijkstra's on the dual graph of the triangulation (where faces are nodes). Our goal is to find the "widest" path from each face to the outside, i.e., the path that maximizes the minimum clearance.
+To answer a query, we proceed as follows:
 
-1.  **Model:**
-    *   **Nodes:** The faces of the Delaunay triangulation.
-    *   **"Weight":** For each face `f`, we want to compute `f->info()`, which will store the squared *diameter* of the largest disk that can escape from `f`. The squared diameter is used because it corresponds directly to the squared length of the bottleneck edge.
-    *   **Edges:** Adjacency between faces. The capacity of the "passage" between two faces is the squared length of their shared Delaunay edge.
+1. Check that the query point is not closer than $d$ to any point in the set (otherwise, escape is impossible).
+2. Locate the triangle containing the query point and compare the required disk size to the precomputed maximum for that triangle. If the required disk size is less than or equal to the maximum, escape is possible; otherwise, it is not.
 
-2.  **Initialization:**
-    *   We use a max-priority queue to manage faces to visit. It will store pairs of `(escape_clearance, face_handle)`.
-    *   The infinite faces of the triangulation are already "outside". Any disk within them has escaped. Therefore, they have an infinite escape clearance. We add all infinite faces to the priority queue with a symbolic infinite clearance.
-    *   We initialize the `info` for all finite faces to 0.
+### Implementation Details
 
-3.  **Execution (Dijkstra-like process):**
-    *   While the priority queue is not empty, extract the entry `(D_sq, F)` with the highest clearance `D_sq`.
-    *   If we have already found a better or equal path for face `F`, we can skip it. Otherwise, we set `F->info() = D_sq`.
-    *   For each neighbor `N` of `F` across a shared edge `e`:
-        *   The squared length of `e` is the maximum squared diameter that can pass between `F` and `N`.
-        *   The maximum clearance for a path from `N` to the outside via `F` is `min(D_sq, squared_length(e))`.
-        *   If this new clearance is greater than the current `N->info()`, we update `N`'s potential and add it to the priority queue.
+- We store the maximum escape radius for each face in the face's info field.
+- To efficiently manage the propagation of escape clearances, we utilize a priority queue (max-heap) to always expand the most promising face first.
 
-After this process completes, `face->info()` for every face will hold the maximum squared diameter of a disk that can escape from that region.
-
-### Answering Queries
-
-With the precomputed values, each query can be answered quickly:
-
-1.  For a query at point `p` with required squared distance `d`:
-2.  **Initial Position Check:** First, find the infected point `v` nearest to `p`. If the squared distance between `p` and `v` is less than `d`, the person is already in a forbidden zone. The answer is 'n'.
-3.  **Escape Path Check:** If the initial position is valid, locate the Delaunay face `f` that contains `p`.
-    *   The precomputed value `f->info()` tells us the maximum squared diameter of a disk that can escape from this face.
-    *   Our disk has a squared radius of `d`, which means its squared diameter is $(2 \times \text{radius})^2 = 4 \times (\text{radius})^2 = 4d$.
-    *   Escape is possible if and only if the required squared diameter is no more than the available clearance: `4*d <= f->info()`.
-    *   If the condition holds, the answer is 'y'; otherwise, it's 'n'.
-
+### Code
 ```cpp
 #include <iostream>
 #include <vector>
@@ -195,6 +191,17 @@ int main() {
   }
 }
 ```
+
+</details>
+
+## 🧠 Learnings
+
+<details> 
+
+<summary> Expand to View </summary>
+
+- Even if its not feasible to use, thinking in terms of the Voronoi Diagram in a Delaunay Triangulation task can be very helpful
+- In a Delaunay Triangulation we can directly store information in the faces using the `info` field.
 
 </details>
 
