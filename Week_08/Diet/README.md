@@ -2,72 +2,77 @@
 
 ## 📝 Problem Description
 
-The problem asks us to find the minimum cost for a daily diet that satisfies a given set of nutritional requirements. We are given $n$ nutrients and $m$ different food products. For each nutrient $i$, we have a required minimum daily intake, $\text{min}_i$, and a maximum daily intake, $\text{max}_i$. For each food product $j$, we are given its price per unit, $p_j$, and the amount of each nutrient $C_{j,i}$ that one unit of this food provides.
+The objective is to determine the minimum cost of a daily diet that satisfies specified nutritional requirements. Given $n$ nutrients and $m$ food products, each nutrient $i$ has a required minimum daily intake $\text{min}_i$ and a maximum daily intake $\text{max}_i$. Each food product $j$ is characterized by its price per unit $p_j$ and the amount of each nutrient $C_{j,i}$ provided per unit.
 
-We can purchase and consume any non-negative, fractional amount of any food product. The task is to determine the combination of foods that meets all nutrient constraints (i.e., for each nutrient, the total amount consumed is between its minimum and maximum required values) at the lowest possible total cost. We need to output this minimum cost, rounded down to the nearest integer. If no combination of foods can satisfy all the nutritional constraints, we should indicate that no such diet exists.
+Any non-negative, fractional amount of any food product may be purchased and consumed. The task is to find a combination of foods such that, for every nutrient, the total intake lies within the specified bounds, while minimizing the total cost.
 
 ## 💡 Hints
 
 <details>
+
 <summary>Hint #1</summary>
+
 The core of the problem is to minimize a total cost, which is a sum of quantities multiplied by prices. This minimization is subject to several conditions, each of which limits the total amount of a nutrient to a specific range. What mathematical framework is designed for optimizing a linear objective function under linear inequality constraints?
+
 </details>
+
 <details>
+
 <summary>Hint #2</summary>
+
 The problem can be modeled as a **Linear Program (LP)**. The variables of the LP would represent the quantities of each food to be purchased. The objective function would be the total cost, and the constraints would ensure that the nutrient intake levels are within the specified bounds.
+
 </details>
+
 <details>
+
 <summary>Hint #3</summary>
-Let $x_j \ge 0$ be the amount of food product $j$ to purchase. The goal is to minimize the objective function $\sum_{j=0}^{m-1} p_j \cdot x_j$. For each nutrient $i$, the total intake is $\sum_{j=0}^{m-1} C_{j,i} \cdot x_j$. This gives us two constraints for each nutrient: $\sum_{j=0}^{m-1} C_{j,i} \cdot x_j \ge \text{min}_i$ and $\sum_{j=0}^{m-1} C_{j,i} \cdot x_j \le \text{max}_i$. These inequalities, along with the non-negativity constraints $x_j \ge 0$, define the full LP. You can use a library like CGAL to solve this.
+
+Let $x_j \ge 0$ be the amount of food product $j$ to purchase. The goal is to minimize the objective function $\sum_{j=0}^{m-1} p_j \cdot x_j$. For each nutrient $i$, the total intake is $\sum_{j=0}^{m-1} C_{j,i} \cdot x_j$. This gives us two constraints for each nutrient: $\sum_{j=0}^{m-1} C_{j,i} \cdot x_j \ge \text{min}_i$ and $\sum_{j=0}^{m-1} C_{j,i} \cdot x_j \le \text{max}_i$. These inequalities, along with the non-negativity constraints $x_j \ge 0$, define the full LP.
+
 </details>
 
 ## ✨ Solutions
 
 <details>
+
 <summary>Final Solution</summary>
-This problem is a classic example of an optimization problem that can be solved using **Linear Programming (LP)**. Our goal is to minimize a linear function (the total cost of the diet) subject to a set of linear inequality constraints (the nutritional requirements).
 
-### LP Formulation
+We can solve this problem using linear programming as we want to **minimize the cost of the diet**, while still fulfilling all the **constraints on the amount of nutrients** (minimum and maximum).
 
-Let's define the components of our linear program.
+We first need to establish **how the cost is calculated**:
 
-#### 1. Variables
-The quantities we need to determine are the amounts of each food product to purchase. Let's define a variable $x_j$ for each food product $j=0, \dots, m-1$, representing the amount of that food in the diet. Since we cannot consume a negative amount of food, we have the implicit constraint $x_j \ge 0$.
+$$
+\text{cost} = c = \sum_{j = 0}^m n_j \cdot p_j
+$$
 
-#### 2. Objective Function
-We want to minimize the total cost of the diet. The cost is calculated by summing the price of each food multiplied by the amount consumed.
-$$ \text{Minimize: } \quad \text{Cost} = \sum_{j=0}^{m-1} p_j \cdot x_j $$
-Here, $p_j$ is the price of one unit of food product $j$.
+The overall cost is calculated as the sum of $n_j$ (the amount of food $j$ the person eats) times the price for each unit of that food. E.g. if the person needs 3 apples and 1 banana and one apple costs 1€ and a banana cost 2€ this would be $c = 3 \cdot 1 + 1 \cdot 2 = 5$ 
 
-#### 3. Constraints
-The diet must satisfy the requirements for each of the $n$ nutrients. For any given nutrient $i$ (where $i=0, \dots, n-1$), its total amount in the diet must be between $\text{min}_i$ and $\text{max}_i$.
+As the **prices are fixed**, we can not change them, so the **obvious choice for the variables in our linear program is the amount for each food** $n_j$. Now the only thing that is left is that we **define the constraints**, such that the max and min for each nutrient are fulfilled. As an equation this would correspond to this
 
-The total amount of nutrient $i$ consumed is the sum of contributions from all food products. One unit of food $j$ provides $C_{j,i}$ of nutrient $i$, so $x_j$ units provide $x_j \cdot C_{j,i}$. Summing over all foods gives the total:
-$$ \text{Total Nutrient}_i = \sum_{j=0}^{m-1} x_j \cdot C_{j,i} $$
-This leads to a pair of inequalities for each nutrient $i$:
-$$ \text{min}_i \le \sum_{j=0}^{m-1} x_j \cdot C_{j,i} \le \text{max}_i $$
+$$
+\begin{align*}
+\text{min}_i \leq \sum_{j = 0}^m n_j \cdot C_{ji} \leq \text{max}_i
+\end{align*}
+$$
 
-### Implementation with CGAL
+The total amount of nutrient $i$ consumed is equal to the sum over all products, where we calculate the amount we eat of product $j$ ($n_j$) times the amount of nutrient $i$, the product $j$ gives us ($C_{ji}$). This amount obviously needs to be between $\min_i$ and $\max_i$
 
-Most LP solvers, including the one in the CGAL library, require constraints to be in the standard form $A \cdot x \le b$. We need to convert our constraints to match this format.
+When we bring this into the **format we need for CGAL**, we get the following constraints
 
-The double-sided inequality for each nutrient can be split into two separate inequalities:
-1.  $\sum_{j=0}^{m-1} x_j \cdot C_{j,i} \le \text{max}_i$
-2.  $\sum_{j=0}^{m-1} x_j \cdot C_{j,i} \ge \text{min}_i$
+$$
+\begin{align*}
+- \sum_{j = 0}^m n_j \cdot C_{ji} &\leq -\text{min}_i \\
+\sum_{j = 0}^m n_j \cdot C_{ji} &\leq \text{max}_i \\
+-n_j &\leq 0
+\end{align*}
+$$
 
-The first inequality is already in the required form. The second one can be converted by multiplying both sides by -1, which reverses the inequality sign:
-$$ -\sum_{j=0}^{m-1} x_j \cdot C_{j,i} \le -\text{min}_i $$
-This gives us a total of $2n$ linear constraints. The non-negativity constraint ($x_j \ge 0$) is handled directly by CGAL by specifying that all variables have a lower bound of 0.
+**Note**: The last constraint is necessary as we obviously **can’t give a person a negative amount of some food**. But the last constraint can be implemented in CGAL easier by just **defining a lower bound on all variables during the creation of the linear program.**
 
-In the code, we set up a `Program` object.
-- The variables $x_0, \dots, x_{m-1}$ correspond to the indices `0, ..., m-1`.
-- For each nutrient $i=0, \dots, n-1$, we add two constraint rows:
-    - Constraint row `i`: Represents $-\sum x_j \cdot C_{j,i} \le -\text{min}_i$.
-    - Constraint row `n+i`: Represents $\sum x_j \cdot C_{j,i} \le \text{max}_i$.
-- The coefficients of the objective function, $p_j$, are set using `lp.set_c()`.
+Now we can simply turn this into CGAL code and solve the task.
 
-After setting up the program, we call `CGAL::solve_linear_program`. If the solution is `infeasible`, no diet satisfies the constraints. Otherwise, we retrieve the optimal objective value, which is the minimum cost, and print it rounded down.
-
+### Code
 ```cpp
 #include<iostream>
 #include<vector>
