@@ -299,6 +299,10 @@ int main() {
 - `std::lower_bound` is a very nice and useful function if you need a quick and simple binary search.
 - For problems which require exponential complexity (as they are NP-hard) split-and-list is probably necessary.
 
+</details>
+
+## ⚡ Result
+
 ```plaintext
 Compiling: successful
 
