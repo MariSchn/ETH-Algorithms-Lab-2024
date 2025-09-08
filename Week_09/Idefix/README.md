@@ -2,56 +2,69 @@
 
 ## 📝 Problem Description
 
-This problem asks us to analyze the connectivity of a set of circular regions. We are given the coordinates of $n$ potential trees and $m$ buried bones. Each tree, when planted, creates a circular "shadow" centered at its location.
+This problem involves analyzing the connectivity of a collection of circular regions. The coordinates of $n$ potential trees and $m$ buried bones are provided. Each tree, when planted, generates a circular "shadow" centered at its location.
 
-We need to determine two values:
-1.  Given a standard squared radius value $s$, which corresponds to a radius $r$ such that $s = 4r^2$, what is the largest number of distinct bones, $a$, that can be visited on a single continuous walk? A walk is considered continuous if its path remains entirely within the union of all tree shadows.
-2.  Given a target number of bones $k$, what is the smallest possible squared radius $q$ that the trees would need to have, such that it becomes possible to visit at least $k$ bones on a single walk? This radius, let's call it $b$, relates to $q$ by $q = 4b^2$.
+The task is to determine two values:
+1.  For a given squared radius value $s$, identify the largest number of distinct bones, $a$, that can be visited during a single continuous walk. A walk is considered continuous if its path remains entirely within the union of all tree shadows.
+2.  For a specified target number of bones $k$, find the smallest possible squared radius $q$ required for the trees so that at least $k$ bones can be visited on a single walk.
 
-A set of bones can be visited on a single walk if the shadows of the trees that cover them form a single, connected region. Two tree shadows are connected if they overlap or touch.
+A set of bones is considered visitable on a single walk if the shadows of the trees covering them form a single, connected region. Two tree shadows are connected if they overlap or touch.
 
 ## 💡 Hints
 
 <details>
+
 <summary>Hint #1</summary>
-The core of the problem lies in understanding when Idéfix can travel from one tree's shadow to another. For a path to exist between the shadows of tree A and tree B, their circular regions must form a single connected area. This happens if the circles touch or overlap. What does this condition imply about the distance between the centers of the two trees in relation to their radius?
+
+Notice that the problem is fundamentally about proximity: which trees and bones are close enough to interact? This is a classic scenario for using the Delaunay Triangulation, which efficiently encodes nearest-neighbor relationships among points in the plane. Consider how this structure can help you quickly identify which trees are close enough to potentially connect.
+
 </details>
+
 <details>
+
 <summary>Hint #2</summary>
-This problem can be effectively modeled by considering trees as vertices in a graph. An edge exists between two vertices if their corresponding tree shadows overlap. The problem of finding which bones can be visited on a single walk is then equivalent to finding connected components in this graph and counting the bones associated with each component. A Union-Find data structure is an excellent tool for efficiently tracking these components as you discover connections.
+
+Once you know which trees are close enough to connect, you need to group them into clusters. The Union-Find (Disjoint Set Union) data structure is ideal for efficiently tracking these connected components as you process the connections. How might you use Union-Find to keep track of which trees belong to the same region?
+
 </details>
+
 <details>
+
 <summary>Hint #3</summary>
-To find the smallest radius $b$ (and thus $q=4b^2$), observe that the number of connected bones is a monotonic function of the radius: as the radius increases, more connections are formed, and more bones become reachable. This structure suggests that we don't need to test every possible radius. Instead, we can identify all the discrete "connection events" — either two trees becoming connected or a bone becoming covered by a tree. Each event happens at a specific critical radius. If we process these events in increasing order of their critical radius, the first time we satisfy the condition of reaching $k$ bones, we will have found the minimum required radius.
+
+To answer the first question, focus on a fixed radius. Use the Delaunay Triangulation to find all pairs of trees that are close enough to connect, and Union-Find to group them. Then, for each bone, check if it is covered by any tree and assign it to the corresponding component. The answer is the largest number of bones in any single connected region.
+
+</details>
+
+<details>
+
+<summary>Hint #4</summary>
+
+For the second question, you need to find the minimum radius so that at least $k$ bones are reachable in a single walk. To do this, imagine the trees' shadows gradually expanding. If you process all possible connections in order of increasing distance, you can simulate the growing of the trees. As you go through these edges ascendingly, use Union-Find to merge components and keep track of how many bones are in each. The first time a component reaches $k$ bones, you have found the minimum radius required.
+
 </details>
 
 ## ✨ Solutions
 
 <details>
+
 <summary>First Solution (Test Set 1 & 2)</summary>
 
-This approach solves the first part of the problem: finding the maximum number of bones, $a$, that can be reached when trees have a fixed radius $r$ (derived from the input $s$).
+This solution addresses the first part of the problem: determining the maximum number of bones, $a$, that can be reached when the trees have a fixed radius $r$ (with $s = 4r^2$ given as input).
 
-### Modeling Connectivity
+The key to an efficient approach is to model the connectivity between trees and bones using geometric relationships. Each tree casts a circular shadow of radius $r$, and any bone within this shadow is considered reachable. To efficiently process proximity and connectivity, we use **CGAL** and specifically the **Delaunay Triangulation**.
 
-The problem can be modeled as finding connected components in a graph where trees are vertices. Two trees are considered connected if their circular shadows, each with radius $r$, overlap or touch. This occurs if the distance $d$ between their centers is at most $2r$. Squaring this inequality gives us the condition $d^2 \le (2r)^2 = 4r^2$. Since the problem provides $s = 4r^2$, the connectivity condition simplifies to checking if the **squared distance** between two tree centers is less than or equal to $s$.
+#### Connectivity Model
 
-A bone is "covered" if it lies within a tree's shadow. This means its distance $d_{\text{bone}}$ to the tree's center is at most $r$. Squaring this gives $d_{\text{bone}}^2 \le r^2$, which is equivalent to $4d_{\text{bone}}^2 \le 4r^2 = s$.
+Two trees are considered connected if their shadows overlap or touch, which happens when the distance $d$ between their centers is at most $2r$. To avoid computing square roots, we square both sides, yielding $d^2 \le (2r)^2 = 4r^2$. Since $s = 4r^2$, the connectivity condition is simply that the squared distance between two tree centers is less than or equal to $s$. Similarly, a bone is covered if its distance to a tree's center is at most $r$, which translates to $d_{\text{bone}}^2 \le r^2$, or equivalently $4d_{\text{bone}}^2 \le s$.
 
-### Algorithm
+#### Step-by-Step Algorithm
 
-1.  **Finding Nearby Trees Efficiently:** A naive check of all $O(n^2)$ pairs of trees to see if they are connected would be too slow for the full constraints. A standard optimization for geometric proximity problems is to use a **Delaunay Triangulation**. This structure connects points to their nearest neighbors and provides a much smaller set of candidate edges to check for connectivity. We build a Delaunay triangulation on the $n$ tree locations.
+First, we build a Delaunay triangulation of all tree positions. This efficiently identifies neighboring trees and reduces the number of pairs to consider from $O(n^2)$ to $O(n \log n)$. For each edge in the triangulation, we check if its squared length is at most $s$. If so, the corresponding trees are connected, and we use a **Union-Find data structure** to track connected components among the trees. Each tree starts as its own component, and valid edges merge components.
 
-2.  **Building Components with Union-Find:** We use a **Union-Find** data structure to efficiently group trees into connected components. Initially, each of the $n$ trees is in its own component. We then iterate through all edges of the Delaunay triangulation. If an edge's squared length is less than or equal to $s$, it represents a valid connection, and we merge the components of the two trees it connects using the `union` operation.
+Next, for each bone, we find its nearest tree using the triangulation's `nearest_vertex` query. If $4d_{\text{bone}}^2 \le s$, the bone is reachable and is assigned to the component of its closest tree. Otherwise, it is ignored. Finally, we count the number of bones assigned to each component, and the answer $a$ is the maximum bone count among all components.
 
-3.  **Assigning Bones to Components:** After all components for the given radius $r$ are formed, we determine how many bones belong to each. For every bone, we must find which component (if any) covers it.
-    - We use the `nearest_vertex` query from the CGAL triangulation data structure to find the closest tree to each bone.
-    - We then check if the bone is actually inside that tree's shadow using the condition $4 \cdot d_{\text{bone}}^2 \le s$.
-    - If it is, we find the representative of that tree's component (using the `find` operation of Union-Find) and increment a counter for that component. If the condition is not met, the bone is not covered by any shadow and is ignored.
-
-4.  **Finding the Maximum:** Finally, we iterate through the bone counts for all components and find the maximum value. This is our answer, $a$. The second part of the output, $q$, is trivially set to $4s$ for these test sets as per the problem statement's assumptions.
-
-### C++ Implementation
+### Code
 ```cpp
 #include <iostream>
 #include <vector>
@@ -157,38 +170,21 @@ int main() {
 </details>
 
 <details>
+
 <summary>Final Solution</summary>
 
-This solution solves both parts of the problem: calculating the maximum bones $a$ for a fixed radius and finding the minimum squared radius $q$ to connect at least $k$ bones. The calculation of $a$ is identical to the first solution. The main challenge is finding $q$.
+To solve the last 2 Test Sets, we additionally need to calculate $q$ which is the minimum radius such that $k$ bones are reachable. The **general approach will be the same as in the First Solution** (use triangulation, consider edges and use union find to calculate components and determine how many bones are in each component).
+**Note**: See First Solution to see how to calculate $a$
 
-### Finding the Minimum Radius `q`
+We can “simulate” the radius of the trees increasing by** iterating over the edges ascendingly** based on their length.
+However, as the shadow of each tree is now **no longer fixed**. Bones **can change** from not being in the shadow to being in the shadow, unlike in the first 2 Test Sets. I.e. a bone that was previously not reachable because it was too far away from the next tree might become reachable after the shadows expand
 
-The core insight is that the number of connected bones only increases at specific, discrete values of the radius. These "events" occur when two components merge or a bone becomes part of a component. We can find the minimum required radius by simulating the process of a gradually increasing radius.
+Therefore we also add the edges between bones and trees to the vector of all edges. Essentially now each **tree and each bone is a component in our Union Find**.
+While iterating over the edges ascendingly, we can then check after every `link` operation, if the new component has at least `k` bones.
+- If not we continue growing, as the trees are still not big enough
+- If yes we have found the exact radius (distance of the “linked” edge) at which `k` bones become reachable, which is exactly what we wanted to calculate.
 
-#### Event-Based Simulation
-
-There are two types of events, each occurring at a critical squared radius $q = 4b^2$:
-
-1.  **Tree-Tree Connection:** Two trees $T_i$ and $T_j$ become connected when their shadows first touch. This happens when the radius $b = \text{dist}(T_i, T_j) / 2$. The critical squared radius is therefore $q = (\text{dist}(T_i, T_j))^2$.
-2.  **Bone-Tree Inclusion:** A bone $B$ is first covered by a tree $T$ when the radius $b = \text{dist}(B, T)$. The critical squared radius for this event is $q = 4 \cdot (\text{dist}(B, T))^2$.
-
-#### Algorithm
-
-1.  **Gather All Potential Events:** We create a list of all possible connection events, represented as edges with an associated cost (the critical $q$ value).
-    -   **Tree-Tree Edges:** We extract all edges from the Delaunay triangulation of the trees. The cost of each edge is its squared length.
-    -   **Bone-Tree Edges:** For each bone, we find its nearest tree (using `nearest_vertex`). The connection to this nearest tree will always be the first one to occur as the radius grows. The cost for this event is $4$ times the squared distance from the bone to its nearest tree.
-
-2.  **Sort Events:** We combine both types of edges into a single list and sort it in ascending order based on their cost.
-
-3.  **Simulate with Union-Find:** We process the sorted edges one by one, effectively simulating an increasing radius.
-    - We use a Union-Find data structure on $n+m$ elements, where indices `0` to `n-1` represent trees and `n` to `n+m-1` represent bones.
-    - We also maintain an array to track the number of bones in each component. Initially, each tree component has 0 bones, and each bone component (indices `n` to `n+m-1`) has 1 bone.
-    - We iterate through the sorted edges. For each edge, we merge the components of the two entities it connects (tree-tree, tree-bone). When merging, we also sum their bone counts.
-    - After each merge, we check if the newly formed component's bone count has reached or exceeded $k$.
-
-4.  **Determine `q`:** The first time a component's bone count reaches at least $k$, the cost of the edge that caused this merge is our desired minimum squared radius, $q$. We can stop the simulation at this point and report this value.
-
-### C++ Implementation
+### Code
 ```cpp
 #include <iostream>
 #include <vector>
@@ -328,6 +324,16 @@ int main() {
   while(n_tests--) { solve(); }
 }
 ```
+</details>
+
+## 🧠 Learnings
+
+<details> 
+
+<summary> Expand to View </summary>
+
+- Delaunay Triangulation and Union Find are a very common combination that go very well together if you there is some distance constraint on when something is connected and we need to track components.
+
 </details>
 
 ## ⚡ Result
