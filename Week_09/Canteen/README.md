@@ -2,39 +2,54 @@
 
 ## 📝 Problem Description
 
-The task is to create a production and serving plan for a canteen over a period of $N$ days. For each day $i$, we are given several parameters:
+Given a period of $N$ days, the task is to design a production and serving plan for a canteen. For each day $i$, the following parameters are provided:
 *   The maximum number of meals that can be produced, $a_i$, and the production cost per meal, $c_i$.
-*   The number of students who want to eat, $s_i$, and the fixed price per meal, $p_i$.
+*   The number of students desiring a meal, $s_i$, and the fixed price per meal, $p_i$.
 
-Meals that are produced but not served on a given day can be stored in a freezer and served on any subsequent day. For each night between day $i$ and day $i+1$, we know:
-*   The maximum number of meals that can be stored in the freezer, $v_i$.
-*   The energy cost to store one meal overnight, $e_i$.
+Meals produced but not served on a given day may be stored in a freezer and served on subsequent days. For each night between day $i$ and day $i+1$, the maximum number of meals that can be stored in the freezer, $v_i$, and the energy cost to store one meal overnight, $e_i$, are specified.
 
-The goal is twofold. First, determine if it's possible to serve every student who wants a meal over the $N$ days. Second, regardless of whether it's possible or not, we must find the maximum number of students that can be served and the corresponding maximum possible profit (or minimum loss) the canteen can achieve. The output should specify if serving all students is possible, followed by the maximum number of students served and the maximum profit.
+The problem requires determining two outcomes. First, assess whether every student requesting a meal during the $N$-day period can be served. Second, compute the highest possible number of students that can be served and the optimal profit (or minimal loss) achievable by the canteen.
 
 ## 💡 Hints
 
 <details>
+
 <summary>Hint #1</summary>
+
 This problem involves managing a resource (meals) that flows through a system over time. Meals are created (production), consumed (by students), and can be passed from one day to the next (storage). This structure suggests modeling the problem as a network where we need to optimize the flow of this resource.
+
 </details>
+
 <details>
+
 <summary>Hint #2</summary>
+
 This problem can be effectively modeled as a flow network. Consider what the nodes, edges, capacities, and costs in such a network could represent. How can you model the progression of days? Each day could be a node, and edges could represent production, consumption, and storage between days.
+
 </details>
+
 <details>
+
 <summary>Hint #3</summary>
-The objective is to serve the maximum number of students (which is equivalent to maximizing the flow of meals to students) while also maximizing profit (which is equivalent to minimizing total cost). This dual objective is the hallmark of a **Min-Cost Max-Flow** problem. Think carefully about how to represent profit within a cost-minimization framework. A common technique is to model revenue as a negative cost.
+
+The objective is to serve the maximum number of students (which is equivalent to maximizing the flow of meals to students) while also maximizing profit (which is equivalent to minimizing total cost). This dual objective is a **Min-Cost Max-Flow** problem. Think carefully about how to represent profit within a cost-minimization framework. A common technique is to model revenue as a negative cost.
+
 </details>
+
 <details>
+
 <summary>Hint #4</summary>
+
 Standard algorithms for Min-Cost Max-Flow can be inefficient if the graph contains edges with negative costs. The cycle-canceling algorithm, which handles such cases, is often too slow for larger constraints. Is it possible to remodel the problem to eliminate negative costs? Instead of maximizing profit directly, consider minimizing "costs" plus "lost opportunity." For example, if the maximum possible price for a meal is $P_{max}$, selling a meal for price $p_i$ can be viewed as incurring a cost of $P_{max} - p_i$. This transformation can make all edge weights non-negative, allowing for more efficient algorithms.
+
 </details>
 
 ## ✨ Solutions
 
 <details>
+
 <summary>First Solution (Test Set 1, 2)</summary>
+
 This problem can be modeled as a **Min-Cost Max-Flow** problem. We want to maximize the number of served students (the "flow") while maximizing the profit (which is equivalent to minimizing the "cost").
 
 ### Graph Construction
@@ -57,16 +72,13 @@ We construct a flow network with a source node `S`, a sink node `T`, and one nod
         *   **Capacity:** $v_i$ (the freezer's capacity).
         *   **Cost:** $e_i$ (the cost to freeze one meal).
 
-### Algorithm
+### Solving
 
-After constructing the graph, we can find the min-cost max-flow. Since our graph has negative edge weights (due to the profit edges), we cannot use simpler algorithms that require non-negative weights. A common approach for graphs with negative weights is:
-1.  Compute the maximum flow from `S` to `T`, for instance, using a push-relabel algorithm. This gives us the maximum number of students we can serve.
-2.  Run a cycle-canceling algorithm on the residual graph to find a flow with the same value but minimum cost.
+In this graph we can then simply calculate the **Max Flow**, which will give us the number of served meals and the **money we make** (or lose) using a Min Cost Max Flow algorithm.
 
-The maximum flow value corresponds to the total number of students served ($S$). The minimum cost found represents the total net cost. Since we modeled profit as negative cost, the maximum profit ($P$) is simply the negation of the minimum cost calculated by the algorithm.
+**Note**: As we have negative edge weights from the days to the sink, we are limited to using the slower `boost::cycle_canceling` which times out on the last test set.
 
-This approach is correct and will pass the first two test sets, but the `cycle_canceling` algorithm can be too slow for the largest constraints.
-
+### Code
 ```cpp
 #include<iostream>
 #include<vector>
@@ -174,8 +186,11 @@ int main() {
 }
 ```
 </details>
+
 <details>
+
 <summary>Final Solution</summary>
+
 The previous solution is too slow for the final test set because `boost::cycle_canceling` is needed for graphs with negative edge weights, and it can have poor worst-case performance. To achieve the required speed-up, we must eliminate these negative costs.
 
 ### Cost Transformation
@@ -195,10 +210,10 @@ With this change, all edge costs in the graph are now non-negative:
 
 The algorithm now minimizes the sum of production costs, freezer costs, and opportunity costs. Let this total minimum cost be $C_{min}$ for a maximum flow of $F$ meals.
 
-$C_{min} = (\text{Total Production Cost}) + (\text{Total Freezer Cost}) + (\text{Total Opportunity Cost})$
-$C_{min} = (\text{True Expenses}) + \sum_{\text{sold meals}} (P_{max} - p_i)$
-$C_{min} = (\text{True Expenses}) + F \cdot P_{max} - \sum_{\text{sold meals}} p_i$
-$C_{min} = (\text{True Expenses}) + F \cdot P_{max} - (\text{True Revenue})$
+- $C_{min} = (\text{Total Production Cost}) + (\text{Total Freezer Cost}) + (\text{Total Opportunity Cost})$
+- $C_{min} = (\text{True Expenses}) + \sum_{\text{sold meals}} (P_{max} - p_i)$
+- $C_{min} = (\text{True Expenses}) + F \cdot P_{max} - \sum_{\text{sold meals}} p_i$
+- $C_{min} = (\text{True Expenses}) + F \cdot P_{max} - (\text{True Revenue})$
 
 Since `True Profit = True Revenue - True Expenses`, we can rearrange the equation:
 $C_{min} = -(\text{True Profit}) + F \cdot P_{max}$
@@ -206,10 +221,9 @@ $C_{min} = -(\text{True Profit}) + F \cdot P_{max}$
 Therefore, the actual maximum profit can be recovered with the formula:
 $$ \text{Profit} = F \cdot P_{max} - C_{min} $$
 
-### Algorithm
-
 Because all edge weights are now non-negative, we can use a more efficient min-cost max-flow algorithm, such as `boost::successive_shortest_path_nonnegative_weights`. This algorithm is fast enough to pass all test sets. After running it, we calculate the total flow and cost to find our final answer. Note that `successive_shortest_path_nonnegative_weights` does not return the flow value, so we must compute it manually by inspecting the flow on the edges leaving the source.
 
+### Code
 ```cpp
 #include<iostream>
 #include<vector>
@@ -323,6 +337,17 @@ int main() {
 }
 ```
 </details>
+
+## 🧠 Learnings
+
+<details> 
+
+<summary> Expand to View </summary>
+
+- In Max Flow Min Cost problems the intuitive way of modeling it often involves negative costs. This then works for the first few test sets, but for the last one you need to rescale it to be non-negative to use the faster.
+
+</details>
+
 
 ## ⚡ Result
 
