@@ -1,46 +1,59 @@
-# Algocoön Group
+# Algocoon Group
 
 ## 📝 Problem Description
 
 The problem asks for the minimum cost to partition a set of figures into two non-empty groups. We are given $N$ figures, indexed from $0$ to $N-1$, and a list of $M$ limbs that connect them. Each limb is described by the two figures it connects, say $a$ and $b$, and a cost $c$ to cut it.
 
-A partition of the figures into two groups defines a "cut". The total cost of this cut is the sum of the costs of all limbs connecting a figure in the first group to a figure in the second group. The objective is to find a partition that minimizes this total cost, under the constraint that both groups must be non-empty. For each sculpture described, the program should output this single minimum cost.
+A partition of the figures into two groups defines a "cut". The total cost of this cut is the sum of the costs of all limbs connecting a figure in the first group to a figure in the second group. The objective is to find a partition that minimizes this total cost, under the constraint that both groups must be non-empty.
 
 ## 💡 Hints
 
 <details>
+
 <summary>Hint #1</summary>
+
 The problem asks for a minimum cost to "cut" a set of interconnected items into two distinct groups. This phrasing is a strong clue towards a specific family of algorithms. How can you model the figures and their connections in a way that allows you to apply a standard algorithm for finding a minimum cut?
+
 </details>
+
 <details>
+
 <summary>Hint #2</summary>
-This problem can be modeled using a graph. Let each figure be a vertex and each limb be an edge between the corresponding vertices. The cost associated with cutting a limb can be represented as the capacity of that edge. The problem is now equivalent to finding a minimum cut that partitions the graph's vertices into two non-empty sets.
+
+This problem can be modeled using a graph. Let each figure be a nodex and each limb be an edge between the corresponding nodes. The cost associated with cutting a limb can be represented as the capacity of that edge. The problem is now equivalent to finding a minimum cut that partitions the graph's nodes into two non-empty sets.
+
 </details>
+
 <details>
+
 <summary>Hint #3</summary>
-A standard minimum cut is defined between a source vertex $s$ and a sink vertex $t$. This cut separates the vertices into two sets: one containing $s$ (the source side) and the other containing $t$ (the sink side). The problem requires finding the minimum cut among all possible non-trivial partitions. How can we choose $s$ and $t$ to guarantee we find the overall minimum cut? Consider fixing one vertex and exploring its relationship with all other vertices.
+
+A standard minimum cut is defined between a source nodex $s$ and a sink nodex $t$. This cut separates the nodes into two sets: one containing $s$ (the source side) and the other containing $t$ (the sink side). The problem requires finding the minimum cut among all possible non-trivial partitions. How can we choose $s$ and $t$ to guarantee we find the overall minimum cut? Consider fixing one nodex and exploring its relationship with all other nodes.
+
 </details>
 
 ## ✨ Solutions
 
 <details>
+
 <summary>First Solution (Test Set 1)</summary>
-This problem can be framed as a **Minimum Cut** problem on a graph. The direct connection between cutting limbs and finding a minimum cut in a graph is a key observation.
 
-### Graph Representation
-We can model the sculpture as a graph where:
-- Each of the $N$ figures is a **vertex**.
-- Each limb connecting two figures is an **edge** between the corresponding vertices. Since a limb from figure $a$ to figure $b$ is the same as one from $b$ to $a$, we can think of this as an undirected connection. When modeling for max-flow, we represent this with two directed edges. The **capacity** of an edge is set to the cost of cutting the corresponding limb.
+By reading the problem description we already get a feeling that this is going to be a **Minimum Cut** problem.
 
-### Applying the Max-Flow Min-Cut Theorem
-The famous **Max-Flow Min-Cut Theorem** states that the maximum flow between a source vertex $s$ and a sink vertex $t$ in a network is equal to the minimum capacity of an $s-t$ cut. An $s-t$ cut is a partition of the vertices into two sets, $S$ and $T$, such that $s \in S$ and $t \in T$. The capacity of the cut is the sum of capacities of all edges going from $S$ to $T$.
+As we want to cut the individual figures, we will design our graph as follows:
 
-For the first test set, we are given a crucial hint: there is an optimal solution where you get Figure 0 and your friend gets Figure $N-1$. This directly tells us which vertices to use as the source and sink.
-- We can designate **vertex 0 as the source ($s$)** and **vertex $N-1$ as the sink ($t$)**.
-- By finding the maximum flow from $s$ to $t$, we simultaneously find the minimum cost to separate vertex 0 from vertex $N-1$.
+- Each **figure becomes a node**.
+- The **limbs become edges between nodes**, with their corresponding cost as capacity.
 
-Since the problem guarantees that this specific partition is optimal, a single max-flow computation is sufficient. The code handles multiple limbs between the same two figures by adding their capacities, which is implicitly done by adding parallel edges in the graph representation.
+The main challenge we now have is, that we have to **ensure, that both people get at least one figure**. More formally this means, that there needs to be **at least one node in $S$ and $T = V\setminus S$**. 
 
+Given the assumption on the test set 1, we know that there exists a solution where A gets figure $0$ and B gets figure $n-1$. So we can **simply use these 2 figures/nodes as source and sink**.
+
+By choosing nodes that are already in the graph, we can ensure that $S$ and $T$ will be non-empty as obviously, after the max flow the source $s$ will be connected to the source, so $s \in S$ and the sink $t$ will be connected to the sink, so $t \in T$. 
+
+We can then simply **calculate the Min Cut by calculating the Max Flow**, as the **Maxflow-Mincut-Theorem** states that both are equal.
+
+### Code
 ```cpp
 #include<iostream>
 #include<vector>
@@ -112,31 +125,19 @@ int main() {
 }
 ```
 </details>
+
 <details>
+
 <summary>Second Solution (Test Set 1, 2)</summary>
-For the second test set, the assumption is relaxed. We are now only guaranteed that an optimal solution exists where you get Figure 0. This means Figure 0 is in your partition (let's call it $S$), but your friend's partition ($T$) can be anchored by *any* other figure.
 
-### Approach
-Since we know Figure 0 will be on the source side of our cut, we can fix **vertex 0 as the source ($s$)**. The problem is that we don't know which vertex from the other partition to pick as the sink ($t$).
+The only difference when moving from test set 1 to test set 2 is that we can now **no longer assume that the optimal solution assigns $n-1$ to B**.
+What we can simply do, is that we **loop over all nodes**, assign them to B (assign them as sink) and calculate the flow.
 
-The constraint that both partitions must be non-empty implies that the friend's partition $T$ must contain at least one figure, say figure $j$. The cost of this partition is the capacity of the minimum cut separating $S$ and $T$. This cut is an $s-t$ cut where $s \in S$ and $t \in T$.
+In the end we simply return the **minimum of the cuts we found**.
 
-Since we know $s=0$, we can find the optimal partition by trying every other possible vertex as the sink. We iterate through all vertices $i \in \{1, 2, \dots, n-1\}$, set each one as the sink, and compute the max-flow from source 0 to sink $i$. The overall minimum cost will be the minimum value found across all these computations.
+This is a pretty "brute-forcy” approach, that can be improved, see the next solution
 
-This approach is effectively a brute-force search for the best partner vertex for our fixed vertex 0.
-
-### Algorithm
-1. Build the same graph as in the first solution.
-2. Fix `v_source = 0`.
-3. Initialize `min_cut` to a very large value.
-4. Loop through every other vertex `i` from `1` to `n-1`:
-   a. Set `v_sink = i`.
-   b. Calculate the max-flow from `v_source` to `v_sink`. Note that max-flow algorithms modify the graph's residual capacities, so we must reconstruct the graph for each sink candidate.
-   c. Update `min_cut = min(min_cut, flow)`.
-5. The final `min_cut` is the answer.
-
-*Note: A more efficient implementation would avoid rebuilding the entire graph. One could save the initial capacities and restore them before each max-flow call. The provided code is simpler but correct for the given constraints.*
-
+### Code
 ```cpp
 #include<iostream>
 #include<vector>
@@ -214,22 +215,15 @@ int main() {
 }
 ```
 </details>
+
 <details>
+
 <summary>Third Solution (Test Set 3)</summary>
+
 For the third test set, all special assumptions are removed. We need to find the **global minimum cut** of the graph, which is the non-trivial cut of minimum capacity over all possible pairs of partitions.
 
 ### Brute-Force Approach
-A straightforward way to find the global minimum cut is to find the minimum $s-t$ cut for every possible pair of distinct vertices $(s, t)$. Since any non-trivial cut separates at least two vertices, the global minimum cut must be an $s-t$ cut for some pair $(s, t)$.
-
-This leads to a simple, albeit inefficient, algorithm:
-1. Build the graph from the input. To handle parallel edges cleanly, we can first accumulate the costs in an adjacency matrix and then build the graph.
-2. Initialize `min_cut` to a very large value.
-3. Iterate through every vertex `s` from `0` to `n-1`.
-4. Inside this loop, iterate through every other vertex `t` from `0` to `n-1`.
-5. If `s != t`:
-   a. Calculate the max-flow from `s` to `t`. Remember to restore the graph's capacities before each calculation.
-   b. Update `min_cut = min(min_cut, flow)`.
-6. The final `min_cut` is the answer.
+A straightforward way to find the global minimum cut is to find the minimum $s-t$ cut for every possible pair of distinct nodes $(s, t)$. Since any non-trivial cut separates at least two nodes, the global minimum cut must be an $s-t$ cut for some pair $(s, t)$.
 
 ### Complexity Analysis
 The number of pairs $(s, t)$ is $N \times (N-1)$, which is $O(N^2)$. The push-relabel max-flow algorithm has a complexity of roughly $O(N^3)$ in practice on general graphs. Therefore, the total time complexity of this approach is $O(N^2 \cdot N^3) = O(N^5)$. For Test Set 3 with $N \le 50$, this is feasible, but it is too slow for the full constraints.
@@ -319,33 +313,23 @@ int main() {
 }
 ```
 </details>
+
 <details>
+
 <summary>Final Solution</summary>
-The brute-force $O(N^5)$ approach is too slow for the full constraints. We need a more efficient way to find the global minimum cut. Instead of iterating through all $O(N^2)$ pairs of vertices, we can find the solution by performing only $O(N)$ max-flow computations.
 
-### The Key Insight
-Let the global minimum cut partition the vertices into sets $S_{opt}$ and $T_{opt}$. Now, let's pick an arbitrary vertex, for instance, **vertex 0**. In the optimal partition, vertex 0 must belong to either $S_{opt}$ or $T_{opt}$. This gives us two exhaustive cases:
+To make the third solution faster, we simply need to **exploit the fact that we have already used in the first 2 solutions**. In general we basically only **need 2 nodes such that one of them is in $S$ and the other in $T$**, and then we can calculate the max flow to get the min cut.
 
-1.  **Case A: Vertex 0 is in $S_{opt}$**.
-    Since $T_{opt}$ is non-empty, it must contain at least one vertex, say $j$. The capacity of the cut $(S_{opt}, T_{opt})$ is equal to the capacity of the minimum $s-t$ cut for *any* pair of vertices $s \in S_{opt}$ and $t \in T_{opt}$. In particular, its capacity is equal to the minimum $0-j$ cut. To find the minimum cut under this case, we can compute the minimum $0-i$ cut for all other vertices $i \neq 0$. This is precisely the logic from our second solution: `min(max_flow(0, i))` for $i \in \{1, \dots, n-1\}$.
+However, now we do **not know anything about which node belongs to which set**. Intuitively we would therefore just iterate over all pairs (like in the third solution). This, as we have seen, is to inefficient.
 
-2.  **Case B: Vertex 0 is in $T_{opt}$**.
-    Similarly, $S_{opt}$ must contain at least one vertex, say $i$. The capacity of the optimal cut is equal to the minimum $i-0$ cut. To cover this case, we can compute the minimum $i-0$ cut for all other vertices $i \neq 0$. This means we calculate `min(max_flow(i, 0))` for $i \in \{1, \dots, n-1\}$.
+BUT, we know that **each node has to belong to either $S$ or $T$**. What we can therefore do is **fix one node** (e.g. node $0$) and **use it as a source** and **compute the max flow to all other nodes** (/consider all other nodes as sinks). If $0 \in S$, then this will already yield the min cut. 
+This is because for at least one other node $i$, we will basically have the same situation as in Test set 1, where this also worked. 
+Note, that up until now we are basically **doing the same as in the second Solution**.
 
-Since any optimal cut must fall into either Case A or Case B, the global minimum cut must be among the values we computed. By taking the minimum over all $2(N-1)$ max-flow computations, we are guaranteed to find the global minimum.
+This will only fail if $0 \in T$, since then our assumption that $0 \in S$ does no longer hold. **BUT** if $0 \in T$, we can do the **exact same as before**, just that we know use $0$ as a sink and compute the max flow from all other nodes (consider every other node a source). 
+With this we have then covered both cases $0 \in S$ and $0 \in T$, and can therefore say for sure, that we have found the min cut, while only needing to run max flow $O(2N)$ times instead of $O(N^2)$ times.
 
-### Algorithm
-1. Build the graph from the input, aggregating capacities of parallel edges.
-2. Fix one vertex, say `v_ref = 0`.
-3. Initialize `min_cut` to a very large value.
-4. For each vertex `i` from `1` to `n-1`:
-   a. Calculate `flow = max_flow(v_ref, i)`. Update `min_cut = min(min_cut, flow)`.
-5. The resulting `min_cut` is the answer.
-
-This reduces the number of max-flow computations from $O(N^2)$ to $O(N-1)$, yielding a total complexity of $O(N \cdot \text{MaxFlow})$, which is efficient enough to pass all test sets.
-
-*Note: In an undirected graph, the min $s-t$ cut is the same as the min $t-s$ cut. So we only need to iterate through all `max_flow(0, i)` for `i=1...n-1`. The provided code calculates both `max_flow(0, i)` and `max_flow(i, 0)` which is redundant but correct.*
-
+### Code
 ```cpp
 #include<iostream>
 #include<vector>
