@@ -2,72 +2,98 @@
 
 ## 📝 Problem Description
 
-The problem asks whether it's possible to gather specific amounts of information about three individuals—Malfoy, Crabbe, and Goyle—within a 24-hour timeframe. We are given a total amount of a potion, $f$, to distribute among $d$ members of a group. There are also $s$ students who possess information.
+The problem asks whether it's possible to gather specific amounts of information about three individuals, Malfoy, Crabbe, and Goyle, within a 24-hour timeframe. We are given a total amount of a potion, $f$, to distribute among $d$ members of a group. There are also $s$ students who possess information.
 
 Each of the $s$ students is located at a specific 2D coordinate and, if interrogated, provides information about Malfoy, Crabbe, and Goyle at constant, given rates per hour. Each of the $d$ group members is also at a 2D coordinate and has an associated cost: the amount of potion required for one hour of activity.
 
 When a group member is given a certain amount of the potion, they gain a proportional amount of active time. During this time, they are guided to interrogate their single closest student from the group of $s$ students.
 
-The goal is to determine if an allocation of the total potion $f$ exists for the $d$ group members such that the total information gathered from all interrogated students meets or exceeds the required amounts for Malfoy ($m$), Crabbe ($c$), and Goyle ($g$). No individual interrogation can last longer than 24 hours. If a valid allocation exists, the output is "L"; otherwise, it is "H".
+The goal is to determine if an allocation of the total potion $f$ exists for the $d$ group members such that the total information gathered from all interrogated students meets or exceeds the required amounts for Malfoy ($m$), Crabbe ($c$), and Goyle ($g$). No individual interrogation can last longer than 24 hours.
 
 ## 💡 Hints
 
 <details>
+
 <summary>Hint #1</summary>
-The problem states that each DA member is guided towards their *closest* Slytherin student. Before considering the resource allocation, how can you efficiently determine this mapping for every DA member? This is a classic computational geometry problem.
+
+This problem naturally splits into two distinct stages. First, you must determine which Slytherin student each DA member will interrogate. Second, you need to decide how to allocate resources to meet the information requirements. Each stage requires a different technique, can you identify which tools are best suited for each?
+
 </details>
+
 <details>
+
 <summary>Hint #2</summary>
-The task of finding the nearest neighbor for a set of query points among a static set of sites can be solved efficiently. A Voronoi diagram partitions the plane into regions based on the closest site. The dual of the Voronoi diagram, a **Delaunay triangulation**, is a powerful structure often used in libraries like CGAL to answer nearest neighbor queries. Once this mapping is established, the problem changes. What happens if multiple DA members are closest to the same Slytherin?
+
+To efficiently assign each DA member to their closest Slytherin, consider using Delaunay Triangulation.
+
 </details>
+
 <details>
+
 <summary>Hint #3</summary>
-After determining which Slytherin each DA member can interrogate, the problem becomes one of resource allocation. You have a budget of Felix Felicis ($f$) and a time limit (24 hours). You must satisfy three minimum information requirements. This setup, involving allocating resources subject to linear constraints, is a strong indicator that **Linear Programming (LP)** is a suitable framework. Think about what your decision variables should be. A good choice of variables will make the constraints easy to express.
+
+Once the mapping is established, the problem becomes one of resource allocation under linear constraints. This is a classic scenario for Linear Programming (LP): you need to decide how much time to spend interrogating each Slytherin, subject to potion and time limits, and information requirements.
+
+</details>
+
+<details>
+
+<summary>Hint #4</summary>
+
+The key modeling trick is to let $x_i$ be the number of hours Slytherin student $i$ is interrogated. Other choices, like the amount of potion per DA member or the time per DA member, lead to complicated constraints or slow LPs. Using hours per Slytherin as variables makes the constraints simple and efficient.
+
+</details>
+
+<details>
+
+<summary>Hint #5</summary>
+
+To keep the LP efficient, only create variables for Slytherins who are actually interrogated. If you create a variable for every Slytherin in the input, even those who are never assigned to any DA member, your LP will have many unnecessary variables—this can make it much slower or even infeasible for large inputs. Instead, re-index the variables so that each one corresponds only to a Slytherin who is actually interrogated by at least one DA member. This way, the LP solver only needs to consider the relevant variables, which greatly improves performance and avoids wasting memory and computation on unused variables.
+
 </details>
 
 ## ✨ Solutions
 
 <details>
+
 <summary>Final Solution</summary>
+
 This problem can be decomposed into two main parts. First, we have a geometric subproblem: for each DA member, we must identify the Slytherin student they will interrogate. Second, we have a resource allocation subproblem: we must decide how to distribute the Felix Felicis to gather the required information.
 
 ### Part 1: Finding the Closest Slytherin
 
-The problem states that each DA member is guided to their unique closest Slytherin student. This is a nearest neighbor problem. Given the large number of DA members and Slytherin students, a naive approach of calculating all pairwise distances would be too slow.
-
-A more efficient method is to use a **Delaunay triangulation**. By constructing a Delaunay triangulation on the set of Slytherin student locations, we create a data structure that allows for fast nearest neighbor queries. For each DA member's location, we can query the triangulation to find the closest Slytherin vertex in logarithmic time on average. This gives us a mapping from each DA member to a specific Slytherin student.
+To efficiently determine the closest Slytherin student for each DA member, we construct a **Delaunay triangulation** using the Slytherin students' coordinates. For each DA member's position, we can directly query the triangulation to identify their unique closest Slytherin student. This approach ensures that the mapping from DA members to Slytherins is computed efficiently, even for large input sizes.
 
 ### Part 2: Resource Allocation via Linear Programming
 
 Once we have this mapping, the problem becomes one of optimally allocating our resources (Felix Felicis and time) to meet a set of goals (information thresholds). This is a classic scenario for **Linear Programming (LP)**. We need to determine if a *feasible* solution exists that satisfies all constraints.
 
-#### LP Formulation
+1.  **Variables:** The most critical step is defining the variables. A natural choice is to let the variable $x_i$ represent the total time (in hours) that Slytherin student $i$ is interrogated. This choice simplifies the formulation of the constraints.
 
-1.  **Decision Variables:** The most critical step is defining the variables. A natural choice is to let the variable $x_i$ represent the total time (in hours) that Slytherin student $i$ is interrogated. This choice simplifies the formulation of the constraints. Other intuitive choices, like the amount of potion each DA member receives, can lead to non-linear constraints or more complex models.
-
-2.  **Cost Simplification:** Multiple DA members might have the same Slytherin as their closest one. For a given Slytherin $i$, if several DA members can interrogate them, it is always optimal to use the DA member with the lowest Felix Felicis cost per hour. Therefore, for each Slytherin $i$ who is the target of at least one DA member, we can determine a single minimum cost, $\text{cost}_i$, required to interrogate them for one hour. Slytherins who are not the closest to any DA member can be ignored.
+2.  **Cost Simplification:** Multiple DA members might have the same Slytherin as their closest one. For a given Slytherin $i$, if several DA members can interrogate them, it is always optimal to use the DA member with the lowest Felix Felicis cost per hour. Therefore, for each Slytherin $i$ who is the target of at least one DA member, we can determine a single minimum cost, $\text{cost}_i$, required to interrogate them for one hour. Slytherins who are not the closest to any DA member can also be ignored.
 
 3.  **Constraints:** With the variables $x_i$ and costs $\text{cost}_i$ defined, we can formulate the constraints:
 
     *   **Time Limit:** Each Slytherin can be interrogated for at most 24 hours.
         $0 \le x_i \le 24$ for each active Slytherin $i$.
 
-    *   **Felix Felicis Budget:** The total amount of potion used cannot exceed the available amount, $f$. The potion cost for interrogating Slytherin $i$ for $x_i$ hours is $x_i \cdot \text{cost}_i$.
-        $\sum_{i} x_i \cdot \text{cost}_i \le f$
+    *   **Felix Felicis Budget:** The total amount of potion used cannot exceed the available amount, $f$. The potion cost for interrogating Slytherin $i$ for $x_i$ hours is $x_i \cdot \text{cost}_i$. Therefore the constraint to not exceed the budget over all DA students is:
+        $$\sum_{i} x_i \cdot \text{cost}_i \le f$$
 
     *   **Information Requirements:** The total information gathered for each of Malfoy, Crabbe, and Goyle must meet the minimum thresholds $m$, $c$, and $g$. Let $(m_i, c_i, g_i)$ be the information rates for Slytherin $i$.
         *   $\sum_{i} x_i \cdot m_i \ge m$
         *   $\sum_{i} x_i \cdot c_i \ge c$
         *   $\sum_{i} x_i \cdot g_i \ge g$
 
-We are not trying to maximize or minimize any particular value; we only need to know if there exists any set of values for $x_i$ that satisfies all these constraints simultaneously. This is a **feasibility problem**. The LP solver will tell us if such a solution exists.
+We are not trying to maximize or minimize any particular value, we only need to know if there exists any set of values for $x_i$ that satisfies all these constraints simultaneously. This is a **feasibility problem**.
 
 #### Implementation Detail: Variable Indexing
 
-A potential performance issue arises if the input indices for Slytherins are large and sparse (e.g., only Slytherins with indices 0 and $10^9$ are relevant). An LP solver might create variables for all indices in between, leading to a huge, slow model. To avoid this, we only create LP variables for the Slytherins that are actually targeted by at least one DA member. We can use a map or re-indexing scheme to map the original Slytherin indices to a compact set of LP variable indices (e.g., $0, 1, 2, \dots$).
+This solution is semantically already correct, but depending on how it is implemented it might bee too slow.
+What is important is that we do not use the “raw” index of each Slytherin $s \leq 10 ^9$, as this can get up to $10^9$. This is because not all Slytherins are interrogated making some variables $x_i$ unnecessary, but they still impact the run time. Therefore we need to remove these uninterrogated Slytherins.
 
-The following C++ code implements this logic using the CGAL library for both the Delaunay triangulation and the LP solver.
 
+### Code
 ```cpp
 #include<iostream>
 #include<vector>
@@ -209,6 +235,16 @@ int main() {
   }
 }
 ```
+</details>
+
+## 🧠 Learnings
+
+<details> 
+
+<summary> Expand to View </summary>
+
+- CGAL creates all intermediate variables, e.g. if you create variable 1000 but the previous highest you had was 100, all 900 variables in between are also created, greaetly impacting run time.
+
 </details>
 
 ## ⚡ Result
