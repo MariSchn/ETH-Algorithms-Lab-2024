@@ -2,58 +2,87 @@
 
 ## 📝 Problem Description
 
-The goal is to devise a transportation plan for a selection of food items along a fixed route to achieve the maximum possible total significance.
+Devise a transportation plan for a selection of food items along a fixed route to achieve the maximum possible total significance.
 
-The route consists of $n$ stops, labeled $s_0, s_1, \ldots, s_{n-1}$. For each leg of the journey between consecutive stops $s_i$ and $s_{i+1}$, there is a capacity limit $c_i$, which is the maximum number of items that can be carried simultaneously on that segment.
+The route consists of $n$ stops, labeled $s_0, s_1, \ldots, s_{n-1}$. For each leg of the journey between consecutive stops $s_i$ and $s_{i+1}$, a capacity limit $c_i$ specifies the maximum number of items that can be carried simultaneously on that segment.
 
-You are given a list of $m$ potential food items. Each item is defined by a pickup stop $s_a$, a drop-off stop $s_b$, and a cultural significance value $d$. You can choose to transport at most one of each listed item. When arriving at a stop, any items destined for that stop are unloaded before new items are picked up.
+A list of $m$ potential food items is provided. Each item is defined by a pickup stop $s_a$, a drop-off stop $s_b$, and a cultural significance value $d$. At most one of each listed item may be transported. Upon arrival at a stop, any items destined for that stop are unloaded before new items are picked up.
 
-Your task is to select a subset of the $m$ items to transport such that the sum of their significance values is maximized, without violating the capacity constraint $c_i$ on any segment of the journey. The output should be this maximum possible total significance.
+The task is to select a subset of the $m$ items for transport so that the sum of their significance values is maximized, while ensuring that the capacity constraint $c_i$ is not violated on any segment of the journey. The output should be the maximum possible total significance.
 
 ## 💡 Hints
 
 <details>
+
 <summary>Hint #1</summary>
-The problem requires you to maximize a certain value (total significance) subject to a set of constraints (the carrying capacities on each leg of the trip). This structure is characteristic of a class of optimization problems. Think about what general algorithmic paradigms are suitable for such problems.
+
+This problem can be solved efficiently using a Max Flow Min Cost algorithm. The goal is to maximize the total significance of transported items, while respecting the capacity constraints on each segment of the route.
+
 </details>
+
 <details>
+
 <summary>Hint #2</summary>
-Consider representing the problem as a network. The stops along the tour can be modeled as nodes in this network. The act of transporting items can be thought of as sending a "flow" through the network. How could you represent the capacities of the tour segments and the significance of the items within this network model?
+
+To model the problem as a flow network, start by representing each stop as a node. The main challenge is in constructing the edges: for each segment between stops, add an edge with capacity equal to the segment's limit. For each item, think about how to represent its possible transport as an edge in the graph.
+
 </details>
+
 <details>
+
 <summary>Hint #3</summary>
-This problem can be effectively solved by modeling it as a **minimum-cost maximum-flow** problem. To maximize the total significance, you can aim to minimize the total "cost", where the cost is related to the negative significance of the items.
 
-The graph should include nodes for each stop, a source node, and a sink node. Edges in the graph can represent two things:
-1. The physical path between consecutive stops.
-2. The "shortcut" path for transporting an item from its pickup stop to its drop-off stop.
+The graph should include edges between consecutive stops to enforce the carrying capacity, and for each item, an edge from its pickup to its drop-off stop. The item edge should have capacity 1 (since each item can be transported at most once) and a cost that reflects its significance. How do these edges interact to ensure the solution respects all constraints?
 
-The capacities and costs of these edges must be set carefully to reflect the problem's constraints and objectives.
+</details>
+
+<details>
+
+<summary>Hint #4</summary>
+
+To construct the graph, create a node for each stop along the route. For every segment between stops $s_i$ and $s_{i+1}$, add a directed edge from node $i$ to node $i+1$ with capacity $c_i$ (the segment's limit). For each item, add a directed edge from its pickup stop $a$ to its drop-off stop $b$ with capacity 1 and cost $-d$ (or transformed cost if using only non-negative weights). Add a source node and connect it to every stop $i$ (except the last) with capacity $c_i$, and add a sink node connected from every stop $i+1$ (except the first) with capacity $c_i$. This setup ensures that the flow models the transportation of items and enforces all capacity constraints.
+
+</details>
+
+<details>
+
+<summary>Hint #5</summary>
+
+Given the input constraints ($n$ up to 300, $m$ up to $10^5$), adding an edge for every item can make the graph too large and slow and might not be even necessary. Notice that the number of items that can be transported between any two stops is limited by the minimum capacity along the path. If there are more items for a route than its bottleneck capacity, you only need to consider the most significant ones. Pruning unnecessary items before building the graph is essential for passing all test sets efficiently.
+
 </details>
 
 ## ✨ Solutions
 
 <details>
+
 <summary>First Solution (Test Set 1, 2, 3, 4)</summary>
 
-### Core Idea: Minimum-Cost Maximum-Flow
-
-This problem asks us to maximize a total value under capacity constraints, which strongly suggests a network flow formulation. Specifically, it can be modeled as a **minimum-cost maximum-flow** problem. The general idea is to associate the *significance* of an item with a negative *cost* in the flow network. By finding a flow that minimizes the total cost, we effectively maximize the total significance.
+This problem asks us to maximize a total value under capacity constraints, which strongly suggests a network flow formulation. Specifically, it can be modeled as a **Max Flow Min Cost** problem. The general idea is to associate the *significance* of an item with a negative *cost* in the flow network. By finding a flow that minimizes the total cost, we effectively maximize the total significance.
 
 ### Graph Construction
 
 To model this, we construct a directed graph with the following components:
 - **Nodes**: We create one node for each of the $n$ stops, plus a global source node `S` and a global sink node `T`.
-- **Edges and Capacities**:
+- **Edges**:
     - **Path Edges**: For each segment of the tour from stop $s_i$ to $s_{i+1}$, we add an edge from node $i$ to node $i+1$. The capacity of this edge is set to $c_i$, directly modeling the transportation limit for that leg of the journey.
-    - **Item Edges**: For each food item, defined by a pickup stop $a$, drop-off stop $b$, and significance $d$, we add an edge from node $a$ to node $b$. The capacity of this edge is 1, as we can transport at most one of each specific item.
-- **Source and Sink**: The source `S` and sink `T` are connected to the stop nodes to allow flow to enter and leave the network.
+    - **Item Edges**: For each food item, defined by a pickup stop $a$, drop-off stop $b$, and significance $d$, we add an edge from node $a$ to node $b$. The capacity of this edge is 1, as we can transport at most one of each specific item. The cost of this edge (intuitively) is $-d$.
+
+### Why Does This Graph Construction Work?
+
+The key insight is that the flow in this network models the transportation of items along the route, while the capacities on the edges enforce the real-world constraints: you can never carry more items than the segment allows. By connecting each stop to the next with a capacity equal to the segment limit, you ensure that the total number of items being transported at any time does not exceed the allowed capacity.
+
+Item edges represent the option to transport a specific item from its pickup to its drop-off stop. Each item edge has capacity 1 (since you can only transport one of each item) and a cost that reflects its significance. When the flow algorithm chooses to use an item edge, it is "selecting" that item for transport, and the negative cost (or cost saving) increases the total significance.
+
+The source and sink connections allow the flow to enter and exit the network at the appropriate points, matching the capacity constraints of the route. The flow must respect all capacities, so the solution automatically ensures that no segment is overloaded and no item is transported more than once.
+
+If you imagine the flow without any item edges, it simply moves along the path edges, respecting the segment capacities, and the total cost is zero. When item edges are present, the flow can "shortcut" the path, picking up and dropping off items, and the cost is reduced by the significance of the items chosen. The algorithm naturally finds the optimal set of items to transport, maximizing the total significance while respecting all constraints.
 
 ### Handling Costs and Negative Weights
 
 The `successive_shortest_path_nonnegative_weights` algorithm, which is efficient, requires all edge weights (costs) to be non-negative. However, our goal to maximize significance naturally leads to negative costs (cost = $-d$). To address this, we perform a **cost transformation**.
 
-Let $M$ be a large constant, greater than the maximum possible significance of an item. In the code, this is `MAX_SIGNIFICANCE = 256` (since $d \le 27$).
+Let $M$ be a large constant, greater than the maximum possible significance of an item. In the code, this is `MAX_SIGNIFICANCE = 256`.
 
 1.  **Path Edge Cost**: We assign a cost of $M$ to each path edge from node $i$ to node $i+1$. Traveling from stop $a$ to $b$ along the main path would therefore incur a cost of $M \cdot (b-a)$.
 
@@ -61,13 +90,9 @@ Let $M$ be a large constant, greater than the maximum possible significance of a
 
 This transformation ensures all edge costs are non-negative (since $M > d$). More importantly, it cleverly encodes the significance as a *cost saving*. For a trip from $a$ to $b$, choosing the direct item edge is $d$ units cheaper than traversing the corresponding path edges. The algorithm will therefore prioritize paths that use item edges with high significance to minimize the total cost.
 
-The provided code uses a specific (and non-standard) way to connect the source and sink to model the capacity constraints across the entire path, but the core logic of cost transformation remains the same. After the min-cost flow is computed, the total significance can be recovered from the resulting flow and cost values.
-
 The final maximum significance is calculated as `flow * MAX_SIGNIFICANCE - cost`. This formula effectively reverses the cost transformation to extract the sum of significances.
 
-This approach is correct but might be too slow if the number of items ($m$) is very large, as it creates one edge for every single item.
-
-**Code**
+### Code
 ```cpp
 // ===== STD INCLUDES =====
 #include <iostream>
@@ -176,10 +201,10 @@ int main() {
 </details>
 
 <details>
-<summary>Final Solution</summary>
-### Problem with the First Approach
 
-The previous min-cost max-flow solution is correct, but its performance suffers when the number of available items ($m$) is large (e.g., up to $10^5$). Creating an edge for every single item results in a graph that is too large, causing the algorithm to exceed the time limit on the final test set.
+<summary>Final Solution</summary>
+
+The previous Max Flow Min Cost solution is correct, but its performance suffers when the number of available items ($m$) is large (e.g., up to $10^5$). Creating an edge for every single item results in a graph that is too large, causing the algorithm to exceed the time limit on the final test set.
 
 ### Optimization: Pruning Useless Items
 
@@ -190,17 +215,17 @@ If there are more than $c'_{ab}$ items available for the route from $a$ to $b$, 
 
 ### Optimized Algorithm
 
-This insight leads to a powerful pre-processing step before building the graph:
+This insight leads to a pre-processing step before building the graph:
 1.  **Group Items**: Instead of processing items one by one, we first group all available items by their pickup and drop-off stops $(a, b)$. A 3D vector or a map can be used for this.
 2.  **Filter by Bottleneck Capacity**: For each pair of stops $(a, b)$ that has items associated with it:
-    a. Calculate the bottleneck capacity $c'_{ab} = \min_{i=a}^{b-1} \{c_i\}$.
-    b. If the number of items for this $(a, b)$ pair exceeds $c'_{ab}$, sort them by significance in descending order.
-    c. Select only the top $c'_{ab}$ items with the highest significance. Discard the others as they could never be chosen in an optimal solution.
-3.  **Build Graph**: Construct the same min-cost max-flow graph as in the first solution, but **only add item edges for the filtered, high-significance items**.
+    1. Calculate the bottleneck capacity $c'_{ab} = \min_{i=a}^{b-1} \{c_i\}$.
+    2. If the number of items for this $(a, b)$ pair exceeds $c'_{ab}$, sort them by significance in descending order.
+    3. Select only the top $c'_{ab}$ items with the highest significance. Discard the others as they could never be chosen in an optimal solution.
+3.  **Build Graph**: Construct the same Max Flow Min Cost graph as in the first solution, but **only add item edges for the filtered, high-significance items**.
 
-This optimization dramatically reduces the number of edges in the graph, especially when $m$ is large and the capacities $c_i$ are small. The resulting smaller graph can be solved much more quickly by the min-cost flow algorithm, allowing it to pass all test sets within the time limit.
+This optimization dramatically reduces the number of edges in the graph, especially when $m$ is large and the capacities $c_i$ are small. The resulting smaller graph can be solved much more quickly by the Max Flow Min Cost algorithm, allowing it to pass all test sets within the time limit.
 
-**Code**
+### Code
 ```cpp
 // ===== STD INCLUDES =====
 #include <iostream>
