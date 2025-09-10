@@ -77,7 +77,7 @@ Many of these tips might seem obvious or trivial, but having an overview of all 
 
 <summary>Sliding Window</summary>
 
-- 
+- Whenever you need to maximize a contiguous segment you probably need to use a sliding window.
 
 </details>
 
@@ -99,6 +99,8 @@ Many of these tips might seem obvious or trivial, but having an overview of all 
 
 <summary>Greedy</summary>
 
+- If you want to try a greedy approach you will probably need to sort (part of) your input first to then choose greedily.
+
 </details>
 
 <details>
@@ -111,6 +113,25 @@ Many of these tips might seem obvious or trivial, but having an overview of all 
 
 <summary>Delaunay Triangulation</summary>
 
+- As soon as the problem asks for some notion of distance or proximity, you will probably need to usea Delaunay Triangulation, as it is just super cheap to do.
+- You often will want to store information at each vertex in the Delaunay Triangulation. Most elementary one would be its index to reference later. For this you can use the following setup (see code example provided in AlgoLab docs for more details).
+```cpp
+typedef std::size_t                                            Index;
+typedef CGAL::Triangulation_vertex_base_with_info_2<Index,K>   Vb;
+typedef CGAL::Triangulation_face_base_2<K>                     Fb;
+typedef CGAL::Triangulation_data_structure_2<Vb,Fb>            Tds;
+typedef CGAL::Delaunay_triangulation_2<K,Tds>                  Delaunay;
+
+typedef std::tuple<Index,Index,K::FT> Edge;
+
+typedef K::Point_2 Point;
+typedef std::pair<Point,Index> IPoint;
+
+...
+
+Index idx = vertex->info();
+```
+
 </details>
 
 <details>
@@ -118,6 +139,8 @@ Many of these tips might seem obvious or trivial, but having an overview of all 
 <summary>Linear Programming</summary>
 
 - If the problem asks you to "*round to the nearest integer*", it is probably a linear programming problem. This is a very ad-hoc tip, but you would be surprised how often this is the case.
+
+- CGAL creates all intermediate variables, e.g. if you create variable 1000 but the previous highest you had was 100, all 900 variables in between are also created, greaetly impacting run time.
 
 </details>
 
@@ -136,6 +159,8 @@ Many of these tips might seem obvious or trivial, but having an overview of all 
 <details>
 
 <summary>Max Flow Min Cost</summary>
+
+- In Max Flow Min Cut problems the intuitive way of modeling it often involves negative costs. This then works for the first few test sets, but for the last one you need to rescale it to be non-negative to use the faster, 
 
 </details>
 
