@@ -2,57 +2,69 @@
 
 ## 📝 Problem Description
 
-We are given a set of $N$ tent locations on a 2D plane. The goal is to assign each tent to a family, subject to certain rules. An assignment is considered $(f, s)$-reasonable if it satisfies three conditions:
-1. Every tent is assigned to one of $f$ families.
-2. Each of the $f$ families receives at least $k$ tents.
-3. The squared Euclidean distance between any two tents assigned to *different* families is at least $s$.
+A set of $N$ tent locations is given on a 2D plane. The objective is to assign each tent to a family, following specific rules. An assignment is called $(f, s)$-reasonable if the following conditions hold:
+1. Each tent is assigned to one of $f$ families.
+2. Every family receives at least $k$ tents.
+3. The squared Euclidean distance between any two tents assigned to different families is at least $s$.
 
-Your task is to solve two independent problems based on these rules:
-1. Given a fixed number of families $f_0$, find the largest possible value of $s$ for which an $(f_0, s)$-reasonable assignment exists.
-2. Given a fixed minimum squared distance $s_0$, find the largest number of families $f$ for which an $(f, s_0)$-reasonable assignment can be made.
+Two independent problems are posed based on these rules:
+1. For a fixed number of families $f_0$, determine the largest possible value of $s$ such that an $(f_0, s)$-reasonable assignment exists.
+2. For a fixed minimum squared distance $s_0$, determine the largest number of families $f$ for which an $(f, s_0)$-reasonable assignment is possible.
 
-For each test case, you will be provided with the number of tents $N$, the minimum tents per family $k$, a target number of families $f_0$, a target squared distance $s_0$, and the coordinates of all $N$ tents. You must output the answers to both questions.
+The answers to both questions must be output for each test case.
 
 ## 💡 Hints
 
 <details>
+
 <summary>Hint #1</summary>
-The problem revolves around distances between tents. A brute-force approach of checking all pairs of tents would be too slow given the potential number of tents. How can we efficiently find the pairs of tents that are closest to each other? Considering the geometric arrangement of the tent locations is key.
+
+The geometric arrangement of the tent locations suggests that we can use a **Delaunay triangulation**. By constructing the Delaunay triangulation, we can quickly identify all pairs of tents that are nearest to each other without checking every possible pair.
+
 </details>
 
 <details>
+
 <summary>Hint #2</summary>
+
 The core constraint states that if two tents are "too close" (i.e., their squared distance is less than $s$), they *must* belong to the same family. This suggests that we can think of tents as being forced into groups. This grouping has a transitive property: if tent A must be with tent B, and tent B must be with tent C, then all three must belong to the same family. This is the definition of a connected component.
+
 </details>
 
 <details>
+
 <summary>Hint #3</summary>
 Consider the relationships between tents in increasing order of distance. If we process pairs of tents from closest to farthest, we can dynamically merge groups. A Union-Find data structure is perfectly suited for managing these dynamic sets and tracking which tents must belong to the same family.
+
 </details>
 
 <details>
+
 <summary>Hint #4</summary>
+
 For the general case where a family requires $k > 1$ tents, simply counting the number of groups (components) is not enough. You also need to know the *size* of each group (i.e., how many tents it contains). The problem then becomes: given a collection of components of various sizes, how can we combine them to form the maximum number of valid families, where each family requires at least $k$ tents? This is a combinatorial counting problem on the component sizes.
 </details>
 
 ## ✨ Solutions
 
 <details>
+
 <summary>First Solution (Test Set 1, 2)</summary>
-
-### Approach
-
-For the first two test sets, we have two simplifying assumptions: each family requires at least one tent ($k=1$), and for the first question, the number of families is equal to the number of tents ($f_0 = n$).
 
 The problem's focus on distances between points, especially nearest neighbors, suggests that a geometric structure like a **Delaunay Triangulation** is highly effective. The Delaunay triangulation of a set of points has the property that the closest pair of points will always form an edge in the triangulation. This allows us to avoid checking all $O(n^2)$ pairs and instead focus only on the $O(n)$ edges of the triangulation.
 
-#### Answering Question 1 (Find max $s$ for $f_0=n$ families)
+For the first two test sets, we have two simplifying assumptions: 
+- Each family requires at least one tent ($k=1$)
+- For the first question, the number of families is equal to the number of tents ($f_0 = n$).
+
+
+### Answering Question 1 (Find max $s$ for $f_0=n$ families)
 
 With the assumptions $k=1$ and $f_0=n$, every family must be assigned exactly one tent. An assignment is $(n, s)$-reasonable if the distance between any two tents (which now belong to different families) is at least $s$. We want to find the largest possible $s$. This is determined by the two closest tents. If their squared distance is $d_{min}$, then any $s \le d_{min}$ is valid. The maximum possible value for $s$ is therefore precisely $d_{min}$.
 
 To find this, we can compute the Delaunay triangulation of all tent locations, find the length of every edge, and the smallest of these squared lengths is our answer.
 
-#### Answering Question 2 (Find max $f$ for a given $s_0$)
+### Answering Question 2 (Find max $f$ for a given $s_0$)
 
 Here, we are given a minimum squared distance $s_0$ and must find the maximum number of families we can accommodate. The condition states that any two tents with a squared distance less than $s_0$ *must* belong to the same family.
 
@@ -60,13 +72,12 @@ This naturally defines a grouping: all tents that are forced to be together form
 
 To find this, we can use a **Union-Find** data structure.
 1. Initialize a Union-Find structure with $n$ sets, one for each tent. The number of families is initially $n$.
-2. Construct the Delaunay triangulation and extract all its edges.
-3. Iterate through the edges. If an edge has a squared length less than $s_0$, it connects two tents that must be in the same family. We `union` the sets containing these two tents. If they were not already in the same set, we decrement our count of families (components).
+3. Iterate through the edges of the Delaunay Triangulation. If an edge has a squared length less than $s_0$, it connects two tents that must be in the same family. We `union` the sets containing these two tents. If they were not already in the same set, we decrement our count of families (components).
 4. After processing all edges shorter than $s_0$, the final count of disjoint sets is the maximum number of families $f$.
 
 For efficiency, it's best to sort the edges by length first. Then, for Question 2, we process edges until their length is $\ge s_0$. For Question 1, the answer is simply the length of the first edge in the sorted list.
 
-### C++ Code
+### Code
 
 ```cpp
 #include <iostream> 
@@ -159,29 +170,20 @@ int main() {
 <details>
 <summary>Second Solution (Test Set 1, 2, 3)</summary>
 
-### Approach
-
 In this version, the assumption $f_0=n$ is dropped, but we still have $k=1$. This primarily affects the first question. The logic for the second question remains unchanged.
 
 #### Answering Question 1 (Find max $s$ for $f_0$ families)
 
 We need to find the largest squared distance $s$ such that we can form at least $f_0$ families. Since $k=1$, one family corresponds to one component of tents. Thus, we need to find the largest $s$ that results in at least $f_0$ components.
 
-There is a clear monotonic relationship: as $s$ increases, more tent pairs are forced into the same component, which *decreases* (or keeps equal) the total number of components. We are looking for the "breaking point".
+The key difference in Test Set 3 is that the number of families $f_0$ is no longer equal to the number of tents $n$. This means we cannot simply return the shortest edge as the answer for Question 1.
 
-We can find this by simulating the process of increasing $s$:
-1.  Start with $n$ components, one for each tent. This corresponds to $s=0$.
-2.  Process the edges of the Delaunay triangulation, sorted by increasing length. Each edge represents a merge event.
-3.  For each edge, we `union` the components of its endpoints. Every time we merge two different components, the total number of components decreases by one.
-4.  We are looking for the largest $s$ that allows for $\ge f_0$ components. This is equivalent to finding the smallest $s$ that results in *fewer than* $f_0$ components. The length of the edge that causes the number of components to drop from $f_0$ to $f_0-1$ is our answer. Any distance just below this value would have kept the components separate, allowing for $f_0$ families.
+Instead, we need to determine the distance $s$ at which the number of components drops below $f_0$. If there are fewer than $f_0$ components, it is impossible to assign each family to a separate group.
 
-#### Answering Question 2 (Find max $f$ for a given $s_0$)
+To achieve this, we use a similar approach as in Question 2: iterate over the sorted edges of the Delaunay triangulation and use a Union-Find data structure to keep track of the number of components. Each time two components are merged, the total count decreases. When the number of components reaches $f_0$, the next edge processed will cause the count to drop below $f_0$. The length of this edge is the smallest $s$ for which fewer than $f_0$ families are possible, so we record this distance as our answer.
 
-This part is identical to the previous solution. We build components by merging all tents connected by edges shorter than $s_0$ and count the final number of components.
-
-### C++ Code
+### Code
 ```cpp
-///3
 #include <iostream> 
 #include <vector>
 #include <limits>
@@ -288,9 +290,8 @@ int main() {
 </details>
 
 <details>
-<summary>Final Solution</summary>
 
-### Approach
+<summary>Final Solution</summary>
 
 The final version of the problem removes all simplifying assumptions, specifically allowing $k > 1$. This means a family requires multiple tents. The core framework of using a Delaunay triangulation and processing sorted edges remains, but how we count the number of possible families changes significantly.
 
@@ -302,12 +303,10 @@ Let's define a function `max_num_families(component_counts, k)` that takes a lis
 
 Given counts of components of sizes 1, 2, ..., $k$, how many families of size $k$ can we form? This is a combinatorial packing problem. A greedy strategy works well here. For example, with $k=4$:
 1.  Any component of size 4 or more (capped at 4) directly forms one family.
-2.  We can combine smaller components. It's often best to combine the largest available components first. For example, pair a size-3 component with a size-1 component.
-3.  Next, pair two size-2 components.
-4.  Handle leftovers greedily. For example, a leftover size-2 component could be combined with two size-1 components.
-5.  Finally, group any remaining size-1 components in sets of 4.
-
-The provided code implements such a greedy strategy for $k=1, 2, 3, 4$.
+2.  We can combine smaller components. It's often best to combine the largest available components first. For example, pair a size 3 component with a size 1 component.
+3.  Next, pair two size 2 components.
+4.  Handle leftovers greedily. For example, a leftover size 2 component could be combined with two size 1 components.
+5.  Finally, group any remaining size 1 components in sets of 4.
 
 #### Answering Question 1 (Find max $s$ for $f_0$ families)
 
@@ -327,7 +326,10 @@ The provided code implements such a greedy strategy for $k=1, 2, 3, 4$.
 4.  After processing all relevant edges, we have the final distribution of component sizes.
 5.  Call `max_num_families` one last time on this final configuration to get the answer $f$.
 
-### C++ Code
+### Code
+
+**Note**: Code taken from [this repo](https://github.com/haeggee/algolab/blob/main/problems/week13-hand/src/algorithm.cpp)
+
 ```cpp
 #include <limits>
 #include <iostream>
