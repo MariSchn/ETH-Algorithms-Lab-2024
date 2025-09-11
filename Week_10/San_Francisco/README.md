@@ -2,68 +2,91 @@
 
 ## 📝 Problem Description
 
-You are given a game played on a board with $n$ holes and $m$ directed canals. Each canal connects two holes, carries a non-negative point value, and can only be traversed in its specified direction. The game begins at a designated starting hole, numbered 0. A "move" consists of traversing a single canal, which takes one turn and adds the canal's points to your total score. If you reach a hole with no outgoing canals, you are instantly teleported back to the starting hole (hole 0). This teleportation is a "free action," costing no moves and yielding no points.
+A game is played on a board with $n$ holes and $m$ directed canals. Each canal connects two holes, carries a non-negative point value, and can only be traversed in its specified direction. The game begins at a designated starting hole, numbered 0. A move consists of traversing a single canal, which takes one turn and adds the canal's points to the total score. Upon reaching a hole with no outgoing canals, instant teleportation back to the starting hole (hole 0) occurs as a free action, costing no moves and yielding no points.
 
-Your task is to determine the minimum number of moves required to achieve a total score of at least $x$, given that you cannot exceed a maximum of $k$ moves. For a given set of $n, m, x, k$ and canal descriptions, you must output this minimum number of moves. If it's impossible to reach the target score within $k$ moves, you should report that.
+The objective is to determine the minimum number of moves required to achieve a total score of at least $x$, without exceeding a maximum of $k$ moves. For given values of $n, m, x, k$ and canal descriptions, the minimum number of moves must be reported. If the target score cannot be reached within $k$ moves, the answer should indicate impossibility.
 
 ## 💡 Hints
 
 <details>
+
 <summary>Hint #1</summary>
-The problem asks for the *minimum* number of moves. A straightforward approach could be to find the maximum score achievable in exactly 1 move, then in exactly 2 moves, and so on, up to $k$ moves. How can we keep track of the game's state, which seems to depend on our current location and the number of moves made?
+
+At first glance, the problem may resemble a flow problem, since it involves moving along directed connections and accumulating points. However, the constraints and the "teleportation" mechanic make traditional flow-based approaches unsuitable. Consider alternative methods for modeling the game's progression.
+
 </details>
+
 <details>
+
 <summary>Hint #2</summary>
-We need to find the maximum score for any given number of moves. Let's try to formalize this. If we define $S(i, j)$ as the maximum score we can get by starting at hole $j$ with $i$ moves remaining, can we establish a relationship between $S(i, j)$ and scores achievable with $i-1$ moves? This structure strongly suggests a dynamic programming approach.
+
+The problem asks for the *minimum* number of moves. A straightforward approach could be to find the maximum score achievable in exactly 1 move, then in exactly 2 moves, and so on, up to $k$ moves. How can we keep track of the game's state, which seems to depend on our current location and the number of moves made?
+
 </details>
+
 <details>
+
 <summary>Hint #3</summary>
+
+We need to find the maximum score for any given number of moves. Let's try to formalize this. If we define $S(i, j)$ as the maximum score we can get by starting at hole $j$ with $i$ moves remaining, can we establish a relationship between $S(i, j)$ and scores achievable with $i-1$ moves? This structure strongly suggests a dynamic programming approach.
+
+</details>
+
+<details>
+
+<summary>Hint #4</summary>
+
 The "free action" from a hole with no outgoing canals (a Weayaya hole) is a critical special case in the recurrence. If you are at a Weayaya hole $u$ with $i$ moves left, the rules state you instantly return to the start (hole 0). This implies that the maximum score you can get from hole $u$ with $i$ moves is exactly the same as the maximum score you can get from hole 0 with $i$ moves. How does this affect your DP state transition?
+
 </details>
 
 ## ✨ Solutions
 
 <details>
+
 <summary>Final Solution</summary>
 
-### Initial Thoughts and Approach
+### First Intuition
 
-At first glance, this problem might seem solvable with graph algorithms like maximum flow, as the board can be modeled as a graph. However, this approach presents difficulties. The input size for $n$ is larger than what is typically feasible for standard max-flow algorithms. Furthermore, modeling the ability to reuse canals and the "free action" teleportation is non-trivial with flows.
+As a first thought solving this problem using a (Min Cost) Max Flow might occur, as the problem can be modeled very nicely as a **Graph.**
+However, many **problems** occur with this approach:
 
-A more direct approach is to focus on the core question: for a given number of moves $i \le k$, what is the maximum score we can achieve? If we can answer this for all $i$ from $0$ to $k$, we can easily find the minimum number of moves to reach the target score $x$. This leads us to a **Dynamic Programming** solution.
+- The input $n \leq 10^3$ is larger than usual for Flow Problems (~$10^2$)
+- Modeling the “ciruclar” aspect of the Game is non-trivial using Flows
 
-### Dynamic Programming Formulation
+### Technique
 
-We will build a solution from the ground up, calculating the maximum score for an increasing number of moves. Let's define our DP state as follows:
+Ultimately we are interested in the following: What is the **minimum number of steps** $k' \leq k$ that is required to **achieve a score $s \geq x$** starting from the Hole **$0$**
 
-$dp[i][j]$ = The maximum score achievable by starting at hole $j$ and making exactly $i$ moves.
+While Flows are not really applicable here, we will use the fact that the **inputs are still relatively small**, as we have $10^3$ Holes and a Maximum of $4 \cdot 10^3$ possible turns. This makes it feasible to calculate the **maximum achievable score for every number of turns $k'$.**
 
-Our goal is to compute this table for $i$ from $0$ to $k$ and $j$ from $0$ to $n-1$.
+For this we will use a **Bottom-Up Dynamic Programming Approach**, to calculate the maximum score $f(k', h)$, where $k'$ is the **number of turns** we can make and $h$ is the **hole where we start**. <br />
+It might seem unintutive why we include the hole we start at $h$ in the DP if we are only interested in the maximum score for hole $0$. But in the design of the DP it is necessary, to model the individual subproblems for which its necessary to consider different starting holes.
 
-**Base Case:**
-With 0 moves ($i=0$), no canals can be traversed, so no points can be scored, regardless of the starting hole.
-$dp[0][j] = 0$ for all $j \in [0, n-1]$.
+### Defining the Recursion
 
-**State Transition (Recurrence):**
-To calculate $dp[i][j]$ for $i > 0$, we consider all possible first moves from hole $j$. If we take a canal from $j$ to a neighboring hole $v$ that gives $p$ points, we use one move. We are now at hole $v$ with $i-1$ moves remaining. The maximum score we can obtain from this new state is, by our definition, $dp[i-1][v]$. The total score for this sequence of plays is $p + dp[i-1][v]$. To maximize our score from hole $j$, we should choose the outgoing canal that leads to the best outcome.
+#### Base Case
 
-Thus, the recurrence relation is:
-$dp[i][j] = \max_{(j, v, p) \in \text{Canals}} \{ p + dp[i-1][v] \}$
+Naturally, the **Base Case** will be if $k' = 0$, which corresponds to no turns being left, so $f(0, h) = 0$
 
-**Handling the "Weayaya" Holes:**
-The rules specify a special case for holes with no outgoing canals (Weayaya holes). From such a hole, we take a "free action" back to the start (hole 0). This action doesn't count as a move. This means the potential to score from a Weayaya hole $j$ with $i$ moves is identical to the potential to score from hole 0 with $i$ moves.
+#### Recursive Case
 
-Therefore, if hole $j$ is a Weayaya hole:
-$dp[i][j] = dp[i][0]$
+The recursive case is defined as:
 
-### Implementation and Final Answer
+$$
+f(k', u) = \begin{cases}
+ \max\{ f(k'-1, v) + s_{(u, v)} \mid (u, v) \in E\} &\text{if $u$ has edges} \\
+f(k', 0) &\text{else }
+\end{cases}
+$$
 
-We can implement this with a 2D array, `dp[k+1][n]`, filled in a bottom-up manner. We iterate `i` from 1 to $k$, and for each `i`, we compute `dp[i][j]` for all holes `j$. The loop structure ensures that when we compute `dp[i][...]`, all values for `dp[i-1][...]` are already available. The special case for Weayaya holes is also handled correctly by the loop order `j = 0, 1, ..., n-1`, as `dp[i][0]` is computed before it is needed by any other Weayaya hole `j > 0`.
+To unpack/understand this, lets start with the simpler $\text{else}$ case. Here the hole $u$ does not have any outgoing edges. Therefore the only possible action is to return to the starting hole $0$, which does not count as a move. Therefore the maximum achievable score $f(k', u)$ for node $u$ is the same as for the node $0$, $f(k', 0)$ with $k'$ turns left <br />
+In the $\text{if}$ case the node $u$ has outgoing edges. What we are essentially doing there is that we consider the score we can get when taking one of these edges. This is first the score $s_{(u, v)}$ we immediately get when going from $u$ to $v$ and the remaining score we can get starting from the new node $v$ with one lesss turn $f(k' -1 ,v)$. By calculating this for every Edge, we can then simply take the maximum among these
 
-After the DP table is fully populated, the value `dp[i][0]` gives the maximum score starting from the beginning with $i$ moves. To find our answer, we iterate `i` from $0$ to $k$. The first value of `i` for which $dp[i][0] \ge x$ is the minimum number of moves required. If no such `i` is found after checking up to $k$ moves, the target score is impossible to achieve within the given move limit.
 
-Scores can be very large ($x \le 10^{14}$), so it's essential to use 64-bit integers (`long long` in C++) for the DP table and the target score $x$.
+For the final output we can simply go over all turns $0 \dots k$ and check at which turn $f(k', 0) \geq x$ and output that turn $k'$
 
+### Code
 ```cpp
 #include <iostream>
 #include <vector>
@@ -114,6 +137,16 @@ int main() {
   while(n_tests--) { solve(); }
 }
 ```
+</details>
+
+## 🧠 Learnings
+
+<details> 
+
+<summary> Expand to View </summary>
+
+- Even if think you got the right technique/algorithm for the problem, be open to changing your mind and explore alternatives.
+
 </details>
 
 ## ⚡ Result
