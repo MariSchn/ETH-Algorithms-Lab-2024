@@ -1,156 +1,57 @@
 # Rubeus Hagrid
 
 ## 📝 Problem Description
+A system consists of a surface entry point and $N$ underground chambers, connected by a network of two-way tunnels with specified lengths. The configuration ensures that from any chamber, a unique path leads back to the surface entry point.
 
-You are given a system comprising a surface entry point and $N$ underground chambers. These locations are interconnected by a network of two-way tunnels, each with a specified length. The layout is structured such that from any chamber, there exists a unique path leading back to the surface entry point.
+Each chamber $i$ initially contains $g_i$ galleons. A traversal begins at the surface entry point, with travel time through each tunnel equal to its length. As time progresses, one galleon disappears from every chamber that has not yet been visited for each second elapsed since the start of the traversal.
 
-Initially, each chamber $i$ contains a certain number of galleons, $g_i$. The task involves planning a traversal that begins at the surface entry point. Travel time through any tunnel is equal to its length. As time passes, the treasure diminishes: for every second elapsed from the start of the traversal, one galleon vanishes from each chamber that has not yet been visited.
+Upon reaching chamber $i$ at time $t$, all remaining galleons in that chamber are collected instantly, yielding $g_i - t$ galleons. It is guaranteed that at least one galleon remains in every chamber when it is visited for the first time.
 
-When a chamber is reached at time $t$, all of its remaining galleons are collected instantly. The number of galleons collected from chamber $i$ if it's reached at time $t$ is therefore $g_i - t$. It is guaranteed that for any valid traversal, at least one galleon will remain in a chamber when it is visited for the first time.
-
-The objective is to determine a traversal strategy that maximizes the total number of galleons collected. The traversal must start at the surface, visit every chamber exactly once to collect its galleons, and finally return to the surface. Each tunnel can be traversed at most twice (once in each direction). For each test case, you are to output a single integer representing this maximum possible number of collected galleons.
+The challenge is to devise a traversal strategy that maximizes the total number of galleons collected. The traversal must start and end at the surface entry point, visit every chamber exactly once, and traverse each tunnel at most twice (once in each direction).
 
 ## 💡 Hints
 
 <details>
+
 <summary>Hint #1</summary>
+
 The problem describes a set of locations (chambers and an entry point) connected by tunnels, with the specific property that there is a unique path from any chamber back to the entry point. This structure is a fundamental concept in algorithmics. What is it called? Consider how a traversal that must visit every location might work within this structure, especially given the constraint that tunnels can be used at most twice.
+
 </details>
+
 <details>
+
 <summary>Hint #2</summary>
+
 The requirement to visit every chamber, combined with the constraint that each tunnel is traversed at most once in each direction, strongly suggests a full traversal of the structure. A Depth-First Search (DFS) is a natural fit for this pattern of exploration. However, a standard DFS explores branches in an arbitrary order. Here, the order matters. The core of the problem is to find the *optimal* order to explore the different branches from any given junction to maximize the total galleons.
+
 </details>
+
 <details>
+
 <summary>Hint #3</summary>
+
 At every second, you lose a total number of galleons equal to the number of chambers you haven't visited yet. To minimize this loss, you should aim to visit chambers as quickly as possible, thereby reducing the count of "unvisited" chambers. When you are at a chamber with several sub-networks to explore, which one should you choose first? A good greedy heuristic would be to prioritize the sub-network that is most "efficient" to clear. Think about how to define this efficiency. It should likely involve a trade-off between how many chambers a sub-network contains and how long it takes to fully explore it.
+
 </details>
+
 <details>
+
 <summary>Hint #4</summary>
-Let's formalize the greedy choice. Suppose from your current location, you can explore two sub-networks, A and B. Sub-network A has $N_A$ chambers and takes $T_A$ time to fully traverse (go in, visit everything, and return). Sub-network B has $N_B$ chambers and takes $T_B$ time.
-If you visit A then B, the $N_B$ chambers in B will each lose an additional $T_A$ galleons while you are busy in A. The "cross-loss" is $N_B \times T_A$.
-If you visit B then A, the "cross-loss" is $N_A \times T_B$.
-To minimize loss, you should visit A first if $N_B \times T_A < N_A \times T_B$, which is equivalent to $\frac{T_A}{N_A} < \frac{T_B}{N_B}$. This gives you the greedy criterion: always explore the sub-network with the smallest (Traversal Time / Number of Chambers) ratio first.
+
+Let's formalize the greedy choice. Suppose from your current location, you can explore two sub-networks, $A$ and $B$. Sub-network $A$ has $N_A$ chambers and takes $T_A$ time to fully traverse (go in, visit everything, and return). Sub-network $B$ has $N_B$ chambers and takes $T_B$ time.
+If you visit $A$ then $B$, the $N_B$ chambers in $B$ will each lose an additional $T_A$ galleons while you are busy in $A$. The "cross-loss" is $N_B \times T_A$.
+If you visit $B$ then $A$, the "cross-loss" is $N_A \times T_B$.
+To minimize loss, you should visit $A$ first if $N_B \times T_A < N_A \times T_B$, which is equivalent to $\frac{T_A}{N_A} < \frac{T_B}{N_B}$. This gives you the greedy criterion: always explore the sub-network with the smallest (Traversal Time / Number of Chambers) ratio first.
+
 </details>
 
 ## ✨ Solutions
 
 <details>
 
-<summary>First Solution (Test Set 1, 2, 3)</summary>
-
-This solution correctly identifies the core approach: using a **greedy strategy** to order the exploration of subtrees based on their efficiency. It implements a single-pass DFS that attempts to compute all necessary values during the traversal.
-
-The algorithm works as follows:
-1. **Single-pass DFS**: Unlike the final solution, this approach tries to calculate all node statistics (`n_nodes`, `traverse_time`, and `value`) in a single recursive traversal.
-2. **Greedy ordering**: At each node, it sorts the children based on a criterion that aims to prioritize more efficient subtrees first.
-3. **Cross-loss calculation**: It attempts to account for the galleons lost in unvisited subtrees while exploring others by using cumulative sums.
-
-However, this implementation has several issues that limit its effectiveness:
-- **Incorrect sorting criterion**: The code sorts by `n_nodes * traverse_time` in descending order, which doesn't correctly implement the optimal greedy strategy of minimizing the time-per-node ratio.
-- **Complex value calculation**: The single-pass approach leads to convoluted logic for calculating the final values, particularly in handling the cross-losses between subtrees.
-- **Potential precision issues**: The cumulative sum approach and the way elapsed time is handled can lead to incorrect calculations in more complex scenarios.
-
-Despite these flaws, the solution manages to pass several test sets because it captures the essential idea of prioritizing subtree exploration order and accounts for some aspects of the time-dependent galleon loss.
-
-### Code
-```cpp
-#include <iostream>
-#include <vector>
-#include <algorithm>
-
-struct Node {
-  int idx; // Used for Debugging
-  long n_nodes; // Number of Nodes in the (sub)rree which has this node as root
-  long traverse_time; // Time it takes from the root to traverse the (sub)tree which has this node as root (Including time to go to the node)
-  long raw_value; // Initial amount of gold in the chamber/node
-  long value; // Amount of gold obtained from this (sub)tree, respecting the elapsed time
-  std::vector<std::pair<Node*, int>> children;
-};
-
-void dfs(Node *root, long elapsed_time) {
-  root->value = root->raw_value - elapsed_time;
-  root->n_nodes = 1;
-  root->traverse_time = elapsed_time;
-  
-  // ===== LEAF NODE =====
-  if(root->children.empty()) {
-    return;
-  }
-  
-  // ===== INNER NODE =====
-  // Calculate/Fill fields for all children
-  for(std::pair<Node*, int> child_pair : root->children) {
-    Node *child = child_pair.first;
-    int distance = child_pair.second;
-    
-    dfs(child, elapsed_time + distance);
-    child->traverse_time += distance; // Add distance again as we need to go return from the child
-  }
-  // Note: Now each node in below "root" has its field filled
-  
-  // Sort children based on how many nodes we clear in the time it takes to clear them (descending)
-  std::sort(root->children.begin(), root->children.end(), [](const std::pair<Node*, int> &a, const std::pair<Node*, int> &b){
-    return a.first->n_nodes * a.first->traverse_time > b.first->n_nodes * b.first->traverse_time;
-  });
-  
-  // Compute cumulative sum of n_nodes
-  std::vector<long> cum_sum(root->children.size(), 0);
-  for(size_t i = 1; i < root->children.size(); ++i) {
-    cum_sum[i] = cum_sum[i-1] + root->children[i-1].first->n_nodes;
-  }
-  
-  // Update the fields for the "root" based on the children
-  for(size_t i = 0; i < root->children.size(); ++i) {
-    Node *child = root->children[i].first;
-      
-    root->n_nodes += child->n_nodes;
-    root->traverse_time += child->traverse_time - elapsed_time; // Avoid adding elapsed_time for each child
-    root->value += child->value + (elapsed_time - child->traverse_time) * cum_sum[i];
-  }
-  
-  // std::cout << "Node " << root->idx << " has n_nodes: " << root->n_nodes << " traverse_time: " << root->traverse_time << " value: " << root->value << std::endl;
-}
-
-
-void solve() {
-  // ===== READ INPUT =====
-  int n; std::cin >> n;
-  
-  std::vector<Node> nodes(n + 1);
-  nodes[0].idx = 0;
-  for(int i = 1; i < n + 1; ++i) {
-    int g; std::cin >> g;
-    nodes[i].raw_value = g;
-    nodes[i].idx = i;
-  }
-  
-  for(int i = 0; i < n; ++i) {
-    int u, v, l; std::cin >> u >> v >> l;
-    nodes[u].children.emplace_back(&nodes[v], l);
-  }
-  
-  // ===== CALCULATE VALUES FOR EACH NODE =====
-  dfs(&nodes[0], 0);
-  
-  // ===== OUTPUT =====
-  std::cout << nodes[0].value << std::endl;
-}
-
-int main() {
-  std::ios_base::sync_with_stdio(false);
-  
-  int n_tests; std::cin >> n_tests;
-  while(n_tests--) {
-    // std::cout << "======================" << std::endl;
-    solve();
-  }
-} 
-```
-
-</details>
-
-<details>
 <summary>Final Solution</summary>
+
 This problem can be modeled using a tree data structure. The surface entry point is the root of the tree, the chambers are the nodes, and the tunnels are the edges. The property that "from every chamber there is a unique sequence of tunnels leading up to the surface" confirms that the structure is indeed a tree.
 
 The niffler's journey requires visiting every chamber, which corresponds to a full traversal of the tree. The constraint that each tunnel is used at most twice (once down, once up) perfectly describes a Depth-First Search (DFS) traversal that explores a subtree completely before backtracking.
@@ -169,12 +70,14 @@ To implement this greedy strategy, we need two key pieces of information for eac
 
 We perform a post-order traversal (a type of DFS) starting from the root to compute the required statistics for each node. For each node `u`, we need:
 -   `n_nodes`: The total number of nodes in the subtree rooted at `u`. This is simply $1$ (for `u` itself) plus the sum of `n_nodes` of all its children.
--   `traverse_time`: The time required to fully explore the subtree rooted at `u` and return to `u`. For a leaf, this is 0. For an internal node `u`, this is the sum of `(2 * length_to_child_v + traverse_time_of_v)` over all its children `v`. To simplify calculations and avoid large numbers, the provided code cleverly calculates *half* of this traversal time. Let's call it `half_traversal_time`. For a node `u`, `half_traversal_time[u] = sum(half_traversal_time[v] + length_to_child_v)`.
+-   `traverse_time`: The time required to fully explore the subtree rooted at `u` and return to `u`. For a leaf, this is 0. For an internal node `u`, this is the sum of `(2 * length_to_child_v + traverse_time_of_v)` over all its children `v`. To simplify calculations and avoid large numbers, we *half* of this traversal time. Let's call it `half_traversal_time`. For a node `u`, `half_traversal_time[u] = sum(half_traversal_time[v] + length_to_child_v)`.
 
 **2. Second Pass: Value Calculation (`calculate_values`)**
 
 With the precomputed values, we perform a second DFS to calculate the maximum number of galleons.
--   This traversal also proceeds from the root. At each node `u`, we sort its children `v` in ascending order based on our greedy criterion: $\frac{\text{half\_traversal\_time}[v] + \text{length}(u,v)}{\text{n\_nodes}[v]}$. To avoid floating-point arithmetic, we use integer cross-multiplication for the comparison: $\frac{T_A}{N_A} < \frac{T_B}{N_B} \iff T_A \times N_B < T_B \times N_A$.
+-   This traversal also proceeds from the root. At each node `u`, we sort its children `v` in ascending order based on our greedy criterion: $$\frac{\text{half\_traversal\_time}[v] + \text{length}(u,v)}{\text{n\_nodes}[v]}$$ 
+To avoid floating-point arithmetic, we use integer cross-multiplication for the comparison: 
+$$\frac{T_A}{N_A} < \frac{T_B}{N_B} \iff T_A \cdot N_B < T_B \cdot N_A$$
 -   We keep track of the `elapsed_time` since the start of the journey. When we move from a parent `u` to a child `v` through a tunnel of length `l`, the elapsed time increases by `l`.
 -   We recursively call the function on the children in the sorted order. After returning from a child `v`'s subtree, the time spent was `2 * (half_traversal_time[v] + l)`. This duration is added to `elapsed_time` before proceeding to the next sibling.
 -   The final value for a subtree at `u` is the sum of galleons collected at `u` (`raw_value - elapsed_time_at_u`) and the total galleons collected from all its child subtrees.
