@@ -8,69 +8,74 @@ Each warehouse stores a single brand of beer, characterized by its available sup
 
 Beer can be transported from any warehouse to any stadium. For each warehouse-stadium pair, there is a base revenue per liter. This base revenue is reduced by a transportation cost which depends on crossing geographical contour lines, modeled as circles. The cost is a fixed amount per liter for each contour line crossed. A delivery from a warehouse to a stadium is assumed to cross a circular contour line if and only if one is inside the circle and the other is outside.
 
-The task is to determine the amount of beer to ship from each warehouse to each stadium to maximize the total profit. The total profit is the sum of revenues minus transportation costs over all shipments. If it's impossible to satisfy all constraints (i.e., meet all demands while respecting supply and alcohol limits), we should report that. Otherwise, we should output the maximum possible profit.
+The task is to determine the amount of beer to ship from each warehouse to each stadium to maximize the total profit. The total profit is the sum of revenues minus transportation costs over all shipments. If it's impossible to satisfy all constraints (i.e., meet all demands while respecting supply and alcohol limits), that should report.
 
 ## 💡 Hints
 
 <details>
+
 <summary>Hint #1</summary>
+
 This problem involves maximizing a certain value (profit) subject to a collection of linear constraints (supply limits, demand requirements, alcohol limits). This structure is characteristic of a particular class of optimization problems. Can you identify which one?
+
 </details>
+
 <details>
+
 <summary>Hint #2</summary>
+
 The problem can be modeled as a Linear Program (LP). The variables of your LP should represent the quantity of beer transported from each warehouse to each stadium. How would you formulate the objective function and the constraints using these variables?
+
 </details>
+
 <details>
+
 <summary>Hint #3</summary>
+
 A major challenge is calculating the transportation cost, which involves checking intersections with up to a million contour lines. A naive check for every warehouse-stadium pair against every contour line will be too slow. Can you find a way to quickly filter out the contour lines that are "irrelevant" for any transport? Also, be mindful of potential floating-point precision issues when setting up the LP. It's often safer to work with integer coefficients by scaling the equations appropriately.
+
 </details>
 
 ## ✨ Solutions
 
 <details>
+
 <summary>First Solution (Test Set 1, 2)</summary>
 
-### Introduction
+When reading through the problem it seems very similar to a **Max Flow Min Cost** problem. However, this is ultimately misleading, as ultimately this can be modeled (easier) using **Linear Programming**.
 
-This problem, with its goal of maximizing a value under several linear constraints, is a classic application of **Linear Programming (LP)**. The initial thought might be to model it as a min-cost max-flow problem, but an LP formulation is more direct and versatile for the given constraints.
+This solution focuses in the first 2 test sets. The main reasons why the initial solution is restricted to only these 2 is that the assumption $c=0$ is given. On the first two test sets we do not have any contour lines, which makes the problem easier to solve.
 
-This first solution addresses the simpler versions of the problem (Test Sets 1 and 2) where there are no contour lines ($c=0$). This simplifies the profit calculation significantly, as there are no transportation costs to subtract.
+In the problem description, we have the following variables:
 
-### LP Formulation
+- $a_{ws}$ which describes the **liters of Beer transported** from $w$ to $s$
+- $r_{ws}$ which describes the **revenue** of one liter of Beer transported from $w$ to $s$
+- $s_w$ which describe the **supply of Beer** at Warehouse $w$
+- $a_w$ which describes the **alcohol percentage** of the Beer at Warehouse $w$
+- $d_s$ which describes the **demand of Beer** of the Stadium $s$
+- $u_s$ which describes the **upper bound** of pure alcohol at Stadium $s$
 
-Let's define our variables and constraints for the linear program. The core decision we need to make is how many liters of beer to transport from each warehouse $w$ to each stadium $s$.
+With these variables in place, the problem requires **maximizing the revenue**, which is described by the following equation (assuming $c = 0$):
 
-**Variables:**
-Let $x_{w,s}$ be the amount of beer (in liters) transported from warehouse $w$ to stadium $s$. These are the variables we want our LP solver to determine. Since we cannot transport a negative amount of beer, we have the implicit constraint $x_{w,s} \ge 0$ for all pairs $(w, s)$.
+$$
+\sum_w \sum_s a_{ws} \cdot r_{ws}
+$$
 
-**Objective Function:**
-Our goal is to maximize the total profit. For test sets with $c=0$, the profit is simply the sum of revenues.
-Let $r_{w,s}$ be the revenue per liter for transporting beer from warehouse $w$ to stadium $s$.
-The objective is to maximize:
-$$ \sum_{w=1}^{N} \sum_{s=1}^{M} x_{w,s} \cdot r_{w,s} $$
+As $r_{ws}$ is a constant value that is given in the input, naturally $a_{ws}$ **are the variables in the Linear Program**.
+With this we are effectively optimizing from which warehouse we sent how much beer to which stadium, which is described by $a_{ws}$
 
-**Constraints:**
-The problem statement imposes several conditions that must be translated into linear constraints:
+The problem description further lists the following **constraints**:
 
-1.  **Supply Constraint:** The total amount of beer shipped from a warehouse cannot exceed its supply. Let $S_w$ be the supply at warehouse $w$.
-    $$ \forall w \in \{1, \dots, N\}: \sum_{s=1}^{M} x_{w,s} \le S_w $$
+- $a_{ws} \geq 0$, We can not send “negative” beer
+- $\sum_s a_{ws} \leq s_w$, We can not send more beer from $w$ than there is present at $w$
+- $\sum_w a_{ws} = d_s$, We need to exactly fulfill the demand of every stadium $s$
+- $\sum_w a_{ws} \cdot a_s \leq u_s$, We need to respect the Upper Bound on the Pure Alcohol for Stadium $s$
 
-2.  **Demand Constraint:** The total amount of beer received by a stadium must exactly match its demand. Let $D_s$ be the demand at stadium $s$.
-    $$ \forall s \in \{1, \dots, M\}: \sum_{w=1}^{N} x_{w,s} = D_s $$
-    *Note: An equality constraint $\sum x = D$ is typically implemented in LP solvers as two inequality constraints: $\sum x \le D$ and $\sum x \ge D$ (which is equivalent to $-\sum x \le -D$).*
+Solving this linear program in theory already gives the **correct solution** for the first 2 Test Sets.
 
-3.  **Alcohol Limit Constraint:** The total amount of pure alcohol delivered to a stadium must not exceed its upper limit. Let $A_w$ be the alcohol percentage of the beer in warehouse $w$, and $U_s$ be the alcohol limit (in liters) at stadium $s$.
-    $$ \forall s \in \{1, \dots, M\}: \sum_{w=1}^{N} x_{w,s} \cdot \frac{A_w}{100} \le U_s $$
+However, due to **precision errors**, the constraint $\sum_w a_{ws} \cdot a_s \leq u_s$ might be off by a tiny bit, resulting in wrong solutions. Therefore, it is necessary to **switch from Liters to Milliliters**. With this the alcohol percentage can be described by an integer which results in the correct result.
 
-### Implementation Details
-
-A common issue with LP solvers is floating-point precision. To ensure accuracy, it's a good practice to work with integer coefficients. We can achieve this by changing our units. For instance, instead of liters, we can work with milliliters (ml).
-
-*   **Amounts:** Convert all supplies, demands, and alcohol limits from liters to milliliters by multiplying by 1000.
-*   **Alcohol Content:** The alcohol percentage $A_w$ means that 1 liter (1000 ml) of beer contains $1000 \cdot (A_w/100) = 10 \cdot A_w$ ml of pure alcohol. This gives us a convenient integer factor.
-
-With these unit changes, our constraints can be written with integer coefficients, making the solution robust. The LP solver will find the optimal values for $x_{w,s}$ (in liters). The final maximum profit is calculated from the objective function's value. If the solver reports that the problem is infeasible, it means no solution exists that satisfies all constraints.
-
+### Code
 ```cpp
 #include <iostream>
 #include <vector>
@@ -248,21 +253,25 @@ int main() {
 
 <summary>Second Solution (Test Set 1, 2, 3)</summary>
 
-This solution extends the first approach to handle contour lines and transportation costs. It maintains the same **Linear Programming** formulation but now incorporates the cost calculation that was missing in the first solution.
+To generalize from the first solution, the **contour lines** need to be considered. As the contour lines only affect the revenues, this only **changes the objective function** of the Linear Program but not any constraints.
 
-### Key Additions
+As described in the problem description, we simply need to adjust the **Revenues per Liter** by the number of **number of contour lines $t_{ws}$** that are hit when **traveling** from warehouse $w$ to stadium $s$
 
-**Transportation Cost Calculation:**
-The solution correctly implements the logic for determining when a contour line is crossed. A delivery from warehouse $w$ to stadium $s$ crosses a contour line if one location is inside the circle and the other is outside. This is checked using CGAL's `has_on_bounded_side()` method.
+**Note**: To adjust for the fact that we use millilieter in the LP, we actually subtract $t_{ws} / 100$.
 
-**Modified Objective Function:**
-The profit per liter for shipping from warehouse $w$ to stadium $s$ becomes:
-$$\text{profit}_{w,s} = \text{revenue}_{w,s} - \frac{\text{intersections}_{w,s}}{100}$$
+$$
+\sum_w \sum_s a_{ws} \cdot ( 100 \cdot r_{ws} - t_{ws})
+$$
 
-To maintain integer coefficients in the LP, the objective function is scaled by 100:
-$$\text{coefficient}_{w,s} = 100 \times \text{revenue}_{w,s} - \text{intersections}_{w,s}$$
+Now it only remains to determine the number of contour lines $t_{ws}$ that are intersect from warehouse $w$ to stadium $s$.
 
-### Implementation Approach
+For this we can simply check if both $s$ and $w$ are **on the same side** (inside or outside) of the Circle using `contour.has_on_bounded_side`.
+If **both are inside** the contour does not need to be crossed (same with both outside)
+If **one is inside and the other outside**, the contour does need to be crossed ($t_{ws} + 1$)
+
+**Note**: Even though you probably assumed that there is a straight line between the warehouse and the stadium this was never specified in the problem. Be careful when reading the problem
+
+### Brute Force
 
 The solution uses a **brute force method** to count contour line intersections:
 ```cpp
@@ -280,10 +289,6 @@ for (int w = 0; w < n; ++w) {
 ```
 
 This has a time complexity of $O(N \times M \times C)$, which works for Test Sets 1-3 where $C$ is relatively small, but becomes too slow for Test Set 4 where $C$ can be up to $10^6$.
-
-### Limitations
-
-While this solution correctly handles the transportation costs and passes more test sets than the first solution, it doesn't scale to the largest test cases due to the inefficient contour line processing. The brute force approach becomes a bottleneck when the number of contour lines is very large.
 
 ### Code
 ```cpp
@@ -437,51 +442,21 @@ int main() {
 
 
 <details>
+
 <summary>Final Solution</summary>
 
-### Generalizing the Solution
+The main idea to generalize to the last test set is to filter the contour lines such that irrelevant contour lines are not considered for the "intersection test".
 
-To solve the problem for all test sets, we must incorporate the cost associated with crossing contour lines. This cost directly affects our profit, and therefore modifies the objective function of our Linear Program. The constraints remain identical to the first solution.
+As we have $c\leq 10^6$ contour lines, but only $100$ of them actually contain any warehouse or stadium (Test Set 4 Assumption), we can filter out the contour lines which do not include any warehouse or stadium as otherwise the intersection test would be meaningless. If a contour line does not contain anything, nothing will intersect it.
 
-The actual profit for transporting one liter of beer from warehouse $w$ to stadium $s$ is $r_{w,s} - \frac{t_{w,s}}{100}$, where $t_{w,s}$ is the number of contour lines separating $w$ and $s$.
+To do this efficiently we will use a **Delaunay Triangulation** which triangulates the Warehouses and Stadiums. For every contour line we can then check **if its distance to the nearest point is smaller than its radius**.
 
-Our new objective function is to maximize:
-$$ \sum_{w=1}^{N} \sum_{s=1}^{M} x_{w,s} \cdot \left(r_{w,s} - \frac{t_{w,s}}{100}\right) $$
+- If not, there is no points inside → Irrelevant
+- If there is, it is **relevant** and needs to be considered for the intersection count $t_{ws}$
 
-To maintain integer coefficients in our LP, we can multiply the entire expression by 100. The objective then becomes maximizing:
-$$ \sum_{w=1}^{N} \sum_{s=1}^{M} x_{w,s} \cdot (100 \cdot r_{w,s} - t_{w,s}) $$
-The final objective value returned by the solver will be 100 times the actual profit, so we must remember to divide it by 100 before outputting the result.
+With this filtering, we can afterwards check for every contour line $c$, warehouse $w$ and stadium $s$ if the intersect or not and adjust the objective function as described above.
 
-### The Challenge of Counting Intersections
-
-The main difficulty is computing $t_{w,s}$ for all pairs $(w, s)$ efficiently. A brute-force approach would be:
-```
-for each warehouse w:
-  for each stadium s:
-    t_ws = 0
-    for each contour line c:
-      if w and s are on opposite sides of c:
-        t_ws++
-```
-With up to $N=200$, $M=20$, and $C=10^6$, this $O(N \cdot M \cdot C)$ approach is far too slow.
-
-However, the problem statement provides a crucial hint for Test Set 4: at most 100 contour lines contain at least one warehouse or stadium. A contour line that contains no locations in its interior cannot separate any pair of locations. This suggests a filtering strategy.
-
-### Efficiently Filtering Contour Lines
-
-We can significantly reduce the number of contour lines we need to check by filtering out those that are "irrelevant". A contour line is only relevant if it has at least one warehouse or stadium inside it.
-
-To check this efficiently for all $C$ contour lines:
-1.  Collect the coordinates of all $N$ warehouses and $M$ stadiums.
-2.  Build a **Delaunay Triangulation** from these $N+M$ points. A key property of Delaunay triangulations is that they provide a fast way to find the nearest neighbor to any query point.
-3.  For each of the $C$ contour lines, find the vertex in the triangulation that is nearest to the circle's center.
-4.  If the squared distance from the circle's center to this nearest point is less than or equal to the circle's squared radius, it means the point is inside or on the circle. We mark this contour line as "relevant".
-5.  This filtering step takes roughly $O(C \log(N+M))$ time.
-
-After filtering, we are left with a much smaller set of relevant contour lines (at most 100). We can then use the brute-force method on this reduced set to calculate all $t_{w,s}$ values in $O(N \cdot M \cdot |\text{relevant_contours}|)$, which is fast enough.
-
-With the $t_{w,s}$ values pre-calculated, we set up and solve the LP just as before, but with the modified objective function coefficients.
-
+### Code
 ```cpp
 #include <iostream>
 #include <vector>
@@ -656,7 +631,14 @@ int main() {
 ```
 </details>
 
-## ⚡ Result
+## 🧠 Learnings
+
+<details> 
+
+<summary> Expand to View </summary>
+
+- Switching units/rescaling your input might be necessaty to meet precision requirements
+- Similar to how we work with squared distances, we should always avoid fractions in an LP by scaling the input values appropriately.
 
 ```plaintext
 Compiling: successful
