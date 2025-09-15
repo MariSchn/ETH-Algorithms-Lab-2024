@@ -1,41 +1,53 @@
 # Ceryneian Hind
 
 ## 📝 Problem Description
+Given a graph consisting of $N$ locations and $M$ directed edges, each node $i$ is assigned an integer convenience score $s_i$.
 
-You are given a map of `N` locations and `M` one-way paths between them. Each location `i` has an associated integer convenience score, $s_i$.
+A "semi-dead end" is defined as a non-empty subset of nodes $S$ such that no path starts from a node in $S$ and ends at a node outside of $S$.
 
-A "semi-dead end" is defined as a non-empty collection of locations, let's call it $S$, with the property that there are no paths originating from a location inside $S$ and ending at a location outside of $S$.
-
-Your task is to find a semi-dead end $S$ for which the sum of convenience scores of all locations within it is as large as possible. If every possible semi-dead end has a total score that is zero or negative, the task is considered impossible. In this case, you should report it as such. Otherwise, you should output the maximum possible positive score.
+The objective is to determine a semi-dead end $S$ that maximizes the sum of convenience scores for all nodes within $S$. If every possible semi-dead end yields a total score that is zero or negative, the task is deemed impossible and should be reported as such. Otherwise, the maximum achievable positive score should be provided.
 
 ## 💡 Hints
 
 <details>
+
 <summary>Hint #1</summary>
+
 The problem asks you to partition all locations into two sets: the semi-dead end $S$ and the rest of the locations, $V \setminus S$. The defining property of $S$ is that no path goes from a location in $S$ to a location in $V \setminus S$. This structure, a partition of elements with constraints on connections between the partitions, is a strong indicator that the problem can be modeled as a minimum cut problem in a graph.
+
 </details>
+
 <details>
+
 <summary>Hint #2</summary>
+
 The goal is to maximize the sum of scores in the set $S$. This is a maximization problem. Minimum cut, on the other hand, is a minimization problem. It's often helpful to rephrase the maximization objective as a minimization one. Consider the total sum of all *positive* convenience scores on the map. Let this be $P$. Any semi-dead end $S$ we choose will have a score of $\sum_{i \in S} s_i$. Maximizing this is equivalent to minimizing $P - \sum_{i \in S} s_i$. Can you express this "loss" in terms of the locations we *don't* choose for $S$ and the negative-score locations we *do* choose for $S$?
+
 </details>
+
 <details>
+
 <summary>Hint #3</summary>
-Let's build a flow network. Create a source vertex `source` and a sink vertex `sink`.
+
+Let's build a flow network. Create a source node `source` and a sink node `sink`.
 1.  For every location `i` with a positive score $s_i > 0$, add a directed connection from `source` to `i` with capacity $s_i$.
 2.  For every location `i` with a negative score $s_i < 0$, add a directed connection from `i` to `sink` with capacity $-s_i$.
 3.  For every original path from location `u` to `v`, add a directed connection from `u` to `v` in our new network. What should its capacity be? The condition is that no path can leave the set $S$. This means if `u` is in $S$ and `v` is not, this configuration should be "forbidden". We can forbid it by assigning an infinite capacity to the connection `(u, v)`.
 
 Now, consider any `source-sink` cut in this network. The cut will partition the locations. The capacity of this cut corresponds exactly to the "loss" we identified in the previous hint. By the max-flow min-cut theorem, finding the minimum cut is equivalent to finding the maximum flow.
+
 </details>
 
 ## ✨ Solutions
 
 <details>
+
 <summary>Final Solution</summary>
-This problem can be elegantly solved by transforming it into a minimum cut problem in a specially constructed flow network. The core idea relies on the **max-flow min-cut theorem**.
+
+This problem can be solved by transforming it into a minimum cut problem in a specially constructed flow network. The core idea relies on the **max-flow min-cut theorem**.
 
 ### Problem Reformulation
-We want to partition the set of all locations $V$ into two disjoint sets: our target semi-dead end $S$ and its complement $T = V \setminus S$. The goal is to maximize the total score of vertices in $S$:
+We want to partition the set of all locations $V$ into two disjoint sets: our target semi-dead end $S$ and its complement $T = V \setminus S$. The goal is to maximize the total score of nodes in $S$:
 $$ \text{maximize} \left( \sum_{i \in S} s_i \right) $$
 This is equivalent to minimizing a "loss" or "cost". Let $P$ be the sum of all positive convenience scores, i.e., $P = \sum_{i \in V, s_i > 0} s_i$. The maximization problem can be rewritten as:
 $$ \text{maximize} \left( \sum_{i \in S} s_i \right) \iff \text{minimize} \left( P - \sum_{i \in S} s_i \right) $$
@@ -45,12 +57,12 @@ This new objective is what we will minimize. It represents the cost of our parti
 
 ### Graph Construction
 We build a flow network with a source `v_source` and a sink `v_sink`:
-1.  **Source Edges:** For each location $i$ with a positive score $s_i > 0$, we add an edge from `v_source` to vertex $i$ with capacity $s_i$. If we cut this edge, it means vertex $i$ is on the sink-side of the cut (in $T$), and we pay a cost of $s_i$.
-2.  **Sink Edges:** For each location $i$ with a negative score $s_i < 0$, we add an edge from vertex $i$ to `v_sink` with capacity $-s_i$. If we cut this edge, it means vertex $i$ is on the source-side of the cut (in $S$), and we pay a cost of $-s_i$.
-3.  **Path Edges:** For each original path from location $u$ to $v$, we add an edge from vertex $u$ to vertex $v$ with **infinite capacity**. This is the crucial step that enforces the semi-dead end property. Any finite `source-sink` cut cannot place $u$ on the source-side ($S$) and $v$ on the sink-side ($T$) simultaneously, because this would require cutting an edge of infinite capacity. This perfectly matches the definition of a semi-dead end: no paths can go from $S$ to $T$.
+1.  **Source Edges:** For each location $i$ with a positive score $s_i > 0$, we add an edge from `v_source` to node $i$ with capacity $s_i$. If we cut this edge, it means node $i$ is on the sink-side of the cut (in $T$), and we pay a cost of $s_i$.
+2.  **Sink Edges:** For each location $i$ with a negative score $s_i < 0$, we add an edge from node $i$ to `v_sink` with capacity $-s_i$. If we cut this edge, it means node $i$ is on the source-side of the cut (in $S$), and we pay a cost of $-s_i$.
+3.  **Path Edges:** For each original path from location $u$ to $v$, we add an edge from node $u$ to node $v$ with **infinite capacity**. This is the crucial step that enforces the semi-dead end property. Any finite `source-sink` cut cannot place $u$ on the source-side ($S$) and $v$ on the sink-side ($T$) simultaneously, because this would require cutting an edge of infinite capacity. This perfectly matches the definition of a semi-dead end: no paths can go from $S$ to $T$.
 
 ### Calculating the Result
-A minimum `source-sink` cut in this graph partitions the vertices into a source set (our desired semi-dead end $S$, plus `v_source`) and a sink set ($T$, plus `v_sink`). The capacity of this minimum cut is exactly the minimum possible value for our loss expression: $\sum_{i \in T, s_i > 0} s_i + \sum_{i \in S, s_i < 0} (-s_i)$.
+A minimum `source-sink` cut in this graph partitions the nodes into a source set (our desired semi-dead end $S$, plus `v_source`) and a sink set ($T$, plus `v_sink`). The capacity of this minimum cut is exactly the minimum possible value for our loss expression: $\sum_{i \in T, s_i > 0} s_i + \sum_{i \in S, s_i < 0} (-s_i)$.
 
 By the max-flow min-cut theorem, the value of the minimum cut is equal to the value of the maximum flow from `v_source` to `v_sink`. So, we can compute the max flow to find this minimum loss.
 
@@ -58,8 +70,7 @@ The final maximum convenience score is:
 $$ \text{Max Score} = (\text{Sum of all positive scores}) - (\text{Max Flow}) $$
 If this result is not strictly positive, no suitable semi-dead end exists.
 
-### C++ Implementation
-The following code implements this strategy using the Boost Graph Library, which provides an efficient `push_relabel_max_flow` algorithm.
+### Code
 
 ```cpp
 #include <iostream>
@@ -75,7 +86,7 @@ typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::directedS, boost:
         boost::property<boost::edge_residual_capacity_t, long,
             boost::property<boost::edge_reverse_t, traits::edge_descriptor>>>> graph;
 
-typedef traits::vertex_descriptor vertex_desc;
+typedef traits::node_descriptor node_desc;
 typedef traits::edge_descriptor edge_desc;
 
 class edge_adder {
@@ -118,8 +129,8 @@ void solve() {
   graph G(n);
   edge_adder adder(G);
   
-  const vertex_desc v_source = boost::add_vertex(G);
-  const vertex_desc v_sink = boost::add_vertex(G);
+  const node_desc v_source = boost::add_node(G);
+  const node_desc v_sink = boost::add_node(G);
   
   // Add source and sink connections
   int positive_sum = 0;
