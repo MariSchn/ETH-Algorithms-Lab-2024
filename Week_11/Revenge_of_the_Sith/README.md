@@ -2,69 +2,81 @@
 
 ## 📝 Problem Description
 
-You are given a set of $n$ planets, represented by their 2D coordinates. These planets are conquered by an empire in a fixed, predetermined sequence, $p_0, p_1, \ldots, p_{n-1}$. Your goal is to form an alliance of the maximum possible size, $k$.
+A set of $n$ planets is given, each represented by its 2D coordinates. These planets are conquered by the empire in a fixed, predetermined sequence: $p_0, p_1, \ldots, p_{n-1}$. The objective is to determine the maximum possible size $k$ of an alliance that can be formed under the following constraints:
 
-To form an alliance of size $k$, you must select $k$ distinct planets. The selection is constrained by two rules:
-1.  All $k$ planets chosen for the alliance must be selected from the set of planets that have not yet been conquered by the empire. After $k$ days, planets $p_0, \ldots, p_{k-1}$ are conquered. Therefore, your selection must come from the remaining planets, $\{p_k, p_{k+1}, \ldots, p_{n-1}\}$.
-2.  The selected set of $k$ planets must be "reachable". This means that the set of planets must form a single connected group. A connection between any two planets exists if the distance between them is less than or equal to a given scout vessel range, $r$. Formally, for any partition of the $k$ chosen planets into two non-empty subsets, there must be a planet in the first subset and a planet in the second subset whose distance is at most $r$.
+1. The alliance must consist of $k$ distinct planets, all selected from those not yet conquered. After $k$ days, planets $p_0$ through $p_{k-1}$ are no longer available, so the selection must be made from the remaining planets $\{p_k, p_{k+1}, \ldots, p_{n-1}\}$.
+2. The chosen set of $k$ planets must be "reachable," meaning they form a single connected group. A connection between any two planets exists if their distance does not exceed a specified scout vessel range $r$. For any partition of the selected planets into two non-empty subsets, there must exist a pair of planets—one from each subset—whose distance is at most $r$.
 
-Your task is to determine the largest integer $k$ for which such an alliance can be formed.
+The task is to find the largest integer $k$ such that an alliance meeting these criteria can be formed.
 
 ## 💡 Hints
 
 <details>
-<summary>Hint #1</summary>
-The problem asks for the *maximum* possible value of $k$. Notice that if it's possible to form an alliance of size $k$, it is also possible to form an alliance of any size smaller than $k$ (by simply taking a connected subset of the size-$k$ alliance). This monotonic property—if a property holds for $k$, it also holds for all $k' < k$—is a strong indicator that a particular search algorithm might be very effective. Which algorithm excels at finding an optimal value in a monotonic search space?
-</details>
-<details>
-<summary>Hint #2</summary>
-You can apply binary search on the answer, $k$. The range for $k$ would be from $1$ to $n$. For a fixed value of $k$ in your binary search, you need a function, let's call it `is_possible(k)`, that returns `true` if an alliance of size $k$ can be formed and `false` otherwise.
 
-How would you implement `is_possible(k)`? According to the rules, you must only consider planets $\{p_k, p_{k+1}, \ldots, p_{n-1}\}$. Among these available planets, you need to check if there is any connected group of at least $k$ planets. How can you model this connectivity and find the size of the largest group?
+<summary>Hint #1</summary>
+
+The problem asks for the *maximum* possible value of $k$. Notice that if it's possible to form an alliance of size $k$, it is also possible to form an alliance of any size smaller than $k$ (by simply taking a connected subset of the size-$k$ alliance). This monotonic property, if a property holds for $k$, it also holds for all $k' < k$, is a strong indicator that a particular search algorithm might be very effective. Which algorithm excels at finding an optimal value in a monotonic search space?
+
 </details>
+
 <details>
+
+<summary>Hint #2</summary>
+
+You can apply binary search on the answer, $k$. The range for $k$ would be from $1$ to $n$. For a fixed value of $k$ in your binary search, you need a function, let's call it `possible(k)`, that returns `true` if an alliance of size $k$ can be formed and `false` otherwise.
+
+How would you implement `possible(k)`? According to the rules, you must only consider planets $\{p_k, p_{k+1}, \ldots, p_{n-1}\}$. Among these available planets, you need to check if there is any connected group of at least $k$ planets. How can you model this connectivity and find the size of the largest group?
+
+</details>
+
+<details>
+
 <summary>Hint #3</summary>
-To implement `is_possible(k)`, you can think of the available planets $\{p_k, \ldots, p_{n-1}\}$ as vertices in a graph. An edge exists between two vertices if the distance between their corresponding planets is at most $r$. The problem then reduces to finding the size of the largest connected component in this graph. If this size is at least $k$, then `is_possible(k)` is `true`.
+
+To implement `possible(k)`, you can think of the available planets $\{p_k, \ldots, p_{n-1}\}$ as vertices in a graph. An edge exists between two vertices if the distance between their corresponding planets is at most $r$. The problem then reduces to finding the size of the largest connected component in this graph. If this size is at least $k$, then `possible(k)` is `true`.
 
 A classic and efficient data structure for managing and counting connected components is the **Union-Find** (or Disjoint Set Union) data structure.
 
-However, constructing the graph by checking all pairs of available planets would result in $O((n-k)^2)$ potential edges, which might be too slow for larger values of $n$. Since connectivity is based on geometric proximity, can you use a geometric data structure to find the necessary connections more efficiently than checking all pairs? A **Delaunay triangulation** is excellent for finding nearby neighbors.
+However, constructing the graph by checking all pairs of available planets would result in $O((n-k)^2)$ potential edges, which might be too slow for larger values of $n$. Since connectivity is based on geometric proximity, can you use a **Delaunay triangulation** for finding nearby neighbors.
+
 </details>
 
 ## ✨ Solutions
 
 <details>
+
 <summary>First Solution (Test Set 1, 2)</summary>
-This problem asks for the maximum integer $k$ that satisfies certain geometric connectivity properties. The monotonic nature of the problem—if an alliance of size $k$ is possible, so is one of size $k-1$—strongly suggests that we can **binary search on the answer $k$**. Our search space for $k$ is $[1, n]$.
+
+This problem asks for the maximum integer $k$ that satisfies certain geometric connectivity properties. The monotonic nature of the problem, if an alliance of size $k$ is possible, so is one of size $k-1$—strongly suggests that we can **binary search on the answer $k$**.
 
 For the binary search to work, we need a function `possible(k)` that efficiently checks if an alliance of size $k$ is feasible.
 
 ### The `possible(k)` Check
 
-For a given $k$, the rules state we can only use planets $\{p_k, p_{k+1}, \ldots, p_{n-1}\}$. Within this set, we need to find if there exists a connected group of at least $k$ planets. Two planets are connected if their distance is at most $r$. This is a classic connectivity problem on a graph.
+For a **given fixed** $k$ we can **check if it is possible** to find such a set of $k$ connected nodes by:
 
-1.  **Model as a Graph**: We can model the available planets as vertices. An edge exists between two vertices if their distance is $\le r$.
-2.  **Find Connected Components**: Our goal is to find the size of the largest connected component in this graph.
-3.  **Union-Find Data Structure**: The Union-Find (or Disjoint Set Union) data structure is perfectly suited for this. We can iterate through all pairs of available planets $(p_i, p_j)$ where $i, j \ge k$. If the squared distance between them is less than or equal to $r^2$, we `union` their sets. We also keep track of the size of each component.
-4.  **Check Condition**: After processing all such pairs, we find the maximum component size. If this size is $\ge k$, then `possible(k)` returns true; otherwise, it returns false.
+1. Find **all possible edges/connections** $(u, v)$ between any planets $u$ and $v$ that we are allowed to take for the given $k$. These must fulfill two conditions:
+    1. The edge has to be **shorter** (or equal) **to the radius of the scouting vessel** $\|u, v\| \leq r$
+        
+        **Note**: We can actually “prefilter” all Edges to only contain those that are shorter than $r$ to avoid doing this multiple times.
+        
+    2. The index of both $u$ and $v$ needs to be at least $k$. So $u,v \geq k$
+        
+         This is because otherwise taking this connection would bring us to a planet that is already captured by the Empire
+        
+2. Given these edges, compute its **Connected Components** using the **Union Find Datastructure**
+3. Check if there is a component that is **at least $k$ large**
 
-### Overall Algorithm
+    No → Not possible to find set of size $k$ <br />
+    Yes → Possible to find set of size $k$
 
-1.  Initialize a search range `low = 1`, `high = n`.
-2.  While `low <= high`:
-    *   Calculate `mid = low + (high - low) / 2`.
-    *   If `possible(mid)` is true, it means an alliance of size `mid` is achievable, so we try for a larger one: `low = mid + 1`. We also store `mid` as a potential answer.
-    *   If `possible(mid)` is false, `mid` is too large, so we must try a smaller size: `high = mid - 1`.
-3.  The final answer is the largest `mid` for which `possible(mid)` was true.
+With this in place, we can now check if for any given $k$ it is possible to find such a set.
+We can therefore simply perform a **Binary Search** over the range of $k$ to find the maximum $k$ that allows to find a set of size $k$.
 
-### Complexity and Implementation Details
+Doing this already yields a solution for the first 2 Test Sets. However, it is too inefficient to solve the others.
 
-The main bottleneck is the `possible(k)` function. A naive implementation that checks all pairs of the $n-k$ available planets has a time complexity of $O((n-k)^2)$. The binary search adds a $\log(n)$ factor, leading to an overall complexity of roughly $O(n^2 \log n)$, which is too slow for the larger constraints.
-
-The provided code attempts an optimization. It first builds a Delaunay triangulation on *all* points to get a smaller set of candidate edges. However, a simple Delaunay triangulation is insufficient, as it only guarantees to include the shortest edge connecting a point to its neighbors, not all edges within a radius $r$. The code compensates for this by performing a search (like DFS or BFS) from each vertex on the triangulation to find all reachable neighbors within the radius, which still results in a large number of edges. This approach is efficient enough for the first two test sets but fails on larger inputs.
-
+### Code
 ```cpp
-///1
 #include <iostream>
 #include <vector>
 
@@ -206,35 +218,26 @@ int main() {
 }
 ```
 </details>
+
 <details>
+
 <summary>Final Solution</summary>
-The previous solution was too slow because its `possible(k)` check was inefficient. The bottleneck was considering too many potential edges. The key insight for an optimal solution is to refine how we generate edges for the connectivity check.
 
-### The Pitfall and The Optimization
+The **main problem** with the previous solution lies in the fact that it **considers all Edges** $(u, v)$ even though many of them **could be ignored**.
 
-A naive approach of building a Delaunay triangulation on *all* planets once and then filtering edges is flawed. Consider two planets $u$ and $v$ with indices greater than $k$ that are within distance $r$. The Delaunay triangulation might not contain the edge $(u,v)$ if another planet $w$ (with index $<k$) lies nearby. In the `possible(k)` check, planet $w$ is unavailable, so we cannot use it as an intermediate step. The direct connection $(u,v)$ is required, but our pre-computed triangulation might have missed it.
+**Note**: It might be tempting to use the **Delaunay Triangulation** on all points and then filter out the edges that are shorter than $r$. However, this won’t work, as the Delaunay Triangulation only provides the closes edges. Meaning that an edge a node $v$ is not the closes to $u$, but still has a distance smaller than $r$, the Delaunay Triangulation will not contain this edge. <br />
+This itself might not seem problematic, as the actual closes node $v'$ to $u$ will be connected to both nodes and therefore we will get the same component. However, if the index of $v'$ is smaller than $k$ we will not be allowed to take this edge, causing $u$ and $v$ to be in separate components, even though they should be in one  
 
-The correct and efficient approach is to build the geometric structure **inside the binary search loop**, using only the set of planets available for that specific $k$.
+Instead we will **Triangulate in every Iteration of the Binary Search**.
 
-### Improved `possible(k)` Check
+In every iteration of `possible` we triangulate the points/planets, **ignoring the first** $k$ **planets**. As they are not allowed to be in the set anyway.
+This allows us to skip the check if for the edge $(u,v)$, one of $u,v$ is smaller than $k$, as no points that are smaller than $k$ are included in the Triangulation.
 
-For a fixed $k$, we do the following:
-1.  **Select Planets**: Create a list of planets that are available, i.e., $\{p_k, p_{k+1}, \ldots, p_{n-1}\}$.
-2.  **Build Delaunay Triangulation**: Construct a Delaunay triangulation using *only* these $n-k$ available planets.
-3.  **Exploit Delaunay Properties**: A crucial property of the Delaunay triangulation is that it contains all the information we need for proximity-based connectivity. If two points $u$ and $v$ are within distance $r$ of each other, there must exist a path between them in the triangulation where every edge on the path has a length at most $r$. Therefore, to check for connectivity within the radius $r$, we only need to consider the edges of the Delaunay triangulation.
-4.  **Union-Find on Triangulation Edges**:
-    *   Iterate through all edges of the newly built triangulation.
-    *   If an edge's length is $\le r$, `union` the two endpoints in a Union-Find data structure.
-    *   Keep track of component sizes.
-5.  **Check Condition**: Find the maximum component size. If it is $\ge k$, return true.
+Removing the first $k$ points solves the problem from above, as now if two planes $u, v$ have a smaller radius than $r$ they will either be direcly connected or have a common neighbor, as now all planets/points are allowed to be taken, this neighbor will cause them to be in the same component.
 
-### Complexity Analysis
+Then we can perform the same Component Computation using Union Find as before, to find the largest set and check if  it is larger or equal to $k$
 
-*   **Delaunay Triangulation**: For $m = n-k$ points, construction takes approximately $O(m \log m)$ time.
-*   **Edge Processing**: The number of edges in a Delaunay triangulation is linear, $O(m)$. Processing them with Union-Find takes nearly linear time, $O(m \alpha(m))$, where $\alpha$ is the very slow-growing inverse Ackermann function.
-*   **Total for `possible(k)`**: The check is dominated by the triangulation, making it $O((n-k) \log(n-k))$.
-*   **Overall**: The binary search performs $\log n$ calls to `possible(k)`. This gives a total time complexity of roughly $O(n \log^2 n)$, which is efficient enough to pass all test sets.
-
+### Code
 ```cpp
 #include <iostream>
 #include <vector>
@@ -376,6 +379,16 @@ int main() {
   while(n_tests--) { solve(); }
 }
 ```
+</details>
+
+## 🧠 Learnings
+
+<details> 
+
+<summary> Expand to View </summary>
+
+- Delaunay Triangulations are super cheap ($O(n \log n)$)
+
 </details>
 
 ## ⚡ Result
