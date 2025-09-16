@@ -86,7 +86,7 @@ typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::directedS, boost:
         boost::property<boost::edge_residual_capacity_t, long,
             boost::property<boost::edge_reverse_t, traits::edge_descriptor>>>> graph;
 
-typedef traits::node_descriptor node_desc;
+typedef traits::vertex_descriptor vertex_desc;
 typedef traits::edge_descriptor edge_desc;
 
 class edge_adder {
@@ -129,8 +129,8 @@ void solve() {
   graph G(n);
   edge_adder adder(G);
   
-  const node_desc v_source = boost::add_node(G);
-  const node_desc v_sink = boost::add_node(G);
+  const vertex_desc v_source = boost::add_vertex(G);
+  const vertex_desc v_sink = boost::add_vertex(G);
   
   // Add source and sink connections
   int positive_sum = 0;
