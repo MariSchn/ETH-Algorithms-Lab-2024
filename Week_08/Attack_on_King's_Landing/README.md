@@ -85,7 +85,7 @@ using traits = boost::adjacency_list_traits<boost::vecS, boost::vecS, boost::dir
 using graph = boost::adjacency_list<boost::vecS,
                                     boost::vecS,
                                     boost::undirectedS>;
-using node_desc = traits::node_descriptor;
+using vertex_desc = traits::vertex_descriptor;
 using edge_desc = traits::edge_descriptor;
 
 void solve() {
@@ -106,8 +106,8 @@ void solve() {
   // ===== FIND MAXIMUM MATCHING =====
   std::vector<int> mate_map(n); // exterior property map
 
-  boost::edmonds_maximum_cardinality_matching(G, boost::make_iterator_property_map(mate_map.begin(), boost::get(boost::node_index, G)));
-  int matching_size = boost::matching_size(G, boost::make_iterator_property_map(mate_map.begin(), boost::get(boost::node_index, G)));
+  boost::edmonds_maximum_cardinality_matching(G, boost::make_iterator_property_map(mate_map.begin(), boost::get(boost::vertex_index, G)));
+  int matching_size = boost::matching_size(G, boost::make_iterator_property_map(mate_map.begin(), boost::get(boost::vertex_index, G)));
   
   // ===== OUTPUT =====
   std::cout << matching_size << std::endl;
@@ -187,7 +187,7 @@ using graph = boost::adjacency_list<boost::vecS,
                                     boost::undirectedS,
                                     boost::no_property,
                                     boost::property<boost::edge_weight_t, int>>;
-using node_desc = traits::node_descriptor;
+using vertex_desc = traits::vertex_descriptor;
 using edge_desc = traits::edge_descriptor;
 
 
@@ -222,7 +222,7 @@ void solve() {
   // ===== FIND SUBGRAPH THAT IS COVERED BY BARRACKS =====
   for(int i = 0; i < b; ++i) {
     std::vector<int> dist_map(num_nodes); //exterior property
-    boost::dijkstra_shortest_paths(G, barracks[i], boost::distance_map(boost::make_iterator_property_map(dist_map.begin(), boost::get(boost::node_index, G))));
+    boost::dijkstra_shortest_paths(G, barracks[i], boost::distance_map(boost::make_iterator_property_map(dist_map.begin(), boost::get(boost::vertex_index, G))));
   
     for(int j = 0; j < num_nodes; ++j) {
       if(dist_map[j] <= d) {
@@ -233,15 +233,15 @@ void solve() {
 
   for(int i = 0; i < num_nodes; ++i) {
     if(!covered[i]) {
-      boost::clear_node(i, G);
+      boost::clear_vertex(i, G);
     }
   }
 
   // ===== FIND MAXIMUM MATCHING =====
   std::vector<int> mate_map(num_nodes);
 
-  boost::edmonds_maximum_cardinality_matching(G, boost::make_iterator_property_map(mate_map.begin(), boost::get(boost::node_index, G)));
-  int matching_size = boost::matching_size(G, boost::make_iterator_property_map(mate_map.begin(), boost::get(boost::node_index, G)));
+  boost::edmonds_maximum_cardinality_matching(G, boost::make_iterator_property_map(mate_map.begin(), boost::get(boost::vertex_index, G)));
+  int matching_size = boost::matching_size(G, boost::make_iterator_property_map(mate_map.begin(), boost::get(boost::vertex_index, G)));
   
   // ===== OUTPUT =====
   std::cout << matching_size << std::endl;
@@ -263,7 +263,7 @@ int main() {
 <summary> Expand to View </summary>
 
 - Whether you use a directed or undirected Graph can have a significant impact on runtime.
-- Depending on the task `boost::clear_node` can delete a node (by removing all of its edges) without the pain of actually deleting nodes in Boost
+- Depending on the task `boost::clear_vertex` can delete a node (by removing all of its edges) without the pain of actually deleting nodes in Boost
 
 </details>
 
