@@ -2,44 +2,53 @@
 
 ## 📝 Problem Description
 
-You are given a set of $N$ provinces. Each province $p_i$ has a financial balance $b_i$, which can be positive (a surplus) or negative (a deficit). Additionally, there are $M$ debt relationships, where each relationship specifies that a province $p_i$ owes an amount $d_{i,j}$ to another province $p_j$.
+Given a set of $N$ provinces, each province $p_i$ is associated with a financial balance $b_i$, which may be positive (indicating a surplus) or negative (indicating a deficit). There are $M$ debt relationships, where each specifies that province $p_i$ owes an amount $d_{i,j}$ to province $p_j$.
 
-Your task is to determine if it's possible to form a *free-standing* union of provinces. A non-empty subset of provinces, let's call it $X$, is considered free-standing if the sum of the balances of all provinces within $X$ is strictly greater than the total debt owed by provinces in $X$ to provinces *outside* of $X$.
-
-Formally, a union $X$ is free-standing if the following inequality holds:
+The objective is to determine whether there exists a non-empty subset of provinces, denoted as $X$, that forms a *free-standing* union. Such a union is defined by the condition that the total balance of all provinces in $X$ is strictly greater than the total debt owed by provinces in $X$ to those outside of $X$:
 $$ \sum_{i \in X} b_i > \sum_{i \in X, j \notin X} d_{i,j} $$
-
-The input consists of the number of provinces $N$, the number of debt relations $M$, the balance $b_i$ for each province, and the $M$ debt relations, each given as a triplet $(i, j, d_{i,j})$. You must output "yes" if at least one such free-standing union exists, and "no" otherwise.
 
 ## 💡 Hints
 
 <details>
+
 <summary>Hint #1</summary>
+
 The problem asks if *any* subset of provinces $X$ can form a free-standing union. This is equivalent to asking if the *best possible* union is free-standing. This suggests we need to find a way to partition the provinces into two sets: those in the union ($X$) and those outside of it. How can we define the "value" or "profit" of a given union $X$ to maximize it?
+
 </details>
 
 <details>
+
 <summary>Hint #2</summary>
+
 Let's reformulate the condition. We are looking for a non-empty set of provinces $X$ that maximizes the value $V(X) = \left( \sum_{i \in X} b_i \right) - \left( \sum_{i \in X, j \notin X} d_{i,j} \right)$. A free-standing union exists if and only if $\max_{X} V(X) > 0$.
 
 This problem of partitioning a set of items to maximize a value, where the value depends on interactions between items in different partitions, can often be modeled as a minimum cut problem in a specially constructed flow network. Consider creating a network with a source $s$ and a sink $t$. How could you represent provinces, their balances, and their debts as components in this network?
+
 </details>
 
 <details>
+
 <summary>Hint #3</summary>
+
 Let's build a flow network. Create a source $s$, a sink $t$, and a vertex for each province $p_i$.
-<ul>
-    <li>For each province $p_i$ with a <b>positive balance</b> $b_i$, add a directed edge from the source $s$ to vertex $p_i$ with capacity $b_i$. These represent the assets of the potential union.</li>
-    <li>For each province $p_i$ with a <b>negative balance</b> $b_i$, add a directed edge from vertex $p_i$ to the sink $t$ with capacity $-b_i$. These represent the liabilities.</li>
-    <li>For each debt $d_{i,j}$ from province $p_i$ to $p_j$, add a directed edge from vertex $p_i$ to vertex $p_j$ with capacity $d_{i,j}$.</li>
-</ul>
+
+
+- For each province $p_i$ with a <b>positive balance</b> $b_i$, add a directed edge from the source $s$ to vertex $p_i$ with capacity $b_i$. These represent the assets of the potential union.
+- For each province $p_i$ with a <b>negative balance</b> $b_i$, add a directed edge from vertex $p_i$ to the sink $t$ with capacity $-b_i$. These represent the liabilities.
+- For each debt $d_{i,j}$ from province $p_i$ to $p_j$, add a directed edge from vertex $p_i$ to vertex $p_j$ with capacity $d_{i,j}$.
+
 Now, consider an $s-t$ cut in this network. A cut partitions the vertices into two sets, $S$ (containing $s$) and $T$ (containing $t$). Let the set of provinces in our union $X$ correspond to the province-vertices in $S$. What does the capacity of this cut represent in terms of the original problem?
+
 </details>
 
 ## ✨ Solutions
 
 <details>
+
 <summary>Final Solution</summary>
+
+**Note**: This is almost the same as the "Ceryneian Hind" problem
 
 This problem can be elegantly solved by transforming it into a **minimum cut problem** on a flow network. By the max-flow min-cut theorem, the value of the minimum cut is equal to the value of the maximum flow, which is computationally feasible.
 
@@ -88,16 +97,7 @@ $$ B_{pos} - C_{min} > 0 \implies C_{min} < B_{pos} $$
 
 By the max-flow min-cut theorem, the minimum cut value is equal to the maximum flow value. So, we can find the answer by calculating the max flow from $s$ to $t$ and checking if it's less than the total sum of all positive balances.
 
-### Implementation
-
-The C++ solution below uses the Boost Graph Library to implement this logic.
-1.  Read the number of provinces $n$, debts $m$, and their respective values.
-2.  Initialize `sum_positive_balances` to keep track of $B_{pos}$.
-3.  Create a graph with $n+2$ vertices (n provinces + source + sink).
-4.  Add edges according to the construction described above.
-5.  Calculate the max flow from source to sink using `boost::push_relabel_max_flow`.
-6.  If `flow < sum_positive_balances`, a free-standing union exists, so we print "yes". Otherwise, we print "no".
-
+### Code
 ```cpp
 #include <iostream>
 #include <vector>
