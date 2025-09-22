@@ -1,47 +1,76 @@
 # The Pied Piper of Hamelin
 
 ## 📝 Problem Description
+The task is to determine the optimal route through the city of Hamelin to maximize the number of rats collected. The city consists of $N$ public squares, numbered from $0$ to $N-1$, connected by $M$ one-way streets, each with a specified number of rats.
 
-You are tasked with finding an optimal route for the Pied Piper through the city of Hamelin to maximize the number of rats he collects. The city has $N$ public squares, numbered $0$ to $N-1$, and $M$ one-way streets. Each street connects two squares and has a specific number of rats on it.
+An acceptable plan must begin and end at square $0$, pass through the main public square $N-1$, and visit each square at most once (except for square $0$, which serves as both the start and end). The route is formed by concatenating two path segments:
+- A monotonically increasing path from square $0$ to square $N-1$, where each street traversed leads from a lower-numbered square to a higher-numbered one.
+- A monotonically decreasing path from square $N-1$ back to square $0$, where each street traversed leads from a higher-numbered square to a lower-numbered one.
 
-An "acceptable plan" for the Piper's route must satisfy several conditions:
-1.  The route must start and end at square $0$.
-2.  It must pass through the main public square, $N-1$.
-3.  No square may be visited more than once, with the exception of square $0$, which is both the start and end point.
-4.  The route must be a concatenation of two specific types of paths:
-    *   A **monotonically increasing path** from square $0$ to square $N-1$. This means for any street on this path segment from square $s_i$ to $s_{i+1}$, it must hold that $s_i < s_{i+1}$.
-    *   A **monotonically decreasing path** from square $N-1$ back to square $0$. This means for any street on this path segment from square $s_j$ to $s_{j+1}$, it must hold that $s_j > s_{j+1}$.
-
-Given the layout of the squares and streets, your goal is to determine the maximum total number of rats the Piper can collect on any single acceptable plan.
+Given the configuration of squares and streets, compute the maximum total number of rats that can be collected on any single acceptable plan.
 
 ## 💡 Hints
 
 <details>
+
 <summary>Hint #1</summary>
+
 The problem asks for a single tour that starts at 0, goes to $N-1$, and returns to 0. Try to visualize this tour. It can be deconstructed into two distinct paths: one from square $0$ to $N-1$ and another from square $N-1$ to $0$. The key constraint is that these two paths must not share any intermediate squares.
+
 </details>
 
 <details>
+
 <summary>Hint #2</summary>
+
 This problem structure, involving finding optimal paths with specific constraints, is a strong indicator for dynamic programming. Consider building the two required paths simultaneously. What information would you need to keep track of in your DP state? To extend the paths, you certainly need to know their current endpoints.
+
 </details>
 
 <details>
+
 <summary>Hint #3</summary>
 A common pitfall is to calculate the best increasing path from $0$ to $N-1$ and the best decreasing path from $N-1$ to $0$ independently and then add their scores. This approach fails because the two paths might share intermediate squares, which is forbidden. Your DP state must enforce the disjointness constraint.
+
 </details>
 
 <details>
+
 <summary>Hint #4</summary>
+
 Let's define a DP state `dp[i][j]` representing the maximum score for two disjoint, monotonically increasing paths starting from square $0$ and ending at squares `i` and `j`. Why two *increasing* paths? A decreasing path from $N-1$ to $0$ is structurally similar to an increasing path from $0$ to $N-1$. Thinking about the problem as finding two disjoint increasing paths that meet at $N-1$ can simplify the logic significantly. The final answer would then be stored in `dp[n-1][n-1]`.
-</body>
+
 </details>
 
+
+<details> 
+
+<summary>Hint #5</summary>
+
+To transition the DP state `dp[i][j]`, consider moving either endpoint forward along a valid street. For each possible next square $i'$ reachable from $i$ (with $i' > i$ and $i' \neq j$), update `dp[i'][j]` with the value of `dp[i][j]` plus the rats on the street $(i, i')$. Similarly, for each possible next square $j'$ reachable from $j$ (with $j' > j$ and $j' \neq i$), update `dp[i][j']`. This ensures the two paths remain disjoint and only move forward. Iterate over all possible transitions to propagate the maximum scores.
+
+</details>
 ## ✨ Solutions
 
 <details>
 
 <summary>First Solution (Test Set 1)</summary>
+
+For the first test set, the city of Hamelin possesses a special layered structure: the squares are partitioned into layers $S_0, S_1, \ldots, S_{k-1}$, with each layer containing at most $10$ squares. Streets only connect squares in consecutive layers, and every monotonically increasing path from $0$ to $N-1$ has a corresponding monotonically decreasing path from $N-1$ to $0$ that is disjoint (except for the endpoints) and collects the same number of rats.
+
+### Approach
+This structure allows us to simplify the problem significantly. Since the layers are small, we can enumerate all possible paths from $0$ to $N-1$ that respect the layering. For each such path, we know there exists a matching decreasing path that is disjoint and collects the same number of rats. Therefore, we only need to find the single best increasing path from $0$ to $N-1$; the corresponding decreasing path will automatically exist and yield the same score.
+
+### Algorithm
+Enumerate Paths: Since each layer contains at most $10$ squares, the total number of possible paths is manageable. We can use dynamic programming or even simple recursion to explore all increasing paths from $0$ to $N-1$.
+Track Rat Count: For each path, sum the number of rats on the streets traversed.
+Select Maximum: The answer is twice the maximum rat count found for any increasing path, as the matching decreasing path will contribute the same amount.
+
+### Why This Works
+The key insight is that the layered structure and the guarantee of a matching decreasing path eliminate the need to explicitly construct both paths or check for disjointness. The problem reduces to a straightforward path-finding task in a layered directed acyclic graph.
+
+### Complexity
+Because each layer is small, the solution runs efficiently even with exhaustive search or dynamic programming. The constraints ensure that the approach is feasible for this test set.
 
 ### Code
 ```cpp
