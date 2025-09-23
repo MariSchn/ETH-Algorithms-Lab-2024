@@ -2,54 +2,86 @@
 
 ## 📝 Problem Description
 
-You are given the locations of $n$ new nails and $m$ old nails on a 2D plane. You need to hang one new rectangular poster, centered on each of the $n$ new nails. The posters already hanging on the $m$ old nails must remain untouched.
+Given the locations of $n$ new nails and $m$ old nails on a 2D plane, the task is to hang one new rectangular poster, centered on each of the $n$ new nails. The posters already hanging on the $m$ old nails must remain untouched.
 
-Initially, all posters have a standard size of $h$ inches in height and $w$ inches in width. For each of the $n$ new posters, you can choose a scaling factor $a \ge 1$ to create a larger poster of size $(a \cdot h) \times (a \cdot w)$. Each new poster can have its own distinct scaling factor.
+Initially, all posters have a standard size of $h$ inches in height and $w$ inches in width. For each of the $n$ new posters, a scaling factor $a \ge 1$ may be chosen to create a larger poster of size $(a \cdot h) \times (a \cdot w)$. Each new poster can have its own distinct scaling factor.
 
-The primary constraint is that no two posters on the wall (new or old) can overlap. The goal is to choose the scaling factors for the $n$ new posters such that the sum of their perimeters is maximized. Your task is to calculate this maximum possible sum of perimeters, rounded up to the nearest integer.
+The primary constraint is that no two posters on the wall (new or old) may overlap. The objective is to select the scaling factors for the $n$ new posters so that the sum of their perimeters is maximized. The maximum possible sum of perimeters, rounded up to the nearest integer, must be computed.
 
 ## 💡 Hints
 
 <details>
+
 <summary>Hint #1</summary>
-The problem asks you to maximize a certain value (the sum of perimeters) by adjusting a set of variables (the scaling factors $a_i$). What kind of constraints do the non-overlapping conditions impose on these variables? Are these constraints linear?
+
+The problem asks you to maximize a linear objective (sum of perimeters) subject to certain constraints (non-overlapping posters). The scaling factors are continuous variables with linear relationships. This structure strongly suggests using **Linear Programming (LP)** to find the optimal solution.
+
 </details>
+
 <details>
+
 <summary>Hint #2</summary>
-This problem can be modeled as a Linear Program (LP). The variables of the LP would be the scaling factors $a_i$ for each new poster. The objective function is a linear combination of these variables. The main challenge is to correctly formulate the non-overlapping conditions as linear constraints.
+
+For each pair of posters that must not overlap, you need to ensure their projections don't overlap in at least one dimension (x or y). This translates to linear constraints of the form: for posters $i$ and $j$, either $\frac{w}{2}a_i + \frac{w}{2}a_j \leq |x_i - x_j|$ (x-dimension) or $\frac{h}{2}a_i + \frac{h}{2}a_j \leq |y_i - y_j|$ (y-dimension) must hold. The key is determining which constraint to actually enforce.
+
 </details>
+
 <details>
+
 <summary>Hint #3</summary>
-Consider two posters, $i$ and $j$, centered at $(x_i, y_i)$ and $(x_j, y_j)$ with scaling factors $a_i$ and $a_j$. For them not to overlap, their projections on the x-axis *or* their projections on the y-axis must not overlap. This means that either $\frac{w}{2}a_i + \frac{w}{2}a_j \le |x_i - x_j|$ or $\frac{h}{2}a_i + \frac{h}{2}a_j \le |y_i - y_j|$ must hold. How can you decide which constraint is the most restrictive one to add to your LP? Think about which dimension will cause an overlap first as the posters grow.
+
+You cannot add constraints for both x and y dimensions for every pair of posters, as this would be overly restrictive. Two rectangles don't overlap if they don't overlap in **at least one** dimension. Therefore, for each pair of posters, you only need to enforce the constraint in **one dimension** - the dimension where overlap would occur first as the posters scale up.
+
+</details>
+
+<details>
+
+<summary>Hint #4</summary>
+
+To determine which dimension constraint to apply for each pair of posters, compare the **normalized distances**: $\frac{|x_i - x_j|}{w}$ versus $\frac{|y_i - y_j|}{h}$. The smaller of these two values corresponds to the more restrictive dimension - the one where overlap would happen first. This tells you whether to enforce the x-constraint or y-constraint for that pair.
+
+</details>
+
+<details>
+
+<summary>Hint #5</summary>
+
+**Important:** Do NOT use Delaunay triangulation for this problem! While the problem involves 2D geometry, it uses the $L_\infty$ norm (Manhattan/Chebyshev distance) for rectangular shapes, not the $L_2$ norm (Euclidean distance) that Delaunay triangulation is designed for. The rectangular poster overlap conditions require a different approach than typical point-distance problems.
+
 </details>
 
 ## ✨ Solutions
 
 <details>
+
 <summary>First Solution (Test Set 1)</summary>
+
 This problem involves maximizing a value subject to a set of constraints, which strongly suggests using **Linear Programming (LP)**. The core of this approach is to define the variables, the objective function, and the constraints.
 
-### Model Formulation
+### Variables
+The quantities we can control are the scaling factors for each of the $n$ new posters. Let's denote the scaling factor for the $i$-th new poster as $a_i$. Since the posters can only be magnified, we have a lower bound $a_i \ge 1$ for all $i=1, \dots, n$.
 
-1.  **Variables:** The quantities we can control are the scaling factors for each of the $n$ new posters. Let's denote the scaling factor for the $i$-th new poster as $a_i$. Since the posters can only be magnified, we have a lower bound $a_i \ge 1$ for all $i=1, \dots, n$.
+### Objective Function
+We want to maximize the sum of the perimeters of the new posters. The perimeter of a poster $i$ with scaling factor $a_i$ is $2(a_i \cdot w + a_i \cdot h) = a_i(2w + 2h)$. Our objective is to maximize:
+  $$ \sum_{i=1}^{n} a_i (2w + 2h) $$
 
-2.  **Objective Function:** We want to maximize the sum of the perimeters of the new posters. The perimeter of a poster $i$ with scaling factor $a_i$ is $2(a_i \cdot w + a_i \cdot h) = a_i(2w + 2h)$. Our objective is to maximize:
-    $$ \sum_{i=1}^{n} a_i (2w + 2h) $$
+### Constraints
+The posters must not overlap. For the first test set, all nails lie on a horizontal line (e.g., $y=0$), and there are no old posters ($m=0$). This simplifies the problem significantly, as we only need to consider overlaps along the x-axis.
 
-3.  **Constraints:** The posters must not overlap. For the first test set, all nails lie on a horizontal line (e.g., $y=0$), and there are no old posters ($m=0$). This simplifies the problem significantly, as we only need to consider overlaps along the x-axis.
+Consider two new posters, $i$ and $j$, centered at $(x_i, 0)$ and $(x_j, 0)$. Let's assume $x_i < x_j$. The posters are scaled by $a_i$ and $a_j$, so their widths are $a_i \cdot w$ and $a_j \cdot w$. Their right and left boundaries are at $x_i \pm \frac{a_i w}{2}$ and $x_j \pm \frac{a_j w}{2}$. To prevent overlap, the right edge of poster $i$ must be to the left of the left edge of poster $j$. <br />
+**Note**: We can always easily check which points lies on the left and which on the right using a simple if statement. This is necessary to ensure that the distance $d$ is positive and correctly calculated
 
-    Consider two new posters, $i$ and $j$, centered at $(x_i, 0)$ and $(x_j, 0)$. Let's assume $x_i < x_j$. The posters are scaled by $a_i$ and $a_j$, so their widths are $a_i \cdot w$ and $a_j \cdot w$. Their right and left boundaries are at $x_i \pm \frac{a_i w}{2}$ and $x_j \pm \frac{a_j w}{2}$. To prevent overlap, the right edge of poster $i$ must be to the left of the left edge of poster $j$.
-    
-    $$ x_i + \frac{a_i w}{2} \le x_j - \frac{a_j w}{2} $$
-    
-    Rearranging this gives us a linear constraint on our variables $a_i$ and $a_j$:
-    
-    $$ \frac{w}{2} a_i + \frac{w}{2} a_j \le x_j - x_i $$
-    
-    We must add such a constraint for every pair of new posters $(i, j)$.
+$$ x_i + \frac{a_i w}{2} \le x_j - \frac{a_j w}{2} $$
 
-By setting up this LP with the CGAL library and solving it, we can find the optimal values for $a_i$ and thus the maximum total perimeter. Remember that CGAL's LP solver minimizes, so we must maximize $\sum a_i(2w+2h)$ by minimizing $-\sum a_i(2w+2h)$.
+Rearranging this gives us a linear constraint on our variables $a_i$ and $a_j$:
 
+$$ \frac{w}{2} a_i + \frac{w}{2} a_j \le x_j - x_i $$
+
+We must add such a constraint for every pair of new posters $(i, j)$.
+
+By setting up this LP with the CGAL library and solving it, we can find the optimal values for $a_i$ and thus the maximum total perimeter.
+
+### Code
 ```cpp
 #include <iostream>
 #include <vector>
@@ -154,7 +186,9 @@ int main() {
 </details>
 
 <details>
+
 <summary>Second Solution (Test Set 1, 2)</summary>
+
 To handle the general 2D case without old posters, we must extend our constraints. A naive approach of adding constraints for both x and y dimensions for every pair of posters is too restrictive. For instance, if two posters have the same x-coordinate but different y-coordinates, an x-constraint would force their widths to be zero, which is incorrect.
 
 ### The Key Insight
@@ -172,6 +206,7 @@ This comparison tells us how many base-widths or base-heights "fit" between the 
 
 This logic ensures that for every pair of new posters, we add the constraint that will become active first, correctly modeling the non-overlap condition.
 
+### Code
 ```cpp
 #include <iostream>
 #include <vector>
@@ -305,8 +340,11 @@ int main() {
 }
 ```
 </details>
+
 <details>
+
 <summary>Final Solution</summary>
+
 The final step is to incorporate the $m$ old posters, which are already on the wall. These posters have a fixed scaling factor of 1.
 
 ### Constraints with Old Posters
@@ -323,10 +361,11 @@ We need to be smarter. For a given new poster $i$, which of the $m$ old posters 
 $$ \max\left(\frac{|x_i - x_k|}{w}, \frac{|y_i - y_k|}{h}\right) $$
 This expression represents the scaling factor at which poster $i$ would first touch poster $k$. By finding the old poster $k$ that minimizes this value, we find the one that limits the growth of poster $i$ the most. We only need to add the non-overlapping constraint(s) for this single, most restrictive old poster. This reduces the number of additional constraints from $O(n \cdot m)$ to $O(n)$, making the LP feasible to solve.
 
-Note: Using a Delaunay triangulation to find the "closest" old poster is tempting but incorrect. Delaunay triangulation is based on Euclidean (L2) distance, whereas our problem's geometry is defined by the L-infinity norm of the normalized coordinates, i.e., $\max(\Delta x/w, \Delta y/h)$. We must therefore iterate through all old posters for each new one to find the correct closest one.
+**Note**: Using a Delaunay triangulation to find the "closest" old poster is tempting but incorrect. Delaunay triangulation is based on Euclidean (L2) distance, whereas our problem's geometry is defined by the L-infinity norm of the normalized coordinates, i.e., $\max(\Delta x/w, \Delta y/h)$. We must therefore iterate through all old posters for each new one to find the correct closest one.
 
-To improve precision and potentially speed up the solver with integer arithmetic, we can multiply our constraints by 2, avoiding floating-point coefficients. For example, $\frac{w}{2}a_i + \frac{w}{2}a_j \le |x_i - x_j|$ becomes $w \cdot a_i + w \cdot a_j \le 2|x_i - x_j|$.
+Additionally, to improve precision and potentially speed up the solver with integer arithmetic, we can multiply our constraints by 2, avoiding floating-point coefficients. For example, $\frac{w}{2}a_i + \frac{w}{2}a_j \le |x_i - x_j|$ becomes $w \cdot a_i + w \cdot a_j \le 2|x_i - x_j|$.
 
+### Code
 ```cpp
 #include <iostream>
 #include <vector>
