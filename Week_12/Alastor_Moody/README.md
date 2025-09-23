@@ -2,21 +2,25 @@
 
 ## 📝 Problem Description
 
-You are given a set of $N$ locations and $M$ bidirectional connections. A specific starting location $S$ and a destination location $P$ are identified. Each connection links two locations, say $u$ and $v$, and has two associated properties: a capacity $c$, representing the maximum number of people that can use it, and a travel time $d$.
+Given a set of $N$ locations and $M$ bidirectional connections, a specific starting location $S$ and a destination location $P$ are identified. Each connection links two locations, denoted $u$ and $v$, and is characterized by two properties: a capacity $c$, indicating the maximum number of people that can use it, and a travel time $d$.
 
-The goal is to determine the maximum number of people that can travel from location $S$ to location $P$ subject to a critical constraint: every person must travel along a path that takes the minimum possible time. Since all individuals travel at the same speed and start simultaneously, this ensures they all arrive at location $P$ at the exact same moment. You need to output this maximum number of people.
+The task is to determine the maximum number of people that can travel from location $S$ to location $P$ under a critical constraint: every person must follow a path that takes the minimum possible time. Since all individuals travel at the same speed and depart simultaneously, they all arrive at location $P$ at the exact same moment. The required output is the maximum number of people who can reach $P$ in this manner.
 
 ## 💡 Hints
 
 <details>
+
 <summary>Hint #1</summary>
-The problem requires satisfying two different conditions: minimizing the travel time for everyone and maximizing the total number of people. Think about how these two objectives interact. Does one take priority over the other? The problem statement says the plan must be "cautious," meaning everyone *must* take a path of the minimum possible duration. This suggests that finding the shortest travel time is the first step.
+
+The problem requires satisfying two different conditions: minimizing the travel time for everyone and maximizing the total number of people. Think about how these two objectives interact. Does one take priority over the other? The problem statement says the plan must be "cautious," meaning everyone *must* take a path of the minimum possible duration.
+
 </details>
+
 <details>
 
 <summary>Hint #2</summary>
 
-This problem can be modeled using a graph, where locations are vertices and connections are edges. The problem then combines concepts from shortest path algorithms and network flow algorithms. A "cautious plan" only allows travel along edges that can be part of a shortest path from the start to the destination. How can you construct a new, smaller graph that includes *only* these valid edges?
+If you assume that all edges are part of some shortest path (as in the first test set), this becomes a straightforward **maximum flow** problem. You can ignore the travel times and focus only on the capacities. Model the locations as vertices and connections as edges with their respective capacities, then find the maximum flow from the start to the destination. This gives you the maximum number of people who can travel simultaneously.
 
 </details>
 
@@ -24,19 +28,29 @@ This problem can be modeled using a graph, where locations are vertices and conn
 
 <summary>Hint #3</summary>
 
-To identify all edges that lie on at least one shortest path, you can use precomputed distances. First, calculate the shortest travel time from the start location $S$ to all other locations; let's call this $d_S(x)$. Second, calculate the shortest travel time from all other locations to the destination $P$; let's call this $d_P(x)$. An edge $(u, v)$ with travel time $d$ is on a shortest path from $S$ to $P$ if and only if $d_S(u) + d + d_P(v)$ is equal to the overall shortest travel time from $S$ to $P$. You can compute all $d_S$ and $d_P$ values efficiently using Dijkstra's algorithm.
+For the general case, not all edges belong to shortest paths. You need to construct a **subgraph containing only the edges that belong to at least one shortest path** from $S$ to $P$. Once you have this "shortest path subgraph," you can run maximum flow on it. The key insight is to identify which edges can actually be used in a cautious plan before attempting to maximize the flow.
+
+</details>
+
+<details>
+
+<summary>Hint #4</summary>
+
+To create the shortest path subgraph: First, run **Dijkstra's algorithm** from $S$ to get distances $d_S(v)$ to all vertices, and from $P$ to get distances $d_P(v)$ from all vertices to $P$. For each edge $(u,v)$ with travel time $d$, include it in your subgraph if $d_S(u) + d + d_P(v) = d_S(P)$ (for direction $u \to v$) or $d_S(v) + d + d_P(u) = d_S(P)$ (for direction $v \to u$). This ensures you only keep edges that lie on some shortest path.
 
 </details>
 
 ## ✨ Solutions
 
 <details>
+
 <summary>First Solution (Test Set 1)</summary>
+
 This problem can be modeled as a graph problem where locations are nodes and flyways are edges. The travel time corresponds to the edge weight (or distance), and the number of people a flyway can hold corresponds to its capacity. The overall goal is to find the maximum number of people that can travel from a source node $s$ to a sink node $p$ along paths of the shortest possible length.
 
 For the first test set, we are given a crucial simplifying assumption: *"for every flyway there is some cautious plan that uses it."* This directly implies that **every flyway (edge) in the input is part of at least one shortest path** from $s$ to $p$.
 
-Because all available edges are guaranteed to be on some shortest path, we don't need to worry about filtering them. Any path we construct using the given edges will satisfy the minimum time constraint. The problem is therefore reduced to a simpler one: finding the maximum number of people that can travel from $s$ to $p$ using the given network of flyways.
+Because all available edges are guaranteed to be on some shortest path, we don't need to worry about filtering them. Any (shortest) path we construct using the given edges will satisfy the minimum time constraint. The problem is therefore reduced to a simpler one: finding the maximum number of people that can travel from $s$ to $p$ using the given network of flyways.
 
 This is a classic **Maximum Flow** problem. We can construct a flow network where:
 - The graph structure is given by the input locations and flyways.
@@ -45,6 +59,7 @@ This is a classic **Maximum Flow** problem. We can construct a flow network wher
 
 Each unit of flow represents one person. By calculating the maximum flow, we find the maximum number of people who can travel from $s$ to $p$ concurrently, which, under the assumptions of Test Set 1, is our final answer.
 
+### Code
 ```cpp
 #include <iostream>
 
@@ -106,8 +121,11 @@ int main() {
 }
 ```
 </details>
+
 <details>
+
 <summary>Final Solution</summary>
+
 The primary challenge in the general version of the problem is that many flyways might not be part of any shortest path. A "cautious plan" forbids using such flyways. Therefore, the approach from the first solution, which assumes all edges are valid, will not work.
 
 The core idea for the final solution is to first identify the subgraph containing **only** the edges that lie on at least one shortest path from the source $s$ to the sink $p$. Once we have this "shortest path subgraph," we can run a max-flow algorithm on it to find the maximum number of people.
@@ -124,10 +142,11 @@ The solution can be broken down into three main steps:
         $$ d_s(u) + d + d_p(v) = d_{min} $$
     -   Similarly, the directed edge $v \to u$ is on a shortest path if:
         $$ d_s(v) + d + d_p(u) = d_{min} $$
-    If a condition is met, we add the corresponding directed edge with capacity $c$ to our new flow network.
+    **Intuition**: Effectively we calculate the shortest path from source to sink, where we force it to take the edge $(u, v)$. If this distance is not the minimal distance, the edge will never be a part of any shortest path, as the best it can do is too slow
 
 3.  **Calculate Maximum Flow:** With the shortest path subgraph constructed, the problem is reduced to a standard max-flow problem. We compute the maximum flow from $s$ to $p$ on this new graph. The resulting flow value is the maximum number of people that can travel according to a "cautious plan."
 
+### Code
 ```cpp
 #include <iostream>
 #include <vector>
