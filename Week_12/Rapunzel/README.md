@@ -2,37 +2,55 @@
 
 ## 📝 Problem Description
 
-You are given a set of $N$ hair ties, indexed from $0$ to $N-1$. Each hair tie $i$ has an associated non-negative brightness value, $h_i$. These hair ties are connected by strands of hair in a specific hierarchical structure. Hair tie $0$ is the topmost one. For any two connected hair ties $u$ and $v$, $u$ is always closer to the top than $v$. The connections are arranged such that from hair tie $0$, there is a unique sequence of connections leading to any other hair tie.
+A set of $N$ hair ties, indexed from $0$ to $N-1$, is given. Each hair tie $i$ has a non-negative brightness value $h_i$. The hair ties are connected by strands of hair in a hierarchical arrangement: hair tie $0$ is the topmost, and for any two connected hair ties $u$ and $v$, $u$ is always closer to the top than $v$. The structure ensures that from hair tie $0$, a unique sequence of connections leads to every other hair tie.
 
-A "rope" is defined as a sequence of hair ties $s_0, s_1, \dots, s_{\ell-1}$ where for each $j$ from $1$ to $\ell-1$, a strand of hair connects $s_{j-1}$ to $s_j$. The problem asks you to identify all "climbable" ropes. A rope is considered climbable if it meets two criteria:
-1.  It must have a specific length of exactly $m$ hair ties.
-2.  It must be "safe," meaning the difference between the maximum and minimum brightness values of all hair ties in the rope (the "contrast") is no more than a given value $k$.
+A "rope" refers to a sequence of hair ties $s_0, s_1, \dots, s_{\ell-1}$ such that for each $j$ from $1$ to $\ell-1$, a strand connects $s_{j-1}$ to $s_j$. The objective is to identify all ropes that are "climbable," which requires meeting two conditions:
+1. The rope must consist of exactly $m$ hair ties.
+2. The difference between the maximum and minimum brightness values among the hair ties in the rope (the "contrast") must not exceed a specified value $k$.
 
-Your task is to find every hair tie that can serve as the starting point of at least one climbable rope. The final output should be a single line containing the indices of these starting hair ties, sorted in increasing order. If no such hair tie exists, you should output 'Abort mission'.
+The task is to determine all hair ties that can serve as the starting point of at least one climbable rope. The output should be a single line listing the indices of these starting hair ties in increasing order. If no such hair tie exists, output 'Abort mission'.
 
 ## 💡 Hints
 
 <details>
+
 <summary>Hint #1</summary>
-The problem describes connections between hair ties where one is always "higher" than the other. It's also stated that a unique sequence of connections exists from the topmost tie (0) to all others. What kind of data structure does this arrangement of connections and elements represent? Modeling the problem using the correct structure is a crucial first step.
+
+The problem describes connections between hair ties where one is always "higher" than the other, with hair tie 0 at the top and a unique sequence of connections from 0 to every other hair tie. This structure is a **tree** with 0 as the root. Recognizing this tree structure is crucial for understanding how to traverse and find all possible paths.
+
 </details>
+
 <details>
+
 <summary>Hint #2</summary>
-The problem asks you to find all "ropes" (which are essentially paths) of a fixed length $m$ that satisfy a condition on the brightness values of their elements. How can you systematically explore all possible downward paths in the structure you identified in Hint #1? Consider a traversal algorithm that starts from the top.
+
+To find all "ropes" (paths) of exactly length $m$, you need to systematically explore all possible downward paths in the tree. Use a **Depth-First Search (DFS)** that starts from the root and explores each complete path before backtracking. As you traverse, maintain the current path and check if it forms a valid rope when it reaches the required length.
+
 </details>
+
 <details>
+
 <summary>Hint #3</summary>
-A simple brute-force approach that re-evaluates every possible path of length $m$ will likely be too slow. As you traverse the structure, you can maintain a "window" of the last $m$ elements visited. The main challenge is to efficiently find the minimum and maximum brightness within this moving window. A linear scan of the window at every step is inefficient. What data structures are specifically designed to maintain a collection of elements in sorted order, allowing for quick retrieval of minimum/maximum values and efficient insertions/deletions?
+
+During your DFS traversal, you need to efficiently track the minimum and maximum brightness values in the current path window of size $m$. Instead of rescanning the entire window each time, use a **`multiset`** to maintain the brightness values in sorted order. This allows you to find the minimum (`*multiset.begin()`) and maximum (`*multiset.rbegin()`) in $O(\log n)$ time, with $O(\log n)$ insertions and deletions as you slide the window.
+
+</details>
+
+<details>
+
+<summary>Hint #4</summary>
+
+Perform a DFS starting from the root, maintaining a `deque` for the current path and a `multiset` for brightness values. At each node, add it to both structures. If the path exceeds length $m$, remove the oldest element from both. When the path has exactly $m$ elements, check if the contrast (max - min brightness from the multiset) is ≤ $k$, and if so, mark the first node in the path as a valid starting point. After exploring all children, backtrack by removing the current node and restoring any previously removed elements to maintain the sliding window correctly.
+
 </details>
 
 ## ✨ Solutions
 
 <details>
+
 <summary>First Solution (Test Set 1, 2)</summary>
 
-### Analysis of the Problem Structure
-
-The problem describes a collection of hair ties (nodes) and strands of hair (edges). Several key properties allow us to model this as a rooted tree:
+The problem describes a collection of hair ties (nodes) and strands of hair (edges). Several key properties allow us to model this as a tree:
 - **Root Node:** Hair tie 0 is explicitly "the topmost one," making it the natural root of our structure.
 - **Directed Edges:** A strand from $u$ to $v$ implies $u$ is "closer to Rapunzel's head," which gives directionality to the connections, always pointing away from the root.
 - **Unique Paths:** The statement, "For each hair tie $u$, there is precisely one rope starting at 0 and ending at $u$," confirms that the structure is a tree, as there is a unique path from the root (0) to every other node.
@@ -63,6 +81,7 @@ To efficiently track the minimum and maximum brightness in the window, we can us
 
 While this recalculation can be slow in the general case, it is sufficient for the constraints of the first test sets.
 
+### Code
 ```cpp
 #include <iostream>
 #include <vector>
@@ -75,7 +94,6 @@ struct Node {
 };
 
 void solve() {
-  // std::cout << "================================" << std::endl;
   // ===== READ INPUT =====
   int n, m, k; std::cin >> n >> m >> k;
   
@@ -90,7 +108,6 @@ void solve() {
   }
   
   // ===== SOLVE =====
-
   std::vector<bool> result(n, false);
   std::deque<Node*> curr_range; curr_range.push_back(&nodes[0]);
   
@@ -110,9 +127,7 @@ void solve() {
   if(curr_max->brightness - curr_min->brightness <= k) { result[curr_range.front()->idx] = true; }
   
   while(!curr_range.back()->children.empty()) {
-    // std::cout << "Current Range: "; for(const Node *node : curr_range) { std::cout << node->idx << " "; } std::cout << std::endl;
-    // std::cout << "Current Max (" << curr_max->idx << "): " << curr_max->brightness << " Current Min (" << curr_min->idx << "): " << curr_min->brightness << std::endl;
-    
+  
     // Move curr_end forward
     curr_range.push_back(curr_range.back()->children[0]);
     
@@ -161,41 +176,45 @@ int main() {
 }
 ```
 </details>
+
 <details>
+
 <summary>Final Solution</summary>
 
-### Generalizing the Approach
+To generalize the First Solution to the remaining Test Sets we need to achieve 2 things
 
-The first solution is tailored to the simplified case where the tree is a linked list. To create a solution for the general case, we must address two main challenges:
-1.  **Handling the Tree Structure:** We need a way to traverse all possible downward paths in a general tree, not just a single list.
-2.  **Efficient Min/Max Finding:** Re-scanning the window to find the minimum and maximum brightness at each step is too slow. For a tree, a path of length $m$ could be checked many times, and this inefficiency becomes a major bottleneck. Its complexity would be roughly $O(N \cdot m)$, which is too slow for the full constraints.
+- Find a **faster way to find the minimum and maximum** in the current window.
+- **Generalize** from Linked Lists to Trees
 
-### The Algorithm: DFS with an Efficient Sliding Window
+### Using a `multiset`
 
-A **Depth-First Search (DFS)** is a natural choice for exploring all paths in a tree starting from the root. As we traverse down the tree, we can maintain a "sliding window" of the last $m$ nodes visited on the current path from the root.
+**Finding a faster way to find the minimum and maximum** is straight forward, as we simply need a **more efficient data structure** than two pointers. For this we will use the fact that **STL Sets are sorted**. Therefore we can simply organize the nodes of the current path in a `multiset` which allows for $\log n$ access to the Min (`*set.begin()`) and Max (`*set.rbegin()`). Additionally it allows for $\log n$ delete and insert, which is necessary, as we are frequently manipulating the set. <br />
+**Note**: Using `multiset` and not `set` is necessary, as we can have duplicate brightness values in our set.
 
-To solve the efficiency problem, we use a data structure that can maintain a collection of numbers and provide the minimum and maximum in logarithmic time. A `std::multiset` in C++ is perfect for this. It keeps elements sorted and allows for efficient insertion, deletion, and retrieval of the min (`*begin()`) and max (`*rbegin()`) elements. We use a `multiset` instead of a `set` to correctly handle duplicate brightness values.
+A `multiset` is simply exactly what we need as it (under the hood) is implemented as a (sorted) Red Black Tree which allows for essentially everything in $\log n$ time.
 
-Our DFS-based algorithm works as follows:
+### Generalizing to Trees
 
-1.  **State representation:** The DFS function will maintain the current path window in a `std::deque` and the brightness values of the nodes in that window in a `std::multiset`.
+To generalize from Linked Lists to Trees, we will need to **traverse the Tree one path at a time**. This sparks the idea that we can simply perform a **DFS on the Tree**. The DFS works as follows:
 
-2.  **Traversal and Window Management:**
-    - When the DFS visits a new node `curr`, we add `curr` to the back of our `deque` and its brightness to the `multiset`.
-    - If the `deque`'s size exceeds `m`, it means our window has become too long. We remove the oldest node (from the front of the `deque`) and its corresponding brightness from the `multiset`. This keeps the window size fixed at $m$.
+1. Add the current node to the **current** `path` and **add its brightness to the current** `brightnesses`
+2. Check if that made the current  `path` **too long** (larger than the path length $m$ we are looking for)
+    
+    If Yes → Remove the first node from the `path` and `brightnesses` as the path is too long
+    
+3. Check if the current path is **long enough** (the path length $m$ we are looking for)
+    
+    If Yes → Check if the contrast (difference between Max and Min Brightness) is low enough ($\leq k$) and mark the first node in the path as a valid start node <br />
+    **Note**: This can be done efficiently as described above
+    
+4. Recurse into all children
+5. As now all children are processed, we need to exit the path. Therefore, remove the current node from both the `path` and the `brightnesses`
+6. Add the previous node (removed during step 2) back at the front of the `path` <br />
+**Note**: This of course only needs to be done, if it is not the root node, as otherwise there is nothing to add
 
-3.  **Condition Check:**
-    - If the `deque`'s size is exactly `m`, we have a valid candidate rope. We check its contrast by subtracting the first element of the `multiset` from the last.
-    - If `*brightnesses.rbegin() - *brightnesses.begin() <= k`, the rope is climbable. We mark its starting node (`path.front()`) as a valid solution.
+After performing this DFS we have found all the valid start positions for a path and can simply output these
 
-4.  **Recursion and Backtracking:**
-    - The DFS proceeds by recursively calling itself on all children of the current node.
-    - After the recursive calls for all children return, we must **backtrack**. This involves undoing the changes made when we first entered the current node, restoring the state for the parent's traversal path. We remove the current node from the back of the `deque` and its brightness from the `multiset`.
-
-The provided code uses an interesting, albeit unconventional, backtracking strategy. Instead of just removing the current node, it also tries to restore the window by adding the parent of the new window-head. A more standard approach is to manage the state restoration entirely within the recursive calls, but the provided logic correctly explores all paths.
-
-By combining DFS with an efficient data structure like `multiset`, we can check every possible rope of length $m$ in the tree with an overall time complexity of approximately $O(N \log m)$, which is efficient enough for all test sets.
-
+### Code
 ```cpp
 #include <iostream>
 #include <vector>
@@ -300,6 +319,16 @@ int main() {
   while(n_tests--) { solve(); }
 }
 ```
+</details>
+
+## 🧠 Learnings
+
+<details> 
+
+<summary> Expand to View </summary>
+
+- Don't necessarily just think about what type of data structure you need, but instead think about what operations you need to do and what time complexity you need for them. Then check which data structure does this.
+
 </details>
 
 ## ⚡ Result
