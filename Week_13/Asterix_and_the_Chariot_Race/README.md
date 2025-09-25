@@ -2,38 +2,70 @@
 
 ## 📝 Problem Description
 
-You are given a set of $n$ cities, identified by integers from $0$ to $n-1$. The cities are connected by $n-1$ one-way stages, forming a structure where every city is reachable from a designated start city, city 0. Each city $i$ has an associated repair cost, $c_i$.
+A set of $n$ cities, labeled from $0$ to $n-1$, is connected by $n-1$ one-way stages, ensuring that every city can be reached from city $0$. Each city $i$ has a repair cost $c_i$. A city is considered "saved from disgrace" if it is repaired, or if at least one directly connected neighboring city is repaired. The goal is to select a subset of cities to repair so that every city is saved from disgrace, while minimizing the total repair cost.
 
-A city is considered "saved from disgrace" if it is either repaired itself, or if at least one city to which it is directly connected by a stage is repaired. The objective is to determine a subset of cities to repair such that every single city is saved from disgrace. Your task is to find the minimum possible total cost to achieve this.
-
-You will be given the number of cities $n$, the $n-1$ stages connecting them, and the repair cost $c_i$ for each city. You must output the minimum total cost.
+Given the number of cities $n$, the $n-1$ connections between them, and the repair costs $c_i$ for each city, determine the minimum total cost required to save all cities from disgrace.
 
 ## 💡 Hints
 
 <details>
+
 <summary>Hint #1</summary>
-The problem describes a specific structure: $n$ cities and $n-1$ connections that ensure every city is reachable from city 0. What kind of data structure does this arrangement form? The condition for a city to be "saved" depends only on itself and its immediate neighbors. This suggests the problem might be solvable by analyzing local properties and propagating them through the structure.
-</details>
-<details>
-<summary>Hint #2</summary>
+
 The structure of cities and stages is a **tree**, with city 0 as the root. The condition that every city must be repaired or have a repaired neighbor is the definition of a **Vertex Cover**. The problem is asking for a **Minimum Weight Vertex Cover** on this tree. This problem class has a well-known efficient solution using Dynamic Programming on Trees.
+
 </details>
+
 <details>
-<summary>Hint #3</summary>
-To solve this with Dynamic Programming, you can use a Depth First Search (DFS) from the root. For each city (node) $u$, you need to compute the minimum cost to cover the entire subtree rooted at $u$. This cost, however, depends on the state of $u$. Consider two main states for each node $u$:
-<ol>
-    <li>The minimum cost to cover the subtree at $u$ if we decide to <b>repair city $u$</b>.</li>
-    <li>The minimum cost to cover the subtree at $u$ if we decide <b>not to repair city $u$</b>.</li>
-</ol>
-If you don't repair $u$, what does this imply for its children? How does this influence the recursive calculation?
+
+<summary>Hint #2</summary>
+
+To solve this with Dynamic Programming, you can use a Depth First Search (DFS) from the root. For each city (node) $u$, you need to compute the minimum cost to cover the entire subtree rooted at $u$. This cost, however, depends on the state of $u$. Consider two main states for each node $u$
+
 </details>
+
+<details>
+
+<summary>Hint #3</summary>
+
+For each node $u$ in the tree, you need to calculate **three different costs** representing different scenarios: the minimum cost to cover the subtree ...
+
+- when $u$ is repaired by itself
+- when $u$ is covered by its parent
+- when $u$ is covered by one of its children. 
+
+These three states capture all possible ways a node can be "saved from disgrace" in the vertex cover problem.
+
+</details>
+
+<details>
+
+<summary>Hint #4</summary>
+
+To calculate each of the 3 costs: 
+- **Self cost** = node's repair cost + sum of children's "parent cost". 
+- **Parent cost** = sum of min(child's self cost, child's child cost) for each child. 
+- **Child cost** = One of the children needs to be repaired. Try each child as the designated repairer, compute the cost when that child must be repaired while others choose optimally, then take the minimum over all choices.
+
+</details>
+
+<details>
+
+<summary>Hint #5</summary>
+
+The most complex case is when a node must be covered by one of its children. In this case, one of its children needs to be selected to be safed. The naive approach tries each child as the designated repairer, but this leads to quadratic complexity. 
+However, you can optimize this: if any child would prefer to be repaired anyway (because repairing itself is cheaper than being covered by its own children), then it can "volunteer" at no extra cost. Only when no child volunteers do you need to force one to be repaired, incurring a penalty.
+Use this optimization to speed up the calculation of the cost when a node is covered by its child.
+
+</details>
+
+
 
 ## ✨ Solutions
 
 <details>
-<summary>First Solution (Test Set 1, 2, 3)</summary>
 
-### Observation and Approach
+<summary>First Solution (Test Set 1, 2, 3)</summary>
 
 As hinted, the problem of ensuring every city is repaired or adjacent to a repaired city is equivalent to finding a **Vertex Cover** in the graph of cities. Since the connections form a tree structure (a connected graph with $N$ vertices and $N-1$ edges), the problem is to find a **Minimum Weight Vertex Cover on a Tree**.
 
@@ -65,19 +97,20 @@ For a leaf node $u$:
 **Recursive Step: Internal Node**
 For an internal node $u$, after computing the values for all its children:
 -   `take_self_cost`: If we repair $u$ (cost $c_u$), it covers the connections to all its children. Each child $v$ is now covered by its parent ($u$). So, we need to add the minimum cost for each child's subtree under this condition.
-    $ \text{take\_self\_cost}(u) = c_u + \sum_{v \in \text{children}(u)} \text{take\_parent\_cost}(v) $
+    $$ \text{take\_self\_cost}(u) = c_u + \sum_{v \in \text{children}(u)} \text{take\_parent\_cost}(v) $$
 
 -   `take_parent_cost`: If $u$ is covered by its parent, we don't need to repair $u$. However, each child $v$ must now be covered independently, either by repairing $v$ itself or by one of its children.
-    $ \text{take\_parent\_cost}(u) = \sum_{v \in \text{children}(u)} \min(\text{take\_self\_cost}(v), \text{take\_child\_cost}(v)) $
+    
+    $$ \text{take\_parent\_cost}(u) = \sum_{v \in \text{children}(u)} \min(\text{take\_self\_cost}(v), \text{take\_child\_cost}(v)) $$
 
 -   `take_child_cost`: If we don't repair $u$ and its parent doesn't repair it, we must force at least one of its children, say $v^*$, to be repaired. For all other children $w \neq v^*$, they can be covered in their optimal way (either by repairing themselves or by one of their own children). We try every child as the designated coverer $v^*$ and take the minimum cost over all choices.
-    $ \text{take\_child\_cost}(u) = \min_{v^* \in \text{children}(u)} \left( \text{take\_self\_cost}(v^*) + \sum_{w \in \text{children}(u), w \neq v^*} \min(\text{take\_self\_cost}(w), \text{take\_child\_cost}(w)) \right) $
+
+    $$ \text{take\_child\_cost}(u) = \min_{v^* \in \text{children}(u)} \left( \text{take\_self\_cost}(v^*) + \sum_{w \in \text{children}(u), w \neq v^*} \min(\text{take\_self\_cost}(w), \text{take\_child\_cost}(w)) \right) $$
 
 **Final Answer**
 The root (city 0) has no parent, so it must be covered either by itself or by one of its children. The final answer is $\min(\text{take\_self\_cost}(0), \text{take\_child\_cost}(0))$.
 
-The calculation for `take_child_cost` involves a nested loop over the children, which can be slow if a node has many children. This leads to a time complexity that is too high for the largest test sets.
-
+### Code
 ```cpp
 #include <iostream>
 #include <vector>
@@ -170,22 +203,32 @@ int main() {
 }
 ```
 </details>
+
 <details>
+
 <summary>Final Solution</summary>
+
 The first solution is logically correct but too slow for the largest test cases. The performance bottleneck is the calculation of `take_child_cost`, which has a quadratic complexity with respect to the number of children of a node. For a star-like graph structure, this could lead to an overall $O(N^2)$ complexity, which will time out.
 
 ### The Optimization
 
 We need to optimize the calculation of `take_child_cost`. Let's re-examine the formula:
-$ \text{take\_child\_cost}(u) = \min_{v^* \in \text{children}(u)} \left( \text{take\_self\_cost}(v^*) + \sum_{w \in \text{children}(u), w \neq v^*} \min(\text{take\_self\_cost}(w), \text{take\_child\_cost}(w)) \right) $
+
+$$ \text{take\_child\_cost}(u) = \min_{v^* \in \text{children}(u)} \left( \text{take\_self\_cost}(v^*) + \sum_{w \in \text{children}(u), w \neq v^*} \min(\text{take\_self\_cost}(w), \text{take\_child\_cost}(w)) \right) $$
 
 We can rewrite the sum inside the `min` by first taking the sum over all children and then adjusting for the chosen child $v^*$:
-$ \sum_{w \neq v^*} \min(\dots) = \left(\sum_{w \in \text{children}(u)} \min(\dots)\right) - \min(\text{take\_self\_cost}(v^*), \text{take\_child\_cost}(v^*)) $
 
-Let $S = \sum_{w \in \text{children}(u)} \min(\text{take\_self\_cost}(w), \text{take\_child\_cost}(w))$.
+$$ \sum_{w \neq v^*} \min(\dots) = \left(\sum_{w \in \text{children}(u)} \min(\dots)\right) - \min(\text{take\_self\_cost}(v^*), \text{take\_child\_cost}(v^*)) $$
+
+Let 
+
+$$ S = \sum_{w \in \text{children}(u)} \min(\text{take\_self\_cost}(w), \text{take\_child\_cost}(w)) $$
+
 Then the total cost when forcing child $v^*$ to be taken is:
-$ \text{Cost}(v^*) = \text{take\_self\_cost}(v^*) + S - \min(\text{take\_self\_cost}(v^*), \text{take\_child\_cost}(v^*)) $
-$ \text{take\_child\_cost}(u) = \min_{v^* \in \text{children}(u)} \text{Cost}(v^*) = S + \min_{v^* \in \text{children}(u)} \left( \text{take\_self\_cost}(v^*) - \min(\text{take\_self\_cost}(v^*), \text{take\_child\_cost}(v^*)) \right) $
+
+$$ \text{Cost}(v^*) = \text{take\_self\_cost}(v^*) + S - \min(\text{take\_self\_cost}(v^*), \text{take\_child\_cost}(v^*)) $$
+
+$$ \text{take\_child\_cost}(u) = \min_{v^* \in \text{children}(u)} \text{Cost}(v^*) = S + \min_{v^* \in \text{children}(u)} \left( \text{take\_self\_cost}(v^*) - \min(\text{take\_self\_cost}(v^*), \text{take\_child\_cost}(v^*)) \right) $$
 
 This calculation can be done in linear time with respect to the number of children. However, there's an even simpler insight that the provided code uses.
 
@@ -199,10 +242,9 @@ This means if there is any child $v$ that "volunteers" to be taken (i.e., taking
 
 If **no** child volunteers (i.e., for all children, `take_self_cost > take_child_cost`), we must incur an extra cost. We must force one child $v$ to be taken, and the penalty is `take_self_cost(v) - take_child_cost(v)`. We should choose the child with the minimum penalty.
 
-The provided code implements the first part of this optimization. It checks if a volunteer exists. If so, it calculates the cost in linear time. If not, it falls back to the original quadratic loop. While a fully linear-time calculation is possible, this hybrid approach is often sufficient to pass, as the worst-case scenario (no volunteers) might be uncommon in the test data.
+The solution code implements the first part of this optimization. It checks if a volunteer exists. If so, it calculates the cost in linear time. If not, it falls back to the original quadratic loop, which is sufficient to pass all tests
 
-This optimization significantly speeds up the DFS, allowing it to pass all test sets within the time limit.
-
+### Code
 ```cpp
 #include <iostream>
 #include <vector>
