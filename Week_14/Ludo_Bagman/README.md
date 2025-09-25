@@ -1,38 +1,62 @@
 # Ludo Bagman
 
 ## 📝 Problem Description
+Given a set of teams from the East, of size $e$, and a set of teams from the West, of size $w$, the task is to design a schedule of Quidditch matches with minimum total risk. Each match must pair one team from the East with one from the West.
 
-The problem asks us to design a schedule of Quidditch matches with minimum total risk. We are given a set of teams from the East, with size $e$, and a set of teams from the West, with size $w$. All matches must be between one team from the East and one from the West.
+A list of potential matches is provided, each with an associated risk value. Matches are classified as either non-difficult or difficult. The goal is to select exactly $p$ matches from this list to form the final schedule.
 
-We are provided with a list of potential matches, each having an associated risk value. These matches are categorized as either non-difficult or difficult. Our goal is to select exactly $p$ matches from this list to form the final schedule.
+A schedule is considered "fair" if every team (from both East and West) is scheduled to play in at least $l$ non-difficult matches.
 
-A schedule is considered "fair" only if every team (from both East and West) is scheduled to play in at least $l$ **non-difficult** matches. Difficult matches do not count towards this requirement for any team.
-
-The objective is to find a fair schedule of exactly $p$ matches such that the sum of the risk values of all chosen matches is minimized. If no such schedule exists, we should indicate that.
+The objective is to determine a fair schedule of exactly $p$ matches that minimizes the total risk value of all selected matches. If no such schedule exists, this should be indicated.
 
 ## 💡 Hints
 
 <details>
+
 <summary>Hint #1</summary>
+
 The problem requires selecting a specific number of items (matches) from a larger pool to minimize a total cost, subject to certain constraints on the participants (teams). This structure, involving two distinct sets of participants (East and West teams) and connections between them, strongly suggests modeling the problem using a network. Consider how teams and potential matches could be represented in such a model.
+
 </details>
+
 <details>
+
 <summary>Hint #2</summary>
-This problem can be effectively modeled as a **minimum-cost maximum-flow** problem. You can represent teams as vertices and potential matches as edges in a flow network. The risk of a match corresponds to the cost of an edge. Think about how to set up the source, the sink, and the capacities to ensure you select the correct number of matches.
+
+This problem can be effectively modeled as a **minimum-cost maximum-flow** problem. You can represent teams as vertices and potential matches as edges in a (bipartite) flow network. The risk of a match corresponds to the cost of an edge. Think about how to set up the source, the sink, and the capacities to ensure you select the correct number of matches.
+
 </details>
+
 <details>
+
 <summary>Hint #3</summary>
+
 A major challenge is enforcing the constraint that each team must play *at least* $l$ non-difficult matches. This is a "lower-bound" constraint. Standard max-flow models handle upper bounds (capacities) easily, but not lower bounds. A common technique to model lower bounds is to introduce additional "helper" vertices. Consider creating a main source and sink, plus a "pseudo-source" and a "pseudo-sink," to create two distinct "types" of flow: one to satisfy the mandatory $l$ matches and another for any additional matches.
+
 </details>
+
 <details>
+
 <summary>Hint #4</summary>
+
+To incorporate the pseudo source and pseudo sink: The **main source** provides exactly $l$ units of flow to each East team (representing mandatory matches), while the **pseudo source** provides additional capacity for extra matches. Similarly, the **main sink** receives exactly $l$ units from each West team, and the **pseudo sink** handles overflow. Connect main source to pseudo source with capacity $(p - l \cdot e)$, and pseudo sink to main sink with capacity $(p - l \cdot w)$. This ensures exactly $p$ total matches while satisfying the $l$-match minimum per team.
+
+</details>
+
+<details>
+
+<summary>Hint #5</summary>
+
 The final challenge is incorporating difficult matches. They contribute to the total of $p$ matches and add to the total risk, but they do *not* help satisfy the $l$ non-difficult match requirement for any team. In the flow model from the previous hint, where does the flow for "optional" matches (those beyond the mandatory $l$) originate and terminate? A difficult match can be seen as an "optional" choice. You can add edges for difficult matches in a way that they consume this "optional" flow without passing through the primary team-constraint part of the network.
+
 </details>
 
 ## ✨ Solutions
 
 <details>
+
 <summary>First Solution (Test Set 1, 2, 3)</summary>
+
 This problem can be modeled as a **minimum-cost maximum-flow** problem. The structure of having two distinct sets of teams (East and West) that play against each other naturally suggests a bipartite graph structure within our flow network.
 
 ### Graph Construction
@@ -69,9 +93,9 @@ The edges are constructed to model the flow of "matches":
 With this graph, we can find the minimum-cost flow. A flow of 1 unit from `v_source` to `v_target` represents one scheduled match.
 - First, we calculate the maximum possible flow in this network.
 - If `max_flow` is exactly equal to $p$, it means a schedule of $p$ matches is possible. The structure of the graph ensures that if a flow of $p$ is achieved, the lower-bound constraints of $l$ matches per team must have been satisfied.
-- The `successive_shortest_path_nonnegative_weights` algorithm will find the way to achieve this flow with the minimum possible cost, which is our minimum total risk.
 - If `max_flow` is less than $p$, it is impossible to schedule $p$ matches, so no fair schedule exists.
 
+### Code
 ```cpp
 #include <iostream>
 
@@ -180,7 +204,9 @@ int main() {
 </details>
 
 <details>
+
 <summary>Final Solution</summary>
+
 To build the final solution, we extend the min-cost max-flow model from the previous approach to correctly handle **difficult matches**. The core graph structure for non-difficult matches remains the same.
 
 ### The Key Insight
@@ -208,6 +234,7 @@ The min-cost flow algorithm will now choose the cheapest combination of non-diff
 
 The final check remains the same: a valid schedule exists if and only if the maximum flow through the network is exactly $p$.
 
+### Code
 ```cpp
 #include <iostream>
 
